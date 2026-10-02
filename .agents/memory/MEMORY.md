@@ -1,0 +1,1 @@
+- [PDF parser runtime](pdf-parser-runtime.md) — pdf-parse v2 needs its optional Node canvas module resolvable at runtime; test parsing, not only typecheck.

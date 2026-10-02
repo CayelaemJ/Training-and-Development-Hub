@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "StudyForge"
+description = "A training platform that turns uploaded learning materials into configurable multiple-choice tests, stores study content and results, and helps learners practice at their chosen difficulty."
+version = "1.0.0"
+id = "artifacts/training-platform"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19495
+
+[services.development]
+run = "pnpm --filter @workspace/training-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/training-platform", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/training-platform/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19495"
+BASE_PATH = "/"

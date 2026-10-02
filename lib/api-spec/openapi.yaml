@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Browser authentication endpoints
+  - name: storage
+    description: Private material upload endpoints
+  - name: training
+    description: Study materials, generated quizzes, attempts, and dashboard
 paths:
   /healthz:
     get:
@@ -24,6 +30,227 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/user:
+    get:
+      operationId: getCurrentAuthUser
+      tags: [auth]
+      summary: Get the currently authenticated user
+      responses:
+        "200":
+          description: Current authentication state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserEnvelope"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned private upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Upload URL created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Invalid file metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /materials:
+    get:
+      operationId: listMaterials
+      tags: [training]
+      summary: List the current user's materials
+      responses:
+        "200":
+          description: Materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyMaterial"
+    post:
+      operationId: createMaterial
+      tags: [training]
+      summary: Save an uploaded material and extract its text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyMaterialInput"
+      responses:
+        "201":
+          description: Saved material
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyMaterial"
+        "400":
+          description: Invalid material or unsupported file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /materials/{id}:
+    delete:
+      operationId: deleteMaterial
+      tags: [training]
+      summary: Delete a material
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Material not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /materials/{id}/quizzes:
+    post:
+      operationId: generateQuiz
+      tags: [training]
+      summary: Generate a multiple-choice quiz from a material
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizGenerationInput"
+      responses:
+        "201":
+          description: Generated quiz
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizDetail"
+        "400":
+          description: Material does not contain enough readable text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Material not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: AI quiz generation is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /quizzes:
+    get:
+      operationId: listQuizzes
+      tags: [training]
+      summary: List the current user's quizzes
+      responses:
+        "200":
+          description: Quizzes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QuizSummary"
+  /quizzes/{id}:
+    get:
+      operationId: getQuiz
+      tags: [training]
+      summary: Get a quiz without revealing its answer key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quiz questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizDetail"
+        "404":
+          description: Quiz not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /quizzes/{id}/attempts:
+    post:
+      operationId: submitQuizAttempt
+      tags: [training]
+      summary: Submit answers and receive score and explanations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizAttemptInput"
+      responses:
+        "201":
+          description: Graded attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizAttemptResult"
+        "400":
+          description: Invalid answer set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Quiz not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [training]
+      summary: Get study activity and recent results
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +260,216 @@ components:
           type: string
       required:
         - status
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, "null"]
+          format: email
+        firstName:
+          type: [string, "null"]
+        lastName:
+          type: [string, "null"]
+        profileImageUrl:
+          type: [string, "null"]
+      required: [id, email, firstName, lastName, profileImageUrl]
+    AuthUserEnvelope:
+      type: object
+      properties:
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/AuthUser"
+            - type: "null"
+      required: [user]
+    UploadUrlRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+      required: [name, size, contentType]
+    UploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+      required: [uploadURL, objectPath]
+    StudyMaterial:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        fileName:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        characterCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, fileName, contentType, sizeBytes, characterCount, createdAt]
+    StudyMaterialInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        objectPath:
+          type: string
+          minLength: 1
+      required: [title, objectPath]
+    QuizGenerationInput:
+      type: object
+      properties:
+        questionCount:
+          type: integer
+          minimum: 1
+          maximum: 30
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        optionCount:
+          type: integer
+          enum: [4, 6]
+      required: [questionCount, difficulty, optionCount]
+    QuizSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        materialId:
+          type: integer
+        materialTitle:
+          type: string
+        title:
+          type: string
+        questionCount:
+          type: integer
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        optionCount:
+          type: integer
+          enum: [4, 6]
+        latestScore:
+          type: [number, "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, materialId, materialTitle, title, questionCount, difficulty, optionCount, latestScore, createdAt]
+    QuizQuestion:
+      type: object
+      properties:
+        prompt:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+      required: [prompt, options]
+    QuizDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        materialId:
+          type: integer
+        title:
+          type: string
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        optionCount:
+          type: integer
+          enum: [4, 6]
+        createdAt:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizQuestion"
+      required: [id, materialId, title, difficulty, optionCount, createdAt, questions]
+    QuizAttemptInput:
+      type: object
+      properties:
+        answers:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+      required: [answers]
+    QuizFeedback:
+      type: object
+      properties:
+        questionIndex:
+          type: integer
+        selectedOption:
+          type: integer
+        correctOption:
+          type: integer
+        explanation:
+          type: string
+        isCorrect:
+          type: boolean
+      required: [questionIndex, selectedOption, correctOption, explanation, isCorrect]
+    QuizAttemptResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        quizId:
+          type: integer
+        correctCount:
+          type: integer
+        totalQuestions:
+          type: integer
+        percentage:
+          type: number
+        completedAt:
+          type: string
+          format: date-time
+        feedback:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizFeedback"
+      required: [id, quizId, correctCount, totalQuestions, percentage, completedAt, feedback]
+    DashboardSummary:
+      type: object
+      properties:
+        totalMaterials:
+          type: integer
+        totalQuizzes:
+          type: integer
+        completedAttempts:
+          type: integer
+        averageScore:
+          type: [number, "null"]
+        recentQuizzes:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizSummary"
+      required: [totalMaterials, totalQuizzes, completedAttempts, averageScore, recentQuizzes]
 
