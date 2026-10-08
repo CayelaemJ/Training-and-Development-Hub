@@ -28,7 +28,6 @@ router.get("/organizations/:orgId/academic/pending-exams",async(req,res)=>{
  .innerJoin(assignmentSubmissionsTable,eq(assignmentSubmissionsTable.assignmentId,academicExamLinksTable.assignmentId))
  .innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId))
  .where(eq(academicAssessmentsTable.organizationId,org.data)).orderBy(desc(writtenExamAttemptsTable.completedAt));
- const reviewed=records.length?await db.select().from(academicExamReviewsTable).where(eq(academicExamReviewsTable.linkId,records[0].linkId)):[]; // Review flags are resolved below for all links
  const fullReviews=records.length?await db.select().from(academicExamReviewsTable):[];
  const ids=new Set(fullReviews.map(r=>r.attemptId));
  res.json(records.map(r=>({...r,reviewed:ids.has(r.attemptId)})));
