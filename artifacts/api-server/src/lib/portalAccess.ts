@@ -1,13 +1,11 @@
 import { and,eq } from "drizzle-orm";
 import { db,organizationMembersTable,managementRoleGrantsTable,guardianRelationshipsTable } from "@workspace/db";
 import { leadershipRanks, type HierarchyRole } from "./hierarchyPolicy";
+import { isTestSuperadmin } from "./platformPolicy";
 
 // An account ID is not a password or a role by itself. Enable only in the isolated test environment.
 export function isPlatformSuperadmin(userId:string):boolean {
- return process.env.RAILWAY_ENVIRONMENT_NAME==="testing" &&
-   process.env.ENABLE_CABO_SUPERADMIN==="true" &&
-   !!process.env.CABO_SUPERADMIN_USER_ID &&
-   userId===process.env.CABO_SUPERADMIN_USER_ID;
+ return isTestSuperadmin(userId,process.env);
 }
 export type PortalRole="superadmin"|"national_director"|"provincial_director"|"district_director"|"group_executive"|"governing_body_chair"|"headmaster"|"deputy_headmaster"|"department_head"|"grade_head"|"teacher"|"assessor"|"administrator"|"parent"|"learner";
 export async function resolvePortal(userId:string):Promise<{role:PortalRole;organizationIds:number[];scopes:{organizationId:number;unitId:number;role:string}[]}>{
