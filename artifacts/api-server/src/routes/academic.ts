@@ -1,17 +1,33 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, inArray } from "drizzle-orm";
+import { isPlatformSuperadmin } from "../lib/portalAccess";
+import { auditSuperadmin } from "../lib/platformAudit";
 import { z } from "zod/v4";
-import { db, academicSettingsTable,academicCoursesTable, academicPeriodsTable,courseEnrollmentsTable,academicAssessmentsTable,academicGradesTable,academicGradeEventsTable,organizationMembersTable,usersTable } from "@workspace/db";
+import { db, academicSettingsTable,academicCoursesTable, academicPeriodsTable,courseEnrollmentsTable,academicAssessmentsTable,academicGradesTable,academicGradeEventsTable,organizationMembersTable,usersTable,courseStaffAssignmentsTable } from "@workspace/db";
 const router:IRouter=Router();
 const id=z.coerce.number().int().positive();
 type MemberRole="owner"|"admin"|"teacher"|"assessor"|"learner";
 function auth(req:Request,res:Response){if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null;}return req.user!.id;}
 async function allowed(req:Request,res:Response,orgId:number,roles?:MemberRole[]){
  const user=auth(req,res);if(!user)return false;
+ if(isPlatformSuperadmin(user)){await auditSuperadmin(user,"academic_access",orgId);return true;}
  const [member]=await db.select().from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,orgId),eq(organizationMembersTable.userId,user))).limit(1);
  if(!member||roles&&!roles.includes(member.role as MemberRole)){res.status(403).json({error:"Access denied"});return false;}return true;
 }
 const staff:MemberRole[]=["owner","admin","teacher","assessor"];
+const managers:MemberRole[]=["owner","admin"];
+async function academicCourseAccess(orgId:number,userId:string,courseId:number){
+ if(isPlatformSuperadmin(userId))return true;
+ if(await allowedRole(orgId,userId,managers))return true;
+ const [assigned]=await db.select({courseId:courseStaffAssignmentsTable.courseId}).from(courseStaffAssignmentsTable).where(and(eq(courseStaffAssignmentsTable.organizationId,orgId),eq(courseStaffAssignmentsTable.courseId,courseId),eq(courseStaffAssignmentsTable.staffId,userId))).limit(1);
+ return !!assigned;
+}
+async function academicCoursesForStaff(orgId:number,userId:string){
+ if(isPlatformSuperadmin(userId)||await allowedRole(orgId,userId,managers))return null;
+ const rows=await db.select({courseId:courseStaffAssignmentsTable.courseId}).from(courseStaffAssignmentsTable).where(and(eq(courseStaffAssignmentsTable.organizationId,orgId),eq(courseStaffAssignmentsTable.staffId,userId)));
+ return new Set(rows.map(r=>r.courseId));
+}
+
 async function course(orgId:number,courseId:number){
  const [row]=await db.select().from(academicCoursesTable).where(and(eq(academicCoursesTable.organizationId,orgId),eq(academicCoursesTable.id,courseId))).limit(1);return row;
 }
@@ -31,17 +47,17 @@ router.put("/organizations/:orgId/academic",async(req,res)=>{
 });
 router.post("/organizations/:orgId/academic/periods",async(req,res)=>{
  const org=id.safeParse(req.params.orgId),input=z.object({name:z.string().trim().min(2).max(100),year:z.number().int().min(2000).max(2200)}).safeParse(req.body);
- if(!org.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,staff))return;
+ if(!org.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,managers))return;
  const [row]=await db.insert(academicPeriodsTable).values({organizationId:org.data,...input.data}).returning();res.status(201).json(row);
 });
 router.post("/organizations/:orgId/academic/courses",async(req,res)=>{
  const org=id.safeParse(req.params.orgId),input=z.object({name:z.string().trim().min(2).max(200),code:z.string().trim().min(1).max(50),level:z.string().trim().min(1).max(50),credits:z.number().int().min(0).max(1000).optional()}).safeParse(req.body);
- if(!org.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,staff))return;
+ if(!org.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,managers))return;
  const [row]=await db.insert(academicCoursesTable).values({organizationId:org.data,...input.data}).returning();res.status(201).json(row);
 });
 router.post("/organizations/:orgId/academic/courses/:courseId/enroll",async(req,res)=>{
  const org=id.safeParse(req.params.orgId),cid=id.safeParse(req.params.courseId),input=z.object({userId:z.string().min(1)}).safeParse(req.body);
- if(!org.success||!cid.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,staff))return;
+ if(!org.success||!cid.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,managers))return;
  const c=await course(org.data,cid.data);
  const [m]=await db.select().from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,input.data.userId),eq(organizationMembersTable.role,"learner"))).limit(1);
  if(!c||!m){res.status(400).json({error:"Course or learner not in institution"});return;}
@@ -50,6 +66,7 @@ router.post("/organizations/:orgId/academic/courses/:courseId/enroll",async(req,
 router.post("/organizations/:orgId/academic/assessments",async(req,res)=>{
  const org=id.safeParse(req.params.orgId),input=z.object({courseId:z.number().int().positive(),periodId:z.number().int().positive(),title:z.string().trim().min(2).max(200),category:z.enum(["assignment","test","exam","practical","oral","project"]),maxMarks:z.number().positive().max(10000),weight:z.number().positive().max(100),instructions:z.string().max(10000).optional(),dueAt:z.iso.datetime().optional()}).safeParse(req.body);
  if(!org.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,staff))return;
+ if(!await academicCourseAccess(org.data,req.user!.id,input.data.courseId)){res.status(403).json({error:"Not assigned to this course"});return}
  const [period]=await db.select().from(academicPeriodsTable).where(and(eq(academicPeriodsTable.id,input.data.periodId),eq(academicPeriodsTable.organizationId,org.data))).limit(1);
  if(!await course(org.data,input.data.courseId)||!period){res.status(400).json({error:"Invalid course or term"});return;}
  const [row]=await db.insert(academicAssessmentsTable).values({...input.data,dueAt:input.data.dueAt?new Date(input.data.dueAt):null,organizationId:org.data,createdBy:req.user!.id}).returning();res.status(201).json(row);
@@ -59,7 +76,9 @@ router.get("/organizations/:orgId/academic/assessments",async(req,res)=>{
  if(!org.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data))return;
  let rows=await db.select().from(academicAssessmentsTable).where(eq(academicAssessmentsTable.organizationId,org.data));
  if(cid.success)rows=rows.filter(r=>r.courseId===cid.data);
- if(!(await allowedRole(org.data,req.user!.id,staff))){
+ if(await allowedRole(org.data,req.user!.id,staff)||isPlatformSuperadmin(req.user!.id)){
+   const visible=await academicCoursesForStaff(org.data,req.user!.id);if(visible)rows=rows.filter(r=>visible.has(r.courseId));
+ }else{
    const enrolled=await db.select({courseId:courseEnrollmentsTable.courseId}).from(courseEnrollmentsTable).where(eq(courseEnrollmentsTable.userId,req.user!.id));
    const own=new Set(enrolled.map(e=>e.courseId));rows=rows.filter(r=>own.has(r.courseId));
  }
@@ -67,13 +86,14 @@ router.get("/organizations/:orgId/academic/assessments",async(req,res)=>{
 });
 async function allowedRole(orgId:number,userId:string,roles:MemberRole[]){
  const [row]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,orgId),eq(organizationMembersTable.userId,userId))).limit(1);
- return !!row&&roles.includes(row.role as MemberRole);
+ return isPlatformSuperadmin(userId)||!!row&&roles.includes(row.role as MemberRole);
 }
 router.put("/organizations/:orgId/academic/assessments/:assessmentId/grades/:learnerId",async(req,res)=>{
  const org=id.safeParse(req.params.orgId),aid=id.safeParse(req.params.assessmentId),
  input=z.object({marks:z.number().min(0),status:z.enum(["draft","published"]),reason:z.string().trim().min(5).max(2000),feedback:z.string().max(5000).optional()}).safeParse(req.body);
  if(!org.success||!aid.success||!input.success){res.sendStatus(400);return;}if(!await allowed(req,res,org.data,staff))return;
  const [assessment]=await db.select().from(academicAssessmentsTable).where(and(eq(academicAssessmentsTable.id,aid.data),eq(academicAssessmentsTable.organizationId,org.data))).limit(1);
+ if(assessment&&!await academicCourseAccess(org.data,req.user!.id,assessment.courseId)){res.status(403).json({error:"Not assigned to this course"});return;}
  if(!assessment||input.data.marks>assessment.maxMarks){res.status(400).json({error:"Assessment unavailable or marks exceed maximum"});return;}
  const [enrolled]=await db.select().from(courseEnrollmentsTable).where(and(eq(courseEnrollmentsTable.courseId,assessment.courseId),eq(courseEnrollmentsTable.userId,req.params.learnerId))).limit(1);
  if(!enrolled){res.status(403).json({error:"Learner is not enrolled in this subject/module"});return;}
@@ -109,6 +129,7 @@ router.get("/organizations/:orgId/academic/leaderboard",async(req,res)=>{
  if(!org.success||!period.success||!cid.success){res.status(400).json({error:"courseId and periodId required"});return;}
  if(!await allowed(req,res,org.data,staff))return;
  if(!await course(org.data,cid.data)){res.sendStatus(404);return;}
+ if(!await academicCourseAccess(org.data,req.user!.id,cid.data)){res.sendStatus(403);return;}
  const entries=summarize((await reportRows(org.data)).filter(r=>r.courseId===cid.data&&r.periodId===period.data)).sort((a,b)=>b.percentage-a.percentage||a.learnerId.localeCompare(b.learnerId)).slice(0,10);
  const learners=entries.length?await db.select({id:usersTable.id,firstName:usersTable.firstName,lastName:usersTable.lastName}).from(usersTable).where(inArray(usersTable.id,entries.map(e=>e.learnerId))):[];
  const users=new Map(learners.map(u=>[u.id,u]));
@@ -117,8 +138,28 @@ router.get("/organizations/:orgId/academic/leaderboard",async(req,res)=>{
 router.get("/organizations/:orgId/academic/reports",async(req,res)=>{
  const org=id.safeParse(req.params.orgId);if(!org.success){res.sendStatus(400);return;}
  if(!await allowed(req,res,org.data,staff))return;
- const results=summarize(await reportRows(org.data));
+ const permitted=await academicCoursesForStaff(org.data,req.user!.id);
+ const results=summarize((await reportRows(org.data)).filter(r=>!permitted||permitted.has(r.courseId)));
  const avg=results.length?Math.round(results.reduce((s,r)=>s+r.percentage,0)/results.length*100)/100:null;
  res.json({averageScore:avg,resultCount:results.length,results});
+});
+
+router.get("/organizations/:orgId/academic/course-staff",async(req,res)=>{
+ const org=id.safeParse(req.params.orgId);if(!org.success){res.sendStatus(400);return}
+ if(!await allowed(req,res,org.data,managers))return;
+ res.json(await db.select({courseId:courseStaffAssignmentsTable.courseId,userId:courseStaffAssignmentsTable.staffId,assignedAt:courseStaffAssignmentsTable.assignedAt}).from(courseStaffAssignmentsTable).where(eq(courseStaffAssignmentsTable.organizationId,org.data)));
+});
+router.post("/organizations/:orgId/academic/course-staff",async(req,res)=>{
+ const org=id.safeParse(req.params.orgId),body=z.object({courseId:z.number().int().positive(),email:z.email()}).safeParse(req.body);
+ if(!org.success||!body.success){res.sendStatus(400);return}
+ if(!await allowed(req,res,org.data,managers))return;
+ const foundCourse=await course(org.data,body.data.courseId);
+ const [person]=await db.select({id:usersTable.id}).from(usersTable).where(eq(usersTable.email,body.data.email)).limit(1);
+ if(!foundCourse||!person){res.status(404).json({error:"Course or registered staff account not found"});return}
+ const [membership]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,person.id))).limit(1);
+ if(!membership||!staff.includes(membership.role as MemberRole)){res.status(403).json({error:"Staff member must belong to this institution"});return}
+ const [assignment]=await db.insert(courseStaffAssignmentsTable).values({organizationId:org.data,courseId:foundCourse.id,staffId:person.id,assignedBy:req.user!.id}).onConflictDoNothing().returning();
+ if(!assignment){res.status(409).json({error:"Already assigned"});return}
+ res.status(201).json({courseId:assignment.courseId,userId:assignment.staffId});
 });
 export default router;
