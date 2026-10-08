@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import WrittenExamsPage from '@/pages/written-exams';
 import OrganizationsPage from '@/pages/organizations';
+import AcademicsPage from '@/pages/academics';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -30,6 +31,7 @@ const navItems = [
   { href: '/quizzes', label: 'Practice tests', icon: BrainCircuit },
   { href: '/written-exams', label: 'Written exams', icon: FileText },
   { href: '/organizations', label: 'Organizations', icon: GraduationCap },
+  { href: '/academics', label: 'Academics', icon: BookOpen },
 ];
 
 function BusyScreen() {
@@ -66,6 +68,7 @@ function Router() {
     <Route path="/quizzes" component={QuizzesPage} />
     <Route path="/written-exams" component={WrittenExamsPage} />
     <Route path="/organizations" component={OrganizationsPage} />
+    <Route path="/academics" component={AcademicsPage} />
     <Route path="/quiz/:id" component={QuizPage} />
     <Route component={NotFound} />
   </Switch></RoutedErrorBoundary>;
@@ -73,7 +76,7 @@ function Router() {
 
 function AppShell({ user, logout }: { user: any; logout: () => void }) {
   const [location] = useLocation();
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
