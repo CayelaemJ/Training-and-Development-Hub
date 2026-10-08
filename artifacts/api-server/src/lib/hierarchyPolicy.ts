@@ -33,3 +33,22 @@ export function descendantIds(units:{id:number;parentId:number|null}[],rootId:nu
  }
  return result;
 }
+
+export function roleAllowedAtUnit(role:HierarchyRole,unitType:string):boolean{
+ const types:Record<HierarchyRole,readonly string[]>={
+  national_director:["national"],
+  provincial_director:["province"],
+  district_director:["district"],
+  group_executive:["group"],
+  governing_body_chair:["school"],
+  headmaster:["school"],
+  deputy_headmaster:["school"],
+  head_of_department:["department"],
+  grade_head:["grade"],
+  teacher:["school","department","grade","class"],
+  assessor:["school","department","grade","class"],
+  administrator:["group","school","department"],
+  parent:[],learner:[]
+ };
+ return types[role].includes(unitType);
+}
