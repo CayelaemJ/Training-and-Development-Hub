@@ -1,6 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { and, desc, eq, or } from "drizzle-orm";
 import { z } from "zod/v4";
+import { isPlatformSuperadmin } from "../lib/portalAccess";
+import { auditSuperadmin } from "../lib/platformAudit";
 import { db, usersTable, organizationsTable, organizationMembersTable, verifiedEnrollmentsTable, schoolTransfersTable, guardianRelationshipsTable } from "@workspace/db";
 const router:IRouter=Router();
 const id=z.coerce.number().int().positive();
@@ -13,6 +15,7 @@ async function membership(org:number,user:string){
  return m;
 }
 async function canRecord(org:number,user:string){
+ if(isPlatformSuperadmin(user)){await auditSuperadmin(user,"institution_admin_access",org);return true;}
  const m=await membership(org,user);return !!m&&["owner","admin"].includes(m.role);
 }
 router.get("/institution-records/me",async(req,res)=>{
