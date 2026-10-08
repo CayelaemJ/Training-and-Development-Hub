@@ -31,3 +31,5 @@ First-phase potential profile, evidence, job listings and consent API implemente
 - [Institution enrolment, transfer and guardian workflows](./INSTITUTION_TRANSFERS_AND_GUARDIANS.md)
 
 - [Education governance hierarchy and roles](./GOVERNANCE_HIERARCHY.md)
+
+- [Role-based portals, superadmin oversight and course-scope permissions](./ROLE_BASED_PORTALS.md)
