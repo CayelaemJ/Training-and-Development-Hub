@@ -100,3 +100,7 @@ This platform is a **CABO Solutions product**. The visual source of truth is [Ca
 This next product module introduces a private potential profile, self-reported growth/skill evidence, organisation-published career opportunities and explicit scoped requests for employer viewing. Open **My potential** in the product navigation. No psychological typing, hidden hiring scores or AI career prediction has been implemented. Employer private-profile access is **disabled by default** pending adult verification, paid entitlement checks and privacy review.
 
 **Documentation:** Start at [docs/README.md](docs/README.md). Detailed documents cover [product vision](docs/PRODUCT_VISION.md), [architecture](docs/ARCHITECTURE.md), [privacy and consent](docs/PRIVACY_AND_CONSENT.md), [API](docs/API_POTENTIAL.md), [deployment](docs/DEPLOYMENT.md) and [roadmap](docs/ROADMAP.md). Implemented features and future aspirations are separated explicitly.
+
+## My journey (development)
+
+A private and explicitly self-reported Grade RR–12-to-university learning timeline and personal milestones feature is available in the **My journey** navigation area. See [Lifelong Learner Identity](docs/LIFELONG_LEARNER_IDENTITY.md) for strict provenance and future guardian/institutional verification requirements.

@@ -8,6 +8,7 @@ import organizationsRouter from "./organizations";
 import academicRouter from "./academic";
 import academicExamLinksRouter from "./academicExamLinks";
 import potentialRouter from "./potential";
+import learnerJourneyRouter from "./learnerJourney";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(organizationsRouter);
 router.use(academicRouter);
 router.use(academicExamLinksRouter);
 router.use(potentialRouter);
+router.use(learnerJourneyRouter);
 
 export default router;
