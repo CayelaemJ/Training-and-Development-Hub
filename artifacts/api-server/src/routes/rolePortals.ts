@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { count,eq } from "drizzle-orm";
-import { db, organizationsTable,organizationMembersTable,managementUnitsTable,guardianRelationshipsTable,learnerJourneysTable,learnerMilestonesTable } from "@workspace/db";
+import { count,eq,desc } from "drizzle-orm";
+import { db, organizationsTable,organizationMembersTable,managementUnitsTable,guardianRelationshipsTable,learnerJourneysTable,learnerMilestonesTable,platformAdminAuditTable } from "@workspace/db";
 import { isPlatformSuperadmin,resolvePortal } from "../lib/portalAccess";
+import { auditSuperadmin } from "../lib/platformAudit";
 const router:IRouter=Router();
 const cards={
  superadmin:[["Organisation registry","/organizations"],["Governance structures","/governance"],["Institution records","/institution-records"],["Academic operations","/academics"]],
@@ -47,8 +48,16 @@ router.get("/portal/me",async(req,res)=>{
 router.get("/platform/overview",async(req,res)=>{
  if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return}
  if(!isPlatformSuperadmin(req.user.id)){res.status(403).json({error:"Platform superadmin required"});return}
+ await auditSuperadmin(req.user.id,"platform_overview");
  const organizations=await db.select({id:organizationsTable.id,name:organizationsTable.name}).from(organizationsTable);
  res.setHeader("Cache-Control","private, no-store");
  res.json({organizations});
+});
+router.get("/platform/audit",async(req,res)=>{
+ if(!req.isAuthenticated()){res.sendStatus(401);return}
+ if(!isPlatformSuperadmin(req.user.id)){res.sendStatus(403);return}
+ const rows=await db.select({id:platformAdminAuditTable.id,action:platformAdminAuditTable.action,organizationId:platformAdminAuditTable.organizationId,createdAt:platformAdminAuditTable.createdAt}).from(platformAdminAuditTable).orderBy(desc(platformAdminAuditTable.createdAt)).limit(50);
+ res.setHeader("Cache-Control","private, no-store");
+ res.json(rows);
 });
 export default router;
