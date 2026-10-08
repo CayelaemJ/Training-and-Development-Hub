@@ -11,6 +11,7 @@ import PotentialPage from '@/pages/potential';
 import LearnerJourneyPage from '@/pages/learner-journey';
 import InstitutionRecordsPage from '@/pages/institution-records';
 import GovernancePage from '@/pages/governance';
+import RoleHomePage from '@/pages/role-home';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -30,7 +31,8 @@ import { formatDistanceToNow, format } from 'date-fns';
 const queryClient = new QueryClient();
 
 const navItems = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
+  { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
   { href: '/quizzes', label: 'Practice tests', icon: BrainCircuit },
   { href: '/written-exams', label: 'Written exams', icon: FileText },
@@ -90,7 +92,8 @@ function AuthGate() {
 
 function Router() {
   return <RoutedErrorBoundary><Switch>
-    <Route path="/" component={DashboardPage} />
+    <Route path="/" component={RoleHomePage} />
+    <Route path="/study-overview" component={DashboardPage} />
     <Route path="/materials" component={MaterialsPage} />
     <Route path="/materials/:id" component={MaterialConfigurePage} />
     <Route path="/quizzes" component={QuizzesPage} />
