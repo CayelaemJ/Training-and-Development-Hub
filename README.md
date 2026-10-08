@@ -82,3 +82,11 @@ The **Academics** page extends optional organization workspaces into schools and
 **Limitations before rollout:** Academic gradebook records currently store assignment instructions and marks but do not yet provide their own online submission page. For online written exams, use the existing Written exams and Organizations assignments features. Academic assessments and the online written-exam system still need integration for automatic mark transfer and moderated final scores. Student term/year aggregate reports, PDF exports, parent access, attendance, timetables, academic promotion rules and versioned assessment templates are next-phase work.
 
 API endpoints are in `artifacts/api-server/src/routes/academic.ts`; PostgreSQL tables in `lib/db/src/schema/academic.ts`. Apply reviewed schema migrations, test access with multiple institutions and student accounts, calibrate grading rules, and verify the CI build before production use.
+
+## Academic online examination integration
+
+Create an academic assessment in **Academics**, generate a written exam in **Written exams**, assign it to a learner group in **Organizations**, and link that exam assignment to the academic assessment in **Academics**. Learners take the assigned exam as before. The moderation queue lists submitted AI-marked attempts. Teachers/assessors enter an approved mark on the academic assessment scale and must provide a justification; published marks appear in the private learner report and educator-only rankings. Raw AI marks remain separate.
+
+The integration uses the academic_exam_links and academic_exam_reviews tables. New endpoints: POST /api/organizations/:orgId/academic/assessments/:assessmentId/link-exam; GET /api/organizations/:orgId/academic/pending-exams; POST /api/organizations/:orgId/academic/attempts/:attemptId/publish.
+
+**Release gates:** complete actual UI and API build checks, inspect reviewed Postgres migration, and exercise multi-tenant authorization tests. Ensure teacher moderation references source answers and rubric; implement submissions locking, deadline enforcement, scoring calibration, final grade event uniqueness under concurrency, and permission regression tests before production adoption.
