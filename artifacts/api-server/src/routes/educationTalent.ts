@@ -26,7 +26,9 @@ router.post("/organizations/:orgId/notices",async(req,res)=>{
  const [row]=await db.insert(schoolNoticesTable).values({...body.data,organizationId:org.data,createdBy:u}).returning();res.status(201).json(row);
 });
 router.post("/opportunities/:id/applications",async(req,res)=>{
- const u=who(req,res);if(!u)return;const oid=pos.safeParse(req.params.id),body=z.object({statement:z.string().trim().min(20).max(3000)}).safeParse(req.body);
+ const u=who(req,res);if(!u)return;
+ if(process.env.ENABLE_CAREER_APPLICATIONS_PILOT!=="true"){res.status(503).json({error:"Applications remain disabled until candidate age and verified employer safeguards are complete"});return}
+ const oid=pos.safeParse(req.params.id),body=z.object({statement:z.string().trim().min(20).max(3000)}).safeParse(req.body);
  if(!oid.success||!body.success){res.sendStatus(400);return}
  const [opportunity]=await db.select({id:careerOpportunitiesTable.id}).from(careerOpportunitiesTable).where(and(eq(careerOpportunitiesTable.id,oid.data),eq(careerOpportunitiesTable.status,"active"))).limit(1);
  if(!opportunity){res.sendStatus(404);return}
