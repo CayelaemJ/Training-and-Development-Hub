@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -727,3 +727,41 @@
     inset: -1px;
   }
 }
+
+/* CABO Solutions product identity — tokens sourced from CABOSOLUTIONS/src/styles/theme.css. */
+:root {
+  --cabo-clay: #C4673A;
+  --cabo-gold: #C9A84C;
+  --cabo-teal: #1D6B6B;
+  --cabo-ink: #0D1117;
+  --cabo-sand: #E8D5BE;
+  --cabo-cream: #F5EDE0;
+  --primary: 19 54% 50%;
+  --primary-foreground: 36 56% 96%;
+  --ring: 19 54% 50%;
+  --sidebar-primary: 19 54% 50%;
+  --sidebar-primary-foreground: 36 56% 96%;
+  --sidebar-ring: 19 54% 50%;
+  --chart-1: 19 54% 50%;
+  --chart-2: 43 54% 54%;
+  --chart-3: 180 58% 27%;
+  --app-font-serif: 'Playfair Display', Georgia, serif;
+  --app-font-sans: 'DM Sans', system-ui, sans-serif;
+}
+.dark {
+  --primary: 19 54% 54%;
+  --primary-foreground: 36 56% 96%;
+  --ring: 19 54% 54%;
+  --sidebar-primary: 19 54% 54%;
+  --sidebar-primary-foreground: 36 56% 96%;
+  --sidebar-ring: 19 54% 54%;
+  --chart-1: 19 54% 54%;
+  --chart-2: 43 54% 54%;
+  --chart-3: 180 58% 35%;
+}
+.cabo-logo { display:block; width:112px; height:auto; flex-shrink:0; }
+.auth-brand .cabo-logo { width:136px; }
+.mobile-brand .cabo-logo { width:80px; }
+.brand:has(.cabo-logo), .auth-brand:has(.cabo-logo), .mobile-brand:has(.cabo-logo) { gap:0.6rem; align-items:center; }
+.brand:has(.cabo-logo) > span:last-child, .auth-brand:has(.cabo-logo) > span:last-child, .mobile-brand:has(.cabo-logo) > b:last-child { font-size:0.78rem; line-height:1.25; letter-spacing:0; max-width:10.5rem; }
+.font-display { font-family:'Playfair Display', Georgia, serif; letter-spacing:-0.025em; }
