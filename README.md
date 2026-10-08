@@ -104,3 +104,7 @@ This next product module introduces a private potential profile, self-reported g
 ## My journey (development)
 
 A private and explicitly self-reported Grade RR–12-to-university learning timeline and personal milestones feature is available in the **My journey** navigation area. See [Lifelong Learner Identity](docs/LIFELONG_LEARNER_IDENTITY.md) for strict provenance and future guardian/institutional verification requirements.
+
+## Institution enrolment and guardian invitations (pilot)
+
+The **Institutions** workspace offers institution-admin-attested enrolments, learner-initiated school-transfer requests and guardian invitations. This does **not** yet constitute official school accreditation, verified legal guardianship or automatic sharing of academic records. See [documentation](docs/INSTITUTION_TRANSFERS_AND_GUARDIANS.md).
