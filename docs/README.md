@@ -33,3 +33,5 @@ First-phase potential profile, evidence, job listings and consent API implemente
 - [Education governance hierarchy and roles](./GOVERNANCE_HIERARCHY.md)
 
 - [Role-based portals, superadmin oversight and course-scope permissions](./ROLE_BASED_PORTALS.md)
+
+- [Phases 1–4 delivery register, open gates and acceptance tests](./PHASES_1_TO_4_DELIVERY_REGISTER.md)
