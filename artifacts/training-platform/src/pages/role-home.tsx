@@ -3,7 +3,15 @@ import {Link} from "wouter";
 type Portal={role:string;organizationIds:number[];scopes:{organizationId:number;unitId:number;role:string}[];summary:Record<string,number>;cards:{label:string;href:string}[]};
 const roleCopy:Record<string,{title:string;description:string}>={
  superadmin:{title:"Platform command centre",description:"CABO test-platform oversight across institutions. Administrative scope is explicit, audited access still requires endpoint-specific permission checks."},
- executive:{title:"Education leadership",description:"Oversight for the institutions and reporting units assigned to your leadership role."},
+ national_director:{title:"National education oversight",description:"Review the national governance units and institutions delegated to you."},
+ provincial_director:{title:"Provincial education oversight",description:"Coordinate authorised districts and regional governance."},
+ district_director:{title:"District operations",description:"Review the schools and reporting units delegated to your district leadership."},
+ group_executive:{title:"School group leadership",description:"Oversee the schools and leadership assignments within your group."},
+ governing_body_chair:{title:"School governance",description:"Review the governance areas assigned to the governing body."},
+ deputy_headmaster:{title:"Deputy principal desk",description:"Coordinate the school operations and departments delegated to you."},
+ department_head:{title:"Department leadership",description:"Oversee the academic teams and subjects assigned to your department."},
+ grade_head:{title:"Grade coordination",description:"Coordinate authorised grade activities and subject responsibilities."},
+ administrator:{title:"Institution administration",description:"Access the administration responsibilities delegated to your account."},
  headmaster:{title:"School leadership",description:"Coordinate your school's governance, learning operations and authorised personnel."},
  teacher:{title:"Teaching desk",description:"Prepare materials, support learners and manage your permitted classes."},
  assessor:{title:"Assessment desk",description:"Review examination results and work through your assigned assessment responsibilities."},
