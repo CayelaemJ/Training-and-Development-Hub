@@ -30,11 +30,19 @@ import { formatDistanceToNow, format } from 'date-fns';
 
 const queryClient = new QueryClient();
 
-type PortalKind='superadmin'|'executive'|'headmaster'|'teacher'|'assessor'|'parent'|'learner';
+type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
  superadmin:['/','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
- executive:['/','/organizations','/governance'],
+ national_director:['/','/organizations','/governance'],
+ provincial_director:['/','/organizations','/governance'],
+ district_director:['/','/organizations','/governance'],
+ group_executive:['/','/organizations','/governance'],
+ governing_body_chair:['/','/organizations','/governance'],
  headmaster:['/','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/','/organizations','/academics','/governance','/institution-records'],
+ department_head:['/','/organizations','/academics','/governance','/written-exams'],
+ grade_head:['/','/organizations','/academics','/governance'],
+ administrator:['/','/organizations','/governance'],
  teacher:['/','/organizations','/materials','/written-exams'],
  assessor:['/','/organizations','/written-exams'],
  parent:['/','/institution-records'],
