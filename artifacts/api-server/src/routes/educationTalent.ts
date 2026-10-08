@@ -3,6 +3,7 @@ import {and,desc,eq} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,organizationMembersTable,schoolAttendanceTable,schoolNoticesTable,guardianRelationshipsTable,careerOpportunitiesTable,careerApplicationsTable,assessmentPassportsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
+import {careerApplicationsEnabled} from "../lib/careerPolicy";
 const router:IRouter=Router();
 const pos=z.coerce.number().int().positive();
 function who(req:any,res:any):string|null{if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null}return req.user.id}
@@ -27,7 +28,7 @@ router.post("/organizations/:orgId/notices",async(req,res)=>{
 });
 router.post("/opportunities/:id/applications",async(req,res)=>{
  const u=who(req,res);if(!u)return;
- if(process.env.ENABLE_CAREER_APPLICATIONS_PILOT!=="true"){res.status(503).json({error:"Applications remain disabled until candidate age and verified employer safeguards are complete"});return}
+ if(!careerApplicationsEnabled(process.env)){res.status(503).json({error:"Applications remain disabled until candidate age and verified employer safeguards are complete"});return}
  const oid=pos.safeParse(req.params.id),body=z.object({statement:z.string().trim().min(20).max(3000)}).safeParse(req.body);
  if(!oid.success||!body.success){res.sendStatus(400);return}
  const [opportunity]=await db.select({id:careerOpportunitiesTable.id}).from(careerOpportunitiesTable).where(and(eq(careerOpportunitiesTable.id,oid.data),eq(careerOpportunitiesTable.status,"active"))).limit(1);
