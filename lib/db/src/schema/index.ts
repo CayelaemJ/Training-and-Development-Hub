@@ -5,3 +5,5 @@ export * from "./academic";
 export * from "./academicExamLinks";
 
 export * from './potential';
+
+export * from './learnerJourney';
