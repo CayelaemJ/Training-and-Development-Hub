@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, varchar, real } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, varchar, real } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 import { writtenExamsTable, writtenExamAttemptsTable } from "./writtenExams";
 
