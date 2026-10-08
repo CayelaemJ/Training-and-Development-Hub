@@ -30,6 +30,16 @@ import { formatDistanceToNow, format } from 'date-fns';
 
 const queryClient = new QueryClient();
 
+type PortalKind='superadmin'|'executive'|'headmaster'|'teacher'|'assessor'|'parent'|'learner';
+const allowedNav:Record<PortalKind,string[]>={
+ superadmin:['/','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ executive:['/','/organizations','/governance'],
+ headmaster:['/','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ teacher:['/','/organizations','/materials','/written-exams'],
+ assessor:['/','/organizations','/written-exams'],
+ parent:['/','/institution-records'],
+ learner:['/','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+};
 const navItems = [
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
@@ -112,6 +122,8 @@ function Router() {
 function AppShell({ user, logout }: { user: any; logout: () => void }) {
   const signOut = import.meta.env.VITE_CABO_TEST_LOGIN === 'true' ? async () => { await fetch('/api/test-logout',{method:'POST',credentials:'include'});window.location.assign('/'); } : logout;
   const [location] = useLocation();
+  const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
+  useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
   const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
@@ -119,7 +131,7 @@ function AppShell({ user, logout }: { user: any; logout: () => void }) {
       <Link href="/" className="brand"><Mark /><span>Training & Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
-        {navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
+        {navItems.filter(item=>portalRole!==null&&allowedNav[portalRole]?.includes(item.href)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
         <div className="side-note"><span className="note-mark"><Target size={17} /></span><p>Small sessions add up.<br /><strong>Keep your rhythm.</strong></p></div>
