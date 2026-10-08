@@ -12,6 +12,7 @@ import LearnerJourneyPage from '@/pages/learner-journey';
 import InstitutionRecordsPage from '@/pages/institution-records';
 import GovernancePage from '@/pages/governance';
 import RoleHomePage from '@/pages/role-home';
+import PlatformAdminPage from '@/pages/platform-admin';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -32,7 +33,7 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/organizations','/governance'],
  provincial_director:['/','/organizations','/governance'],
  district_director:['/','/organizations','/governance'],
@@ -50,6 +51,7 @@ const allowedNav:Record<PortalKind,string[]>={
 };
 const navItems = [
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
+  { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
   { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
   { href: '/quizzes', label: 'Practice tests', icon: BrainCircuit },
@@ -111,6 +113,7 @@ function AuthGate() {
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={RoleHomePage} />
+    <Route path="/platform-admin" component={PlatformAdminPage} />
     <Route path="/study-overview" component={DashboardPage} />
     <Route path="/materials" component={MaterialsPage} />
     <Route path="/materials/:id" component={MaterialConfigurePage} />
@@ -132,7 +135,7 @@ function AppShell({ user, logout }: { user: any; logout: () => void }) {
   const [location] = useLocation();
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
