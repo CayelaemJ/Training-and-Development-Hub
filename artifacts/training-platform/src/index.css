@@ -765,3 +765,16 @@
 .brand:has(.cabo-logo), .auth-brand:has(.cabo-logo), .mobile-brand:has(.cabo-logo) { gap:0.6rem; align-items:center; }
 .brand:has(.cabo-logo) > span:last-child, .auth-brand:has(.cabo-logo) > span:last-child, .mobile-brand:has(.cabo-logo) > b:last-child { font-size:0.78rem; line-height:1.25; letter-spacing:0; max-width:10.5rem; }
 .font-display { font-family:'Playfair Display', Georgia, serif; letter-spacing:-0.025em; }
+
+/* Persistent parent brand: always visible regardless of selected product page. */
+.topbar-cabo-identity { display:flex; align-items:center; gap:0.65rem; flex-shrink:0; text-decoration:none; color:inherit; }
+.topbar-cabo-identity .cabo-logo { width:90px; min-width:90px; height:auto; }
+.topbar-cabo-identity > span { font-size:0.75rem; font-weight:700; line-height:1.25; max-width:130px; }
+.cabo-product-footer { display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap; }
+.cabo-product-footer .cabo-logo { width:76px; height:auto; }
+@media (max-width: 760px) {
+ .topbar-cabo-identity { gap:0.4rem; min-width:0; }
+ .topbar-cabo-identity .cabo-logo { width:74px; min-width:74px; }
+ .topbar-cabo-identity > span { font-size:0.65rem; max-width:105px; }
+ .topbar .crumb { display:none; }
+}
