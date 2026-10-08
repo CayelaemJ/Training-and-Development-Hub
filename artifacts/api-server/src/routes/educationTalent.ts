@@ -6,6 +6,7 @@ import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {careerApplicationsEnabled} from "../lib/careerPolicy";
 const router:IRouter=Router();
 const pos=z.coerce.number().int().positive();
+router.get("/career/capabilities",(_req,res)=>res.json({applicationsEnabled:careerApplicationsEnabled(process.env),passportDisclosureEnabled:false,developmentEvidenceEnabled:true}));
 function who(req:any,res:any):string|null{if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null}return req.user.id}
 async function role(org:number,user:string){if(isPlatformSuperadmin(user))return "owner";const [m]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org),eq(organizationMembersTable.userId,user))).limit(1);return m?.role}
 router.get("/school/attendance/me",async(req,res)=>{const u=who(req,res);if(!u)return;res.setHeader("Cache-Control","no-store");res.json(await db.select().from(schoolAttendanceTable).where(eq(schoolAttendanceTable.learnerId,u)).orderBy(desc(schoolAttendanceTable.day)).limit(180))});
