@@ -158,6 +158,24 @@ function EmptyState({ icon: Icon, title, description, action }: { icon: any; tit
   return <div className="empty-state"><div className="empty-art"><span className="empty-orbit orbit-a" /><span className="empty-orbit orbit-b" /><span className="empty-icon"><Icon size={25} /></span></div><h3 className="font-display">{title}</h3><p>{description}</p>{action}</div>;
 }
 
+type GrowthSummary={profile:{headline:string;aspirations:string};evidence:Record<string,number>;learningStages:number;milestones:number;pendingAccessRequests:number};
+function GrowthSnapshot() {
+  const [data,setData]=useState<GrowthSummary|null>(null);
+  const [error,setError]=useState(false);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{let active=true;fetch('/api/development/overview',{credentials:'include',cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Could not fetch growth profile');return r.json()}).then((x:GrowthSummary)=>{if(active)setData(x)}).catch(()=>{if(active)setError(true)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[]);
+  const evidenceTotal=Object.values(data?.evidence??{}).reduce((sum,n)=>sum+n,0);
+  return <section className="growth-section" aria-label="Personal development overview">
+    <div className="growth-header"><div><p className="eyebrow">YOUR LONG-TERM JOURNEY</p><h2 className="font-display">More than a test score.</h2><p>Build a record of what you learn, make and achieve over time. Your information is private and remains under your control.</p></div><Link href="/learner-journey" className="button button-outline">View my journey <ArrowRight size={15}/></Link></div>
+    {loading?<p className="growth-empty">Loading your development snapshot…</p>:error?<p role="status" className="growth-empty">Development totals aren't available right now. You can still open your profile and learning history.</p>:<div className="growth-metrics">
+      <div><strong>{data?.learningStages??0}</strong><span>Learning stages</span></div>
+      <div><strong>{data?.milestones??0}</strong><span>Milestones</span></div>
+      <div><strong>{evidenceTotal}</strong><span>Portfolio entries</span></div>
+      <div><strong>{data?.pendingAccessRequests??0}</strong><span>Permission requests</span></div>
+    </div>}
+    <div className="growth-actions"><Link href="/potential">Develop my potential <ArrowUpRight size={15}/></Link><Link href="/institution-records">School & guardian records <ArrowUpRight size={15}/></Link></div>
+  </section>;
+}
 function DashboardPage() {
   const dashboard = useGetDashboard();
   const materials = useListMaterials();
@@ -170,6 +188,7 @@ function DashboardPage() {
       <Metric label="Sessions completed" value={dashboard.data?.completedAttempts ?? 0} icon={CheckCircle2} note="Every attempt counts" accent="gold" />
       <Metric label="Average score" value={dashboard.data?.averageScore == null ? '—' : `${Math.round(dashboard.data.averageScore)}%`} icon={Target} note="Across completed sessions" accent="blue" />
     </div>}
+    <GrowthSnapshot />
     <section className="dashboard-lower">
       <div className="section-panel recent-panel">
         <div className="section-head"><div><p className="eyebrow">Keep the momentum</p><h2 className="font-display">Recent practice</h2></div><Link href="/quizzes" className="text-link">All tests <ArrowRight size={15} /></Link></div>
