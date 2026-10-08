@@ -37,3 +37,13 @@ Future strengths/career insights should be suggestions with displayed provenance
 ## Threat modelling starting points
 
 Cross-tenant profile access; forged subject approval; ID enumeration; repeated unsolicited access requests; abusive opportunity descriptions; stored XSS; audit tampering; unauthorised access after expiry; unauthorized learner-to-parent/teacher disclosure. Track mitigations and tests in the roadmap.
+
+## Release-guard update (October 2026)
+
+A security audit of the first potential module identified a pilot feature-flag enforcement gap on **creating** employer access requests. It is fixed by a shared policy helper, with the flag checked before any request is inserted. Employer **read** access was already feature-flagged; it now also uses that same helper. The allowlist now exposes only a headline and scope-specific self-reported evidence, excluding potentially sensitive free-text `about` and `aspirations` profile fields.
+
+Automated pure policy tests are under `artifacts/api-server/src/tests/consentPolicy.test.mjs` and invoked by CI. These tests are **not a substitute** for authenticated API integration testing with adult users and tenant isolation.
+
+### Required deployment gate
+
+Before deploying the merged Potential tables, examine differences between current and proposed PostgreSQL schemas, take a backup, apply a reviewed migration and test rollback. Never run `push-force` on a production database. Any non-development employer pilot requires implemented user-age and guardian checks, contract and billing entitlement validation, request rate limits, legal approval and end-to-end authorisation tests. Keep the flag off until then.
