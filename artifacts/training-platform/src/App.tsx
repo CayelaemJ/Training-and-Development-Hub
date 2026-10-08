@@ -96,12 +96,12 @@ function AppShell({ user, logout }: { user: any; logout: () => void }) {
     </aside>
     <div className="app-main">
       <header className="topbar">
-        <div className="mobile-brand"><Mark /><b>Training & Development Hub</b></div>
+        <Link href="/" className="topbar-cabo-identity" aria-label="CABO Solutions Training and Development Hub home"><Mark /><span>Training &amp; Development Hub</span></Link>
         <div className="crumb"><span>Workspace</span><ChevronRight size={14} /><strong>{title}</strong></div>
         <div className="topbar-right"><span className="quiet-status"><span className="status-dot" /> Your study space</span><div className="avatar avatar-small">{initials}</div></div>
       </header>
       <main className="main-content"><Router /></main>
-      <footer className="footer"><span>Training & Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
+      <footer className="footer cabo-product-footer"><Mark /><span>Training &amp; Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
     </div>
   </div>;
 }
