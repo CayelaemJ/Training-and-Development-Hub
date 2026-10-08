@@ -61,3 +61,36 @@ Workspace workflow:
 Endpoints are defined in `artifacts/api-server/src/routes/organizations.ts`; database entities in `lib/db/src/schema/organizations.ts`.
 
 **Before rollout:** Run `pnpm run typecheck && pnpm run build`, apply database migrations safely, and test multi-account access control, authorization across two organizations, due dates, group enrollment, assessor permissions, override histories, and submission aggregation. Marking overrides are stored as audit entries, but *effective final scores and dashboards do not yet incorporate them*. Do not advertise reviewed grades as finalized. Organizational invitations, member removal, tenant-wide material libraries, robust notification delivery, role administration, production database migrations and automated tests are not included yet.
+
+## Schools and universities (academic phase)
+
+The **Academics** page extends optional organization workspaces into schools and universities.
+
+- School modes: NSC, IEB or custom; university modes: university or custom.
+- Subjects/modules and educational level, optional university credits.
+- Academic periods for school terms or university semesters.
+- Learner enrollment into subjects and modules.
+- Assignment, test, exam, practical, oral and project gradebook records.
+- Teacher marking as drafts or published results, with an immutable event history recording the reason, assessor, former value and new value.
+- Private learner reports with weighted period-level subject/module performance over time.
+- Staff-only academic reporting and top-10 ranking per subject/module and period, using published results only.
+
+**Important:** The system does **not** yet implement official NSC/IEB promotion rules, subject-level CAPS requirements, official Umalusi/IEB recognition, official transcripts, pass/fail progression, or university-specific qualification rules. Institution framework metadata does not imply compliance with any examination body. School-specific prescribed SBA, PAT, oral and exam weighting varies by subject, grade, assessment period and qualification: there is no universal formula hardcoded. Configure and validate it with the latest official regulatory documents before reporting final certificates.
+
+**Score interpretation:** Weighted results are calculated as sum(percentage × configured assessment weight) / sum(configured weights for published assessments). An incomplete weighting is flagged as partial. Top-10 lists are *private to staff* and based on a comparable subject and term, not schoolwide or university-wide rankings across unrelated course combinations. School learner performance and educational personal data are confidential; no public leaderboard is provided.
+
+**Limitations before rollout:** Academic gradebook records currently store assignment instructions and marks but do not yet provide their own online submission page. For online written exams, use the existing Written exams and Organizations assignments features. Academic assessments and the online written-exam system still need integration for automatic mark transfer and moderated final scores. Student term/year aggregate reports, PDF exports, parent access, attendance, timetables, academic promotion rules and versioned assessment templates are next-phase work.
+
+API endpoints are in `artifacts/api-server/src/routes/academic.ts`; PostgreSQL tables in `lib/db/src/schema/academic.ts`. Apply reviewed schema migrations, test access with multiple institutions and student accounts, calibrate grading rules, and verify the CI build before production use.
+
+## Academic online examination integration
+
+Create an academic assessment in **Academics**, generate a written exam in **Written exams**, assign it to a learner group in **Organizations**, and link that exam assignment to the academic assessment in **Academics**. Learners take the assigned exam as before. The moderation queue lists submitted AI-marked attempts. Teachers/assessors enter an approved mark on the academic assessment scale and must provide a justification; published marks appear in the private learner report and educator-only rankings. Raw AI marks remain separate.
+
+The integration uses the academic_exam_links and academic_exam_reviews tables. New endpoints: POST /api/organizations/:orgId/academic/assessments/:assessmentId/link-exam; GET /api/organizations/:orgId/academic/pending-exams; POST /api/organizations/:orgId/academic/attempts/:attemptId/publish.
+
+**Release gates:** complete actual UI and API build checks, inspect reviewed Postgres migration, and exercise multi-tenant authorization tests. Ensure teacher moderation references source answers and rubric; implement submissions locking, deadline enforcement, scoring calibration, final grade event uniqueness under concurrency, and permission regression tests before production adoption.
+
+## CABO Solutions product branding
+
+This platform is a **CABO Solutions product**. The visual source of truth is [CayelaemJ/CABOSOLUTIONS](https://github.com/CayelaemJ/CABOSOLUTIONS), specifically its `src/app/components/Nav.tsx`, `src/app/components/Footer.tsx`, and `src/styles/theme.css`. The source repository currently creates its CABO/Solutions wordmark with styled text and does not include separate image-logo assets; `public/cabo-wordmark.svg` is a reusable vector recreation of that source-defined wordmark, not an exported original logo file. The favicon is a CABO-inspired mark, not a verified official asset. Theme colours: clay #C4673A, gold #C9A84C, ink #0D1117, cream #F5EDE0, teal #1D6B6B. Preserve legibility and contrast across light and dark modes and do not override individual institution names with the parent vendor identity.
