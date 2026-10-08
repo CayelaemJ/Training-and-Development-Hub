@@ -6,6 +6,7 @@ import trainingRouter from "./training";
 import writtenExamsRouter from "./writtenExams";
 import organizationsRouter from "./organizations";
 import academicRouter from "./academic";
+import academicExamLinksRouter from "./academicExamLinks";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(trainingRouter);
 router.use(writtenExamsRouter);
 router.use(organizationsRouter);
 router.use(academicRouter);
+router.use(academicExamLinksRouter);
 
 export default router;
