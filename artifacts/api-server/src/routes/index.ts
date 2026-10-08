@@ -11,6 +11,7 @@ import potentialRouter from "./potential";
 import learnerJourneyRouter from "./learnerJourney";
 import institutionRecordsRouter from "./institutionRecords";
 import managementHierarchyRouter from "./managementHierarchy";
+import rolePortalsRouter from "./rolePortals";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(potentialRouter);
 router.use(learnerJourneyRouter);
 router.use(institutionRecordsRouter);
 router.use(managementHierarchyRouter);
+router.use(rolePortalsRouter);
 
 export default router;
