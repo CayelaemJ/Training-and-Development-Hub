@@ -41,13 +41,13 @@ function BusyScreen() {
 function SignedOut() {
   const { login } = useAuth();
   return <main className="auth-screen">
-    <div className="auth-brand"><Mark /><span>StudyForge</span></div>
+    <div className="auth-brand"><Mark /><span>Training & Development Hub</span></div>
     <section className="auth-panel">
       <div className="auth-symbol"><GraduationCap size={26} /></div>
       <p className="eyebrow">A clearer way to study</p>
       <h1 className="font-display">Make your notes<br />work harder.</h1>
       <p className="auth-copy">Turn the material you already have into focused practice. Pick up where you left off, whenever you’re ready.</p>
-      <button className="button button-primary auth-login" onClick={login} data-testid="button-login">Continue to StudyForge <ArrowRight size={17} /></button>
+      <button className="button button-primary auth-login" onClick={login} data-testid="button-login">Continue to Training & Development Hub <ArrowRight size={17} /></button>
       <div className="auth-foot"><span>Private by design</span><span className="auth-dot" /><span>Your materials stay yours</span></div>
     </section>
     <p className="auth-aside">A study companion, not another distraction.</p>
@@ -80,7 +80,7 @@ function AppShell({ user, logout }: { user: any; logout: () => void }) {
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
-      <Link href="/" className="brand"><Mark /><span>StudyForge</span></Link>
+      <Link href="/" className="brand"><Mark /><span>Training & Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
         {navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
@@ -96,17 +96,17 @@ function AppShell({ user, logout }: { user: any; logout: () => void }) {
     </aside>
     <div className="app-main">
       <header className="topbar">
-        <div className="mobile-brand"><Mark /><b>StudyForge</b></div>
+        <div className="mobile-brand"><Mark /><b>Training & Development Hub</b></div>
         <div className="crumb"><span>Workspace</span><ChevronRight size={14} /><strong>{title}</strong></div>
         <div className="topbar-right"><span className="quiet-status"><span className="status-dot" /> Your study space</span><div className="avatar avatar-small">{initials}</div></div>
       </header>
       <main className="main-content"><Router /></main>
-      <footer className="footer"><span>StudyForge</span><span className="footer-divider" /> One page at a time.</footer>
+      <footer className="footer"><span>Training & Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
     </div>
   </div>;
 }
 
-function Mark() { return <span className="brand-mark"><BookOpen size={17} strokeWidth={2.2} /><span /></span>; }
+function Mark() { return <img className="cabo-logo" src="/cabo-wordmark.svg" alt="CABO Solutions" width={140} height={47} />; }
 
 function PageHeading({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: ReactNode }) {
   return <div className="page-heading page-enter"><div><p className="eyebrow">{kicker}</p><h1 className="font-display">{title}</h1><p className="page-description">{description}</p></div>{action && <div className="heading-action">{action}</div>}</div>;
