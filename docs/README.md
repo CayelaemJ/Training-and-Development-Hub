@@ -29,3 +29,5 @@ First-phase potential profile, evidence, job listings and consent API implemente
 - [Lifelong learner identity](./LIFELONG_LEARNER_IDENTITY.md)
 
 - [Institution enrolment, transfer and guardian workflows](./INSTITUTION_TRANSFERS_AND_GUARDIANS.md)
+
+- [Education governance hierarchy and roles](./GOVERNANCE_HIERARCHY.md)
