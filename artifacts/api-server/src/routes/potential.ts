@@ -1,10 +1,10 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, usersTable, organizationsTable, organizationMembersTable, potentialProfilesTable, potentialEvidenceTable, careerOpportunitiesTable, employerAccessRequestsTable, employerAccessAuditTable } from "@workspace/db";
 const router:IRouter=Router();
 const pos=z.coerce.number().int().positive();
-function identity(req:Parameters<typeof router.get>[1] extends infer U?any:any,res:any):string|null {
+function identity(req:Request,res:Response):string|null {
  if(!req.isAuthenticated()){res.status(401).json({error:"Login required"});return null}
  return req.user!.id;
 }
@@ -78,7 +78,7 @@ router.post("/potential/access-requests/:id/decision",async(req,res)=>{
 });
 router.get("/organizations/:orgId/potential-access/:requestId",async(req,res)=>{
  const user=identity(req,res);if(!user)return;const org=pos.safeParse(req.params.orgId),rid=pos.safeParse(req.params.requestId);
- if(!org.success||!rid.success){res.sendStatus(400);return}if(!await employer(org.data,user)){res.sendStatus(403);return}
+ if(!org.success||!rid.success){res.sendStatus(400);return}if(process.env.ENABLE_EMPLOYER_ACCESS_PILOT!=="true"){res.sendStatus(503);return}if(!await employer(org.data,user)){res.sendStatus(403);return}
  const [request]=await db.select().from(employerAccessRequestsTable).where(and(eq(employerAccessRequestsTable.id,rid.data),eq(employerAccessRequestsTable.organizationId,org.data),eq(employerAccessRequestsTable.status,"approved"))).limit(1);
  if(!request||!request.expiresAt||request.expiresAt<=new Date()){res.status(403).json({error:"Active authorisation required"});return}
  const [profile]=await db.select({headline:potentialProfilesTable.headline,about:potentialProfilesTable.about,aspirations:potentialProfilesTable.aspirations}).from(potentialProfilesTable).where(eq(potentialProfilesTable.userId,request.personId)).limit(1);
