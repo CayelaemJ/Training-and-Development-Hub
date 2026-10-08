@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq, desc, count, avg, inArray } from "drizzle-orm";
+import { and, eq, desc, count, avg } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, usersTable, organizationsTable, organizationMembersTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
 const router: IRouter=Router();
