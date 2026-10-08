@@ -108,3 +108,7 @@ A private and explicitly self-reported Grade RR–12-to-university learning time
 ## Institution enrolment and guardian invitations (pilot)
 
 The **Institutions** workspace offers institution-admin-attested enrolments, learner-initiated school-transfer requests and guardian invitations. This does **not** yet constitute official school accreditation, verified legal guardianship or automatic sharing of academic records. See [documentation](docs/INSTITUTION_TRANSFERS_AND_GUARDIANS.md).
+
+## Role-based education governance (pilot)
+
+The **Governance** workspace supports tenant-scoped national, provincial, district, group, school, department, grade and classroom reporting units with delegated leadership assignments. The API enforces rank and organisational scope. This pilot does not grant parent access to child records or automatically elevate academic API permissions. See [Governance Hierarchy](docs/GOVERNANCE_HIERARCHY.md).
