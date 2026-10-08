@@ -2,8 +2,9 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, organizationMembersTable, usersTable, managementUnitsTable, managementRoleGrantsTable } from "@workspace/db";
-import { roleNames, leadershipRanks, descendantIds, mayDelegate, type HierarchyRole } from "../lib/hierarchyPolicy";
+import { roleNames, leadershipRanks, descendantIds, mayDelegate, roleAllowedAtUnit, type HierarchyRole } from "../lib/hierarchyPolicy";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
+import { auditSuperadmin } from "../lib/platformAudit";
 
 const router:IRouter=Router();
 const positive=z.coerce.number().int().positive();
@@ -40,6 +41,7 @@ router.get("/organizations/:orgId/hierarchy",async(req,res)=>{
  const actor=user(req,res);if(!actor)return;
  const org=positive.safeParse(req.params.orgId);if(!org.success){res.sendStatus(400);return}
  const ctx=await context(org.data,actor);if(!ctx){res.sendStatus(403);return}
+ await auditSuperadmin(actor,"hierarchy_access",org.data)
  // Learner and parent memberships only get their own identity and no organisation tree.
  const viewableUnits=ctx.units.filter(u=>ctx.visible.has(u.id));
  const grants=ctx.grants.filter(g=>ctx.visible.has(g.unitId)&&(
@@ -77,6 +79,7 @@ router.post("/organizations/:orgId/hierarchy/grants",async(req,res)=>{
  if(!org.success||!payload.success){res.sendStatus(400);return}
  const ctx=await context(org.data,actor);if(!ctx){res.sendStatus(403);return}
  const unit=ctx.units.find(u=>u.id===payload.data.unitId);if(!unit){res.sendStatus(404);return}
+ if(!roleAllowedAtUnit(payload.data.role,unit.type)){res.status(400).json({error:"Role is not valid for this reporting level"});return}
  const actorRank=bestAuthority(ctx,unit.id);
  if(!ctx.owned&&!ctx.myGrants.some(g=>descendantIds(ctx.units,g.unitId).has(unit.id)&&mayDelegate(g.role as HierarchyRole,payload.data.role))){res.sendStatus(403);return}
  if(!ctx.owned&&actorRank<=leadershipRanks[payload.data.role]){res.sendStatus(403);return}
