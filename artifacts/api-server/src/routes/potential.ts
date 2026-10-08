@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
+import { employerPilotEnabled, validDecision, canReadGrant, disclosedEvidenceCategories } from "../lib/consentPolicy";
 import { db, usersTable, organizationsTable, organizationMembersTable, potentialProfilesTable, potentialEvidenceTable, careerOpportunitiesTable, employerAccessRequestsTable, employerAccessAuditTable } from "@workspace/db";
 const router:IRouter=Router();
 const pos=z.coerce.number().int().positive();
@@ -49,6 +50,7 @@ router.post("/organizations/:orgId/potential-access",async(req,res)=>{
  const id=identity(req,res);if(!id)return;const org=pos.safeParse(req.params.orgId);
  const body=z.object({personId:z.string().min(1),purpose:z.string().trim().min(15).max(2000),scope:z.enum(["professional","portfolio"])}).safeParse(req.body);
  if(!org.success||!body.success){res.sendStatus(400);return}if(!await employer(org.data,id)){res.sendStatus(403);return}
+ if(!employerPilotEnabled(process.env)){res.status(503).json({error:"Employer access remains disabled pending safeguards"});return}
  if(body.data.personId===id){res.status(400).json({error:"Self access request not needed"});return}
  const [person]=await db.select({id:usersTable.id}).from(usersTable).where(eq(usersTable.id,body.data.personId)).limit(1);
  if(!person){res.sendStatus(404);return}
@@ -68,8 +70,7 @@ router.post("/potential/access-requests/:id/decision",async(req,res)=>{
  if(!id.success||!body.success){res.sendStatus(400);return}
  const [row]=await db.select().from(employerAccessRequestsTable).where(and(eq(employerAccessRequestsTable.id,id.data),eq(employerAccessRequestsTable.personId,user))).limit(1);
  if(!row){res.sendStatus(404);return}
- if(row.status!=="pending"&&!(row.status==="approved"&&body.data.decision==="revoked")){res.status(409).json({error:"Request already resolved"});return}
- if(row.status==="pending"&&body.data.decision==="revoked"){res.sendStatus(400);return}
+ if(!validDecision(row.status as "pending"|"approved"|"denied"|"revoked",body.data.decision)){res.status(409).json({error:"Request already resolved"});return}
  const result=await db.transaction(async tx=>{
  const [r]=await tx.update(employerAccessRequestsTable).set({status:body.data.decision,decidedAt:new Date(),expiresAt:body.data.decision==="approved"?new Date(Date.now()+7*86400000):new Date()}).where(and(eq(employerAccessRequestsTable.id,id.data),eq(employerAccessRequestsTable.status,row.status))).returning();
  if(!r)throw new Error("Consent updated concurrently");
@@ -78,12 +79,12 @@ router.post("/potential/access-requests/:id/decision",async(req,res)=>{
 });
 router.get("/organizations/:orgId/potential-access/:requestId",async(req,res)=>{
  const user=identity(req,res);if(!user)return;const org=pos.safeParse(req.params.orgId),rid=pos.safeParse(req.params.requestId);
- if(!org.success||!rid.success){res.sendStatus(400);return}if(process.env.ENABLE_EMPLOYER_ACCESS_PILOT!=="true"){res.sendStatus(503);return}if(!await employer(org.data,user)){res.sendStatus(403);return}
+ if(!org.success||!rid.success){res.sendStatus(400);return}if(!employerPilotEnabled(process.env)){res.sendStatus(503);return}if(!await employer(org.data,user)){res.sendStatus(403);return}
  const [request]=await db.select().from(employerAccessRequestsTable).where(and(eq(employerAccessRequestsTable.id,rid.data),eq(employerAccessRequestsTable.organizationId,org.data),eq(employerAccessRequestsTable.status,"approved"))).limit(1);
- if(!request||!request.expiresAt||request.expiresAt<=new Date()){res.status(403).json({error:"Active authorisation required"});return}
- const [profile]=await db.select({headline:potentialProfilesTable.headline,about:potentialProfilesTable.about,aspirations:potentialProfilesTable.aspirations}).from(potentialProfilesTable).where(eq(potentialProfilesTable.userId,request.personId)).limit(1);
+ if(!request||!canReadGrant(request.status,request.expiresAt,new Date())){res.status(403).json({error:"Active authorisation required"});return}
+ const [profile]=await db.select({headline:potentialProfilesTable.headline}).from(potentialProfilesTable).where(eq(potentialProfilesTable.userId,request.personId)).limit(1);
  const all=await db.select({category:potentialEvidenceTable.category,title:potentialEvidenceTable.title,description:potentialEvidenceTable.description,source:potentialEvidenceTable.source}).from(potentialEvidenceTable).where(eq(potentialEvidenceTable.userId,request.personId));
- const evidence=all.filter(e=>request.scope==="portfolio"?["project","achievement","skill"].includes(e.category):["skill","strength","project","achievement","interest"].includes(e.category));
+ const evidence=all.filter(e=>disclosedEvidenceCategories(request.scope as "professional"|"portfolio").includes(e.category));
  await db.insert(employerAccessAuditTable).values({requestId:request.id,actorId:user,action:"viewed"});
  res.json({profile:profile??null,evidence,scope:request.scope,expiresAt:request.expiresAt});
 });
