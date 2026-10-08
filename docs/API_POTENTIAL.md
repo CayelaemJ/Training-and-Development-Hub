@@ -42,3 +42,21 @@ Only the profile subject can decide. An approved grant expires after seven days.
 ## API debt
 
 Add this contract to the central OpenAPI specification and regenerate the typed client; add pagination, rate limits, response schemas, request idempotency, account-age requirements and an explicit company billing entitlement check before production.
+
+## Development overview (dashboard)
+
+`GET /api/development/overview` returns an authenticated, account-owner-only summary:
+
+```json
+{
+  "profile": {"headline": "", "aspirations": ""},
+  "evidence": {"skill": 2, "project": 1},
+  "learningStages": 3,
+  "milestones": 2,
+  "pendingAccessRequests": 0
+}
+```
+
+Values are database aggregates scoped to the authenticated user ID. This is descriptive data, not an AI personality assessment or prediction. `Cache-Control: no-store` is set to discourage caching of the private response. No institution records, grade results or child-related comments are disclosed here to employers.
+
+UI: Overview > Personal development, with navigation to My potential, My journey and Institutions. The React interface displays explicit loading/error states and 2-column mobile metric tiles.
