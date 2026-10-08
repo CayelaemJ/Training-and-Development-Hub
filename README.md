@@ -1,4 +1,4 @@
-# Training & Development Hub
+# Training & Development Hub — a CABO Solutions product
 
 A flexible learning and assessment application for individual learners, students, teachers and future company training programmes.
 
@@ -94,3 +94,9 @@ The integration uses the academic_exam_links and academic_exam_reviews tables. N
 ## CABO Solutions product branding
 
 This platform is a **CABO Solutions product**. The visual source of truth is [CayelaemJ/CABOSOLUTIONS](https://github.com/CayelaemJ/CABOSOLUTIONS), specifically its `src/app/components/Nav.tsx`, `src/app/components/Footer.tsx`, and `src/styles/theme.css`. The source repository currently creates its CABO/Solutions wordmark with styled text and does not include separate image-logo assets; `public/cabo-wordmark.svg` is a reusable vector recreation of that source-defined wordmark, not an exported original logo file. The favicon is a CABO-inspired mark, not a verified official asset. Theme colours: clay #C4673A, gold #C9A84C, ink #0D1117, cream #F5EDE0, teal #1D6B6B. Preserve legibility and contrast across light and dark modes and do not override individual institution names with the parent vendor identity.
+
+## Potential & Opportunity Engine (development)
+
+This next product module introduces a private potential profile, self-reported growth/skill evidence, organisation-published career opportunities and explicit scoped requests for employer viewing. Open **My potential** in the product navigation. No psychological typing, hidden hiring scores or AI career prediction has been implemented. Employer private-profile access is **disabled by default** pending adult verification, paid entitlement checks and privacy review.
+
+**Documentation:** Start at [docs/README.md](docs/README.md). Detailed documents cover [product vision](docs/PRODUCT_VISION.md), [architecture](docs/ARCHITECTURE.md), [privacy and consent](docs/PRIVACY_AND_CONSENT.md), [API](docs/API_POTENTIAL.md), [deployment](docs/DEPLOYMENT.md) and [roadmap](docs/ROADMAP.md). Implemented features and future aspirations are separated explicitly.
