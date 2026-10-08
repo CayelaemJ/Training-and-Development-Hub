@@ -13,6 +13,8 @@ import InstitutionRecordsPage from '@/pages/institution-records';
 import GovernancePage from '@/pages/governance';
 import RoleHomePage from '@/pages/role-home';
 import PlatformAdminPage from '@/pages/platform-admin';
+import SchoolOperationsPage from '@/pages/school-operations';
+import CareerPassportPage from '@/pages/career-passport';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -33,25 +35,27 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/','/school-operations','/career-passport','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/organizations','/governance'],
  provincial_director:['/','/organizations','/governance'],
  district_director:['/','/organizations','/governance'],
  group_executive:['/','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ headmaster:['/','/school-operations','/organizations','/academics','/institution-records','/governance','/written-exams'],
  deputy_headmaster:['/','/organizations','/academics','/governance','/institution-records'],
  department_head:['/','/organizations','/academics','/governance','/written-exams'],
  grade_head:['/','/organizations','/academics','/governance'],
  administrator:['/','/organizations','/governance'],
- teacher:['/','/organizations','/materials','/written-exams'],
+ teacher:['/','/school-operations','/organizations','/materials','/written-exams'],
  assessor:['/','/organizations','/written-exams'],
  parent:['/','/institution-records'],
- learner:['/','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ learner:['/','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
+  { href: '/school-operations', label: 'School operations', icon: BookOpen },
+  { href: '/career-passport', label: 'Careers & passport', icon: Target },
   { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
   { href: '/quizzes', label: 'Practice tests', icon: BrainCircuit },
@@ -114,6 +118,8 @@ function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={RoleHomePage} />
     <Route path="/platform-admin" component={PlatformAdminPage} />
+    <Route path="/school-operations" component={SchoolOperationsPage} />
+    <Route path="/career-passport" component={CareerPassportPage} />
     <Route path="/study-overview" component={DashboardPage} />
     <Route path="/materials" component={MaterialsPage} />
     <Route path="/materials/:id" component={MaterialConfigurePage} />
