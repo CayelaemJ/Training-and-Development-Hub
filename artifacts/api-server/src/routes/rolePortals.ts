@@ -5,8 +5,16 @@ import { isPlatformSuperadmin,resolvePortal } from "../lib/portalAccess";
 const router:IRouter=Router();
 const cards={
  superadmin:[["Organisation registry","/organizations"],["Governance structures","/governance"],["Institution records","/institution-records"],["Academic operations","/academics"]],
- executive:[["Governance and reporting","/governance"],["Organisation oversight","/organizations"]],
+ national_director:[["National oversight","/governance"],["Organisation registry","/organizations"]],
+ provincial_director:[["Provincial governance","/governance"],["Institution oversight","/organizations"]],
+ district_director:[["District schools","/organizations"],["District reporting structure","/governance"]],
+ group_executive:[["School group overview","/organizations"],["Leadership governance","/governance"]],
+ governing_body_chair:[["Governance and appointments","/governance"],["Institution overview","/organizations"]],
  headmaster:[["School governance","/governance"],["School operations","/organizations"],["Institution records","/institution-records"],["Academic overview","/academics"]],
+ deputy_headmaster:[["School operations","/organizations"],["Governance delegation","/governance"],["Academic coordination","/academics"]],
+ department_head:[["Department operations","/organizations"],["Subject delivery","/academics"],["Governance","/governance"]],
+ grade_head:[["Grade coordination","/organizations"],["Grade academic oversight","/academics"],["Governance","/governance"]],
+ administrator:[["Institution administration","/organizations"],["Governance","/governance"]],
  teacher:[["Teaching workspace","/organizations"],["Study materials","/materials"],["Written examinations","/written-exams"]],
  assessor:[["Assessment review","/organizations"],["Written examinations","/written-exams"]],
  learner:[["Study materials","/materials"],["Practice tests","/quizzes"],["My journey","/learner-journey"],["My potential","/potential"]],
