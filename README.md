@@ -116,3 +116,7 @@ The **Governance** workspace supports tenant-scoped national, provincial, distri
 ## Role-based portals (testing)
 
 The home dashboard now adapts to CABO's institutional hierarchy, with distinct experiences for national/provincial/district leadership, headmasters, educators, learners, parents and an isolated Railway test superadmin. Academic grading and assessment review access is restricted to assigned courses or authorised administrators. See [Role-Based Portals](docs/ROLE_BASED_PORTALS.md).
+
+## Phases 1–4 implementation tracker
+
+CABO's development branch includes new school attendance/notices, a candidate application workflow and a private six-month **development review** passport. Employer-facing application submission and psychometric disclosure stay gated pending independent eligibility, professional and legal review. See [Phases 1–4 delivery register](docs/PHASES_1_TO_4_DELIVERY_REGISTER.md) for what is implemented vs. still required.
