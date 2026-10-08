@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import OpenAI from "openai";
-import { db, studyMaterialsTable, writtenExamsTable, writtenExamAttemptsTable, type WrittenQuestion, type WrittenMark } from "@workspace/db";
+import { db, studyMaterialsTable, writtenExamsTable, writtenExamAttemptsTable, examAssignmentsTable, assignmentSubmissionsTable, learnerGroupMembersTable, organizationMembersTable, type WrittenQuestion, type WrittenMark } from "@workspace/db";
 import { extractMaterialText, readObjectBuffer } from "../lib/materialText";
 import { ObjectStorageService } from "../lib/objectStorage";
 
@@ -33,7 +33,14 @@ const markingSchema = z.object({
     needsReview: z.boolean(),
   })),
 });
-const answerInput = z.object({ answers: z.array(z.string().max(15000)).min(1).max(15) });
+const answerInput = z.object({ answers: z.array(z.string().max(15000)).min(1).max(15), assignmentId: z.number().int().positive().optional() });
+async function assigned(assignmentId:number,userId:string,examId:number) {
+ const [row]=await db.select({assignment:examAssignmentsTable}).from(examAssignmentsTable)
+ .innerJoin(learnerGroupMembersTable,eq(learnerGroupMembersTable.groupId,examAssignmentsTable.groupId))
+ .innerJoin(organizationMembersTable,and(eq(organizationMembersTable.organizationId,examAssignmentsTable.organizationId),eq(organizationMembersTable.userId,learnerGroupMembersTable.userId)))
+ .where(and(eq(examAssignmentsTable.id,assignmentId),eq(examAssignmentsTable.examId,examId),eq(learnerGroupMembersTable.userId,userId))).limit(1);
+ return row?.assignment ?? null;
+}
 function authenticated(req: Request, res: Response): boolean {
   if (req.isAuthenticated()) return true;
   res.status(401).json({ error: "Unauthorized" });
@@ -94,6 +101,16 @@ router.post("/materials/:id/written-exams", async (req, res) => {
     res.status(502).json({ error: "Exam generation failed or could not be verified against the source" });
   }
 });
+router.get("/assignments/:assignmentId/exam", async(req,res)=>{
+ if(!authenticated(req,res))return;
+ const id=z.coerce.number().int().positive().safeParse(req.params.assignmentId);
+ if(!id.success){res.sendStatus(400);return;}
+ const [link]=await db.select().from(examAssignmentsTable).where(eq(examAssignmentsTable.id,id.data)).limit(1);
+ if(!link || !await assigned(link.id,req.user!.id,link.examId)){res.sendStatus(404);return;}
+ const [exam]=await db.select().from(writtenExamsTable).where(eq(writtenExamsTable.id,link.examId)).limit(1);
+ if(!exam){res.sendStatus(404);return;}
+ res.json(examView(exam));
+});
 router.get("/written-exams/:id", async (req, res) => {
   if (!authenticated(req, res)) return;
   const id = z.coerce.number().int().positive().safeParse(req.params.id);
@@ -109,8 +126,12 @@ router.post("/written-exams/:id/attempts", async (req, res) => {
   const input = answerInput.safeParse(req.body);
   if (!id.success || !input.success) { res.status(400).json({ error: "Invalid answers" }); return; }
   const [exam] = await db.select().from(writtenExamsTable)
-    .where(and(eq(writtenExamsTable.id, id.data), eq(writtenExamsTable.userId, req.user!.id))).limit(1);
+    .where(eq(writtenExamsTable.id, id.data)).limit(1);
   if (!exam) { res.status(404).json({ error: "Exam not found" }); return; }
+  const assignment = input.data.assignmentId ? await assigned(input.data.assignmentId,req.user!.id,exam.id) : null;
+  if (exam.userId !== req.user!.id && !assignment) { res.status(403).json({error:"Exam not assigned to this learner"}); return; }
+  if (input.data.assignmentId && !assignment) { res.status(403).json({error:"Assignment not available"}); return; }
+  if (assignment?.dueAt && assignment.dueAt.getTime() < Date.now()) {res.status(409).json({error:"Assignment deadline passed"});return;}
   if (input.data.answers.length !== exam.questions.length) {
     res.status(400).json({ error: "Provide one answer field for each question" }); return;
   }
@@ -135,6 +156,7 @@ router.post("/written-exams/:id/attempts", async (req, res) => {
       percentage: Math.round(awardedMarks / maxMarks * 1000)/10,
       reviewRequired: marks.some(m => m.needsReview) ? 1 : 0,
     }).returning();
+    if (assignment) await db.insert(assignmentSubmissionsTable).values({assignmentId:assignment.id,userId:req.user!.id,attemptId:attempt.id});
     res.status(201).json(attempt);
   } catch (error) {
     req.log.error({ err: error }, "Written exam marking failed");
