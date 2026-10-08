@@ -1,9 +1,9 @@
 import {index,integer,pgTable,serial,text,timestamp,uniqueIndex,varchar} from "drizzle-orm/pg-core";
-import {organizationsTable} from "./organizations";
+import {careerOpportunitiesTable} from "./potential";
 import {usersTable} from "./auth";
 export const careerApplicationsTable=pgTable("career_applications",{
  id:serial("id").primaryKey(),
- opportunityId:integer("opportunity_id").notNull(),
+ opportunityId:integer("opportunity_id").notNull().references(()=>careerOpportunitiesTable.id,{onDelete:"cascade"}),
  candidateId:varchar("candidate_id").notNull().references(()=>usersTable.id,{onDelete:"cascade"}),
  statement:text("statement").notNull().default(""),
  status:varchar("status",{length:24}).notNull().default("submitted"),
