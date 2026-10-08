@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, desc, count, avg } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, usersTable, organizationsTable, organizationMembersTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
+import { isPlatformSuperadmin } from "../lib/portalAccess";
+import { auditSuperadmin } from "../lib/platformAudit";
 const router: IRouter=Router();
 const num=z.coerce.number().int().positive();
 function me(req:Request,res:Response):string|null {if (!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null;} return req.user!.id;}
@@ -10,11 +12,18 @@ async function member(orgId:number,userId:string) {
 }
 async function guard(req:Request,res:Response,orgId:number,roles?:string[]) {
  const user=me(req,res);if(!user)return null;
+ const elevated=isPlatformSuperadmin(user);
+ if(elevated){await auditSuperadmin(user,"organization_access",orgId);return {role:"owner",organizationId:orgId,userId:user};}
  const m=await member(orgId,user);if(!m||roles&&!roles.includes(m.role)){res.status(403).json({error:"Not authorised in this organization"});return null;}return m;
 }
 const staff=["owner","admin","teacher","assessor"];
 router.get("/organizations",async(req,res)=>{
  const id=me(req,res);if(!id)return;
+ if(isPlatformSuperadmin(id)){
+  const all=await db.select({id:organizationsTable.id,name:organizationsTable.name}).from(organizationsTable);
+  await auditSuperadmin(id,"organizations_list");
+  res.setHeader("Cache-Control","no-store");res.json(all.map(o=>({...o,role:"owner"})));return;
+ }
  const rows=await db.select({id:organizationsTable.id,name:organizationsTable.name,role:organizationMembersTable.role}).from(organizationMembersTable).innerJoin(organizationsTable,eq(organizationsTable.id,organizationMembersTable.organizationId)).where(eq(organizationMembersTable.userId,id));
  res.json(rows);
 });
@@ -38,7 +47,7 @@ router.post("/organizations/:orgId/members",async(req,res)=>{
  const body=z.object({email:z.email(),role:z.enum(["admin","teacher","assessor","learner"])}).safeParse(req.body);
  if(!oid.success||!body.success){res.status(400).json({error:"Invalid member details"});return;}
  if(!await guard(req,res,oid.data,["owner","admin"]))return;
- if(body.data.role==="admin" && (await member(oid.data,req.user!.id))?.role!=="owner"){res.sendStatus(403);return;}
+ if(body.data.role==="admin" && !isPlatformSuperadmin(req.user!.id) && (await member(oid.data,req.user!.id))?.role!=="owner"){res.sendStatus(403);return;}
  const [person]=await db.select().from(usersTable).where(eq(usersTable.email,body.data.email)).limit(1);
  if(!person){res.status(404).json({error:"User must sign up before they can be added"});return;}
  try {await db.insert(organizationMembersTable).values({organizationId:oid.data,userId:person.id,role:body.data.role});res.status(201).json({userId:person.id,role:body.data.role});}
