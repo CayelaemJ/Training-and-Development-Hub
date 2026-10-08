@@ -4,6 +4,7 @@ type Material = { id: number; title: string; fileName: string };
 type Question = { prompt: string; type: string; maxMarks: number };
 type Exam = { id: number; title: string; difficulty: string; questions: Question[] };
 type Mark = { questionIndex: number; awardedMarks: number; maxMarks: number; feedback: string; needsReview: boolean };
+type Assignment = { id:number; examId:number; title:string; organization:string; dueAt:string|null };
 type Result = { percentage: number; awardedMarks: number; maxMarks: number; feedback: Mark[]; reviewRequired: number };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -16,6 +17,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 export default function WrittenExamsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [activeAssignment, setActiveAssignment] = useState<number|null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
   const [materialId, setMaterialId] = useState("");
   const [difficulty, setDifficulty] = useState("intermediate");
@@ -26,8 +29,8 @@ export default function WrittenExamsPage() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    Promise.all([request<Material[]>("/materials"), request<Exam[]>("/written-exams")])
-      .then(([m, e]) => { setMaterials(m); setExams(e); })
+    Promise.all([request<Material[]>("/materials"), request<Exam[]>("/written-exams"),request<Assignment[]>("/my-assignments")])
+      .then(([m, e, a]) => { setMaterials(m); setExams(e); setAssignments(a); })
       .catch(e => setError(e.message));
   }, []);
   async function generate() {
@@ -37,17 +40,18 @@ export default function WrittenExamsPage() {
       const e = await request<Exam>("/materials/" + materialId + "/written-exams", {
         method: "POST", body: JSON.stringify({ questionCount, difficulty }),
       });
-      setExams(prev => [e, ...prev]); selectExam(e);
+      setExams(prev => [e, ...prev]); setActiveAssignment(null); selectExam(e);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to generate exam"); }
     finally { setWorking(false); }
   }
   function selectExam(e: Exam) { setExam(e); setResult(null); setAnswers(e.questions.map(() => "")); }
+  async function openAssignment(a:Assignment){setError("");try{const e=await request<Exam>("/assignments/"+a.id+"/exam");setActiveAssignment(a.id);selectExam(e)}catch(e){setError(e instanceof Error?e.message:"Cannot open assignment")}}
   async function submit() {
     if (!exam || answers.some(a => !a.trim())) { setError("Please answer every question before submitting."); return; }
     setWorking(true); setError("");
     try {
       const r = await request<Result>("/written-exams/" + exam.id + "/attempts", {
-        method: "POST", body: JSON.stringify({ answers }),
+        method: "POST", body: JSON.stringify({ answers, ...(activeAssignment?{assignmentId:activeAssignment}:{}) }),
       });
       setResult(r);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to mark exam"); }
@@ -80,8 +84,9 @@ export default function WrittenExamsPage() {
       </div>
       <button disabled={!materialId || working} onClick={generate} className="rounded-md bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{working ? "Working…" : "Generate written examination"}</button>
     </div>
+    {assignments.length>0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Assigned to you</h2><div className="flex flex-wrap gap-2">{assignments.map(a=><button key={a.id} className="rounded-md border px-4 py-3 text-sm" onClick={()=>openAssignment(a)}>{a.title} · {a.organization}{a.dueAt ? " · Due "+new Date(a.dueAt).toLocaleDateString() : ""}</button>)}</div></section>}
     {exams.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Your examinations</h2>
-      <div className="flex flex-wrap gap-2">{exams.map(e => <button key={e.id} onClick={() => selectExam(e)} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">{e.title} · {e.questions.length} questions</button>)}</div>
+      <div className="flex flex-wrap gap-2">{exams.map(e => <button key={e.id} onClick={() => {setActiveAssignment(null);selectExam(e)}} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">{e.title} · {e.questions.length} questions</button>)}</div>
     </section>}
     {exam && <section className="space-y-5"><div className="border-b pb-4"><h2 className="text-2xl font-semibold">{exam.title}</h2>
       <p className="text-sm text-muted-foreground">{exam.questions.reduce((s,q) => s+q.maxMarks,0)} marks · {exam.difficulty}</p></div>
