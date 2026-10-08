@@ -112,3 +112,7 @@ The **Institutions** workspace offers institution-admin-attested enrolments, lea
 ## Role-based education governance (pilot)
 
 The **Governance** workspace supports tenant-scoped national, provincial, district, group, school, department, grade and classroom reporting units with delegated leadership assignments. The API enforces rank and organisational scope. This pilot does not grant parent access to child records or automatically elevate academic API permissions. See [Governance Hierarchy](docs/GOVERNANCE_HIERARCHY.md).
+
+## Role-based portals (testing)
+
+The home dashboard now adapts to CABO's institutional hierarchy, with distinct experiences for national/provincial/district leadership, headmasters, educators, learners, parents and an isolated Railway test superadmin. Academic grading and assessment review access is restricted to assigned courses or authorised administrators. See [Role-Based Portals](docs/ROLE_BASED_PORTALS.md).
