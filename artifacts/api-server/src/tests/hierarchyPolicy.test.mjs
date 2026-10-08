@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {descendantIds, leadershipRanks, mayDelegate, managementRole} from "../lib/hierarchyPolicy.ts";
+import {descendantIds, leadershipRanks, mayDelegate, managementRole, roleAllowedAtUnit} from "../lib/hierarchyPolicy.ts";
 test("governance uses strict, descending delegation",()=>{
  assert.equal(mayDelegate("headmaster","teacher"),true);
  assert.equal(mayDelegate("headmaster","headmaster"),false);
@@ -20,4 +20,14 @@ test("delegated scope never includes siblings or their children",()=>{
  assert.deepEqual([...descendantIds(units,2)].sort((a,b)=>a-b),[2,4,6]);
  assert.equal(descendantIds(units,2).has(5),false);
  assert.deepEqual([...descendantIds(units,4)].sort((a,b)=>a-b),[4,6]);
+});
+
+test("role appointment must match institutional level",()=>{
+ assert.equal(roleAllowedAtUnit("national_director","national"),true);
+ assert.equal(roleAllowedAtUnit("national_director","school"),false);
+ assert.equal(roleAllowedAtUnit("district_director","school"),false);
+ assert.equal(roleAllowedAtUnit("headmaster","school"),true);
+ assert.equal(roleAllowedAtUnit("headmaster","district"),false);
+ assert.equal(roleAllowedAtUnit("teacher","class"),true);
+ assert.equal(roleAllowedAtUnit("parent","school"),false);
 });
