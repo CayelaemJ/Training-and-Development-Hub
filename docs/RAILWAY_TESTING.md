@@ -38,3 +38,22 @@ The current app uses Replit OIDC (`ISSUER_URL` defaults to `https://replit.com/o
 ## Verification
 
 Check Railway app deployment status, UI home page, `GET /api/healthz`, database schema creation, unauthenticated access rejection, and then (after auth setup) two learner accounts, two institutions, guardian invitations and cross-tenant data isolation. Do not expose child records to employers or enable paid-profile access until safeguarding and billing requirements pass.
+
+## Optional independent role-test logins
+
+The Railway-only login endpoint now accepts additional principals from `CABO_TEST_USERS_JSON`, which must be a Railway secret, not a checked-in file. The variable is a JSON array of at most 30 entries, each with `username`, `userId`, `email`, `firstName`, `lastName`, and a salted `hash` in `scrypt saltHex:hashHex` format. A valid example shape is:
+
+```json
+[{
+ "username":"cabo_teacher_demo",
+ "userId":"cabo-fixture-teacher",
+ "email":"teacher@example.invalid",
+ "firstName":"Demo",
+ "lastName":"Teacher",
+ "hash":"<32-hex-character-random-salt>:<128-hex-character-scrypt-derived-key>"
+}]
+```
+
+Generate each verifier separately with Node's `crypto.randomBytes(16)` and `scryptSync(password, salt, 64)`. The example uses placeholders, not working credentials. Real passwords must be stored outside source control and distributed only to authorised testers. Do not store credentials, hashes or access tokens in tickets or screenshots.
+
+The existing `cabo_test` login remains mapped to its fixed superadmin test identity, with its own independent Railway secrets. Adding the fixture account does **not** assign staff rights automatically: a school owner or platform superadmin must register the fixture in the appropriate organisation membership and hierarchy or course role. Every test account needs its own browser session and forbidden-operation tests. This test login system must remain unavailable outside Railway `testing` and must never become CABO's production authentication system.
