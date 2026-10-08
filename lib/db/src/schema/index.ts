@@ -13,3 +13,5 @@ export * from './institutionRecords';
 export * from './managementHierarchy';
 
 export * from './platformAudit';
+
+export * from './courseStaff';
