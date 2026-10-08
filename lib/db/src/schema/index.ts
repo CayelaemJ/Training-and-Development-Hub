@@ -15,3 +15,6 @@ export * from './managementHierarchy';
 export * from './platformAudit';
 
 export * from './courseStaff';
+
+export * from './schoolOperations';
+export * from './talentPassport';
