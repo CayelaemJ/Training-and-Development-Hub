@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, organizationMembersTable, usersTable, managementUnitsTable, managementRoleGrantsTable } from "@workspace/db";
 import { roleNames, leadershipRanks, descendantIds, mayDelegate, type HierarchyRole } from "../lib/hierarchyPolicy";
+import { isPlatformSuperadmin } from "../lib/portalAccess";
 
 const router:IRouter=Router();
 const positive=z.coerce.number().int().positive();
@@ -14,10 +15,10 @@ function user(req:Request,res:Response){
 async function context(orgId:number,userId:string){
  const [member]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable)
   .where(and(eq(organizationMembersTable.organizationId,orgId),eq(organizationMembersTable.userId,userId))).limit(1);
- if(!member)return null;
+ if(!member&&!isPlatformSuperadmin(userId))return null;
  const units=await db.select().from(managementUnitsTable).where(eq(managementUnitsTable.organizationId,orgId));
  const grants=await db.select().from(managementRoleGrantsTable).where(eq(managementRoleGrantsTable.organizationId,orgId));
- const owned=member.role==="owner";
+ const owned=member?.role==="owner"||isPlatformSuperadmin(userId);
  // Legacy owner is bootstrap authority for their own organisation only, not a cross-tenant superuser.
  const myGrants=grants.filter(g=>g.userId===userId);
  const visible=new Set<number>();
@@ -28,7 +29,7 @@ async function context(orgId:number,userId:string){
   if(leadershipRanks[g.role as HierarchyRole]>=35)descendants.forEach(id=>visible.add(id));
   else visible.add(g.unitId);
  }
- return {member,units,grants,myGrants,visible,owned};
+ return {member:member??{role:"superadmin"},units,grants,myGrants,visible,owned};
 }
 function bestAuthority(ctx:NonNullable<Awaited<ReturnType<typeof context>>>,target:number){
  if(ctx.owned)return 101;
