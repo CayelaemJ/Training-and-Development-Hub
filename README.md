@@ -61,3 +61,24 @@ Workspace workflow:
 Endpoints are defined in `artifacts/api-server/src/routes/organizations.ts`; database entities in `lib/db/src/schema/organizations.ts`.
 
 **Before rollout:** Run `pnpm run typecheck && pnpm run build`, apply database migrations safely, and test multi-account access control, authorization across two organizations, due dates, group enrollment, assessor permissions, override histories, and submission aggregation. Marking overrides are stored as audit entries, but *effective final scores and dashboards do not yet incorporate them*. Do not advertise reviewed grades as finalized. Organizational invitations, member removal, tenant-wide material libraries, robust notification delivery, role administration, production database migrations and automated tests are not included yet.
+
+## Schools and universities (academic phase)
+
+The **Academics** page extends optional organization workspaces into schools and universities.
+
+- School modes: NSC, IEB or custom; university modes: university or custom.
+- Subjects/modules and educational level, optional university credits.
+- Academic periods for school terms or university semesters.
+- Learner enrollment into subjects and modules.
+- Assignment, test, exam, practical, oral and project gradebook records.
+- Teacher marking as drafts or published results, with an immutable event history recording the reason, assessor, former value and new value.
+- Private learner reports with weighted period-level subject/module performance over time.
+- Staff-only academic reporting and top-10 ranking per subject/module and period, using published results only.
+
+**Important:** The system does **not** yet implement official NSC/IEB promotion rules, subject-level CAPS requirements, official Umalusi/IEB recognition, official transcripts, pass/fail progression, or university-specific qualification rules. Institution framework metadata does not imply compliance with any examination body. School-specific prescribed SBA, PAT, oral and exam weighting varies by subject, grade, assessment period and qualification: there is no universal formula hardcoded. Configure and validate it with the latest official regulatory documents before reporting final certificates.
+
+**Score interpretation:** Weighted results are calculated as sum(percentage × configured assessment weight) / sum(configured weights for published assessments). An incomplete weighting is flagged as partial. Top-10 lists are *private to staff* and based on a comparable subject and term, not schoolwide or university-wide rankings across unrelated course combinations. School learner performance and educational personal data are confidential; no public leaderboard is provided.
+
+**Limitations before rollout:** Academic gradebook records currently store assignment instructions and marks but do not yet provide their own online submission page. For online written exams, use the existing Written exams and Organizations assignments features. Academic assessments and the online written-exam system still need integration for automatic mark transfer and moderated final scores. Student term/year aggregate reports, PDF exports, parent access, attendance, timetables, academic promotion rules and versioned assessment templates are next-phase work.
+
+API endpoints are in `artifacts/api-server/src/routes/academic.ts`; PostgreSQL tables in `lib/db/src/schema/academic.ts`. Apply reviewed schema migrations, test access with multiple institutions and student accounts, calibrate grading rules, and verify the CI build before production use.
