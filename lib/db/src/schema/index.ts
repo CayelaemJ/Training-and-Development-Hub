@@ -7,3 +7,5 @@ export * from "./academicExamLinks";
 export * from './potential';
 
 export * from './learnerJourney';
+
+export * from './institutionRecords';
