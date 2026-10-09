@@ -73,10 +73,25 @@ function BusyScreen() {
   return <div className="min-h-[100dvh] grid place-items-center"><div className="flex items-center gap-3 text-muted-foreground"><span className="skeleton-dot" /><span>Getting your study space ready</span></div></div>;
 }
 
+function SignedOutConfirmation() {
+  return <main className="signed-out-screen" aria-labelledby="signed-out-title">
+    <div className="signed-out-card">
+      <img src="/cabo-wordmark.svg" alt="CABO Solutions" width={125} height={42} />
+      <p className="eyebrow">SESSION ENDED</p>
+      <h1 id="signed-out-title" className="font-display">You've signed out.</h1>
+      <p>Your CABO session on this device has ended. You can return whenever you're ready.</p>
+      <a className="button button-primary signed-out-return" href="/">Return to sign in <ArrowRight size={17} /></a>
+      <span className="signed-out-footer">Training &amp; Development Hub · A CABO Solutions product</span>
+    </div>
+  </main>;
+}
+
 function AuthGate() {
   const auth = useAuth();
   if (auth.isLoading) return <BusyScreen />;
-  return auth.isAuthenticated ? <AppShell user={auth.user} logout={auth.logout} /> : <CaboAccessLanding />;
+  if (auth.isAuthenticated) return <AppShell user={auth.user} />;
+  if (window.location.pathname === '/signed-out') return <SignedOutConfirmation />;
+  return <CaboAccessLanding />;
 }
 
 function Router() {
@@ -101,8 +116,27 @@ function Router() {
   </Switch></RoutedErrorBoundary>;
 }
 
-function AppShell({ user, logout }: { user: any; logout: () => void }) {
-  const signOut = import.meta.env.VITE_CABO_TEST_LOGIN === 'true' ? async () => { await fetch('/api/test-logout',{method:'POST',credentials:'include'});window.location.assign('/'); } : logout;
+function AppShell({ user }: { user: any }) {
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError('');
+    if (import.meta.env.VITE_CABO_TEST_LOGIN !== 'true') {
+      window.location.assign('/api/logout?returnTo=%2Fsigned-out');
+      return;
+    }
+    try {
+      const response = await fetch('/api/test-logout', { method: 'POST', credentials: 'include', cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to sign out. Please retry.');
+      queryClient.clear();
+      window.location.replace('/signed-out');
+    } catch {
+      setSignOutError('We could not end your session. Please retry.');
+      setSigningOut(false);
+    }
+  }
   const [location] = useLocation();
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
@@ -120,16 +154,25 @@ function AppShell({ user, logout }: { user: any; logout: () => void }) {
         <div className="profile-row">
           <div className="avatar">{initials}</div>
           <div className="profile-copy"><strong>{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Learner'}</strong><span>{user?.email || 'Your account'}</span></div>
-          <button className="icon-button logout-button" onClick={signOut} aria-label="Log out" title="Log out" data-testid="button-logout"><LogOut size={16} /></button>
         </div>
+        <button type="button" className="sidebar-signout" disabled={signingOut} onClick={signOut} data-testid="button-logout">
+          <LogOut size={16} /><span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
+        </button>
       </div>
     </aside>
     <div className="app-main">
       <header className="topbar">
         <Link href="/" className="topbar-cabo-identity" aria-label="CABO Solutions Training and Development Hub home"><Mark /><span>Training &amp; Development Hub</span></Link>
         <div className="crumb"><span>Workspace</span><ChevronRight size={14} /><strong>{title}</strong></div>
-        <div className="topbar-right"><span className="quiet-status"><span className="status-dot" /> Your study space</span><div className="avatar avatar-small">{initials}</div></div>
+        <div className="topbar-right">
+          <span className="quiet-status"><span className="status-dot" /> Your workspace</span>
+          <div className="avatar avatar-small">{initials}</div>
+          <button type="button" className="topbar-signout" disabled={signingOut} onClick={signOut} aria-label="Sign out" data-testid="button-mobile-logout">
+            <LogOut size={17} aria-hidden="true" /><span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
+          </button>
+        </div>
       </header>
+      {signOutError && <div className="signout-error" role="alert">{signOutError} <button type="button" onClick={signOut}>Retry sign out</button></div>}
       <main className="main-content"><Router /></main>
       <footer className="footer cabo-product-footer"><Mark /><span>Training &amp; Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
     </div>
