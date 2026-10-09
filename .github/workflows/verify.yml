@@ -2,7 +2,7 @@ name: Verify training hub
 on:
   pull_request:
   push:
-    branches: [feature/ai-written-examinations]
+    branches: [main, feature/ai-written-examinations]
 jobs:
   build:
     runs-on: ubuntu-latest
