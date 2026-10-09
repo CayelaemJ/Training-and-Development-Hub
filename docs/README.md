@@ -27,3 +27,11 @@ The Training & Development Hub is the first product in a larger, consent-centred
 First-phase potential profile, evidence, job listings and consent API implemented in feature branch. Enterprise billing, employer verification, age checks, safeguarding, verified credentials, university integrations and automated career inference are **not yet implemented**. Employer profile access defaults **OFF**.
 
 - [Lifelong learner identity](./LIFELONG_LEARNER_IDENTITY.md)
+
+- [Institution enrolment, transfer and guardian workflows](./INSTITUTION_TRANSFERS_AND_GUARDIANS.md)
+
+- [Education governance hierarchy and roles](./GOVERNANCE_HIERARCHY.md)
+
+- [Role-based portals, superadmin oversight and course-scope permissions](./ROLE_BASED_PORTALS.md)
+
+- [Phases 1–4 delivery register, open gates and acceptance tests](./PHASES_1_TO_4_DELIVERY_REGISTER.md)

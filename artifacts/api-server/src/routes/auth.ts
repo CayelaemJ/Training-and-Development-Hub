@@ -2,6 +2,8 @@ import { GetCurrentAuthUserResponse } from '@workspace/api-zod';
 import { db, usersTable } from '@workspace/db';
 import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
+import { scryptSync, timingSafeEqual } from 'node:crypto';
+import {configuredPrincipals} from '../lib/testPrincipals';
 
 import {
   clearSession,
@@ -80,6 +82,34 @@ async function upsertUser(claims: Record<string, unknown>) {
   return user;
 }
 
+// Password auth is available only on the isolated Railway testing deployment.
+// Its verifier is supplied as a salted scrypt hash via Railway secrets, never source code.
+const failures = new Map<string,{count:number;until:number}>();
+router.post('/test-login', async (req:Request,res:Response) => {
+ if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return;}
+ const key=req.ip??'unknown';const rate=failures.get(key);
+ if(rate&&rate.count>=6&&rate.until>Date.now()){res.status(429).json({error:'Too many attempts; try again later'});return;}
+ const username=typeof req.body?.username==='string'?req.body.username:'';
+ const password=typeof req.body?.password==='string'?req.body.password:'';
+ const configured=configuredPrincipals(process.env.CABO_TEST_USERS_JSON);
+ const fixture=configured.find(x=>x.username===username);
+ const setting=fixture?.hash??process.env.CABO_TEST_PASSWORD_HASH??'';
+ const [saltHex,hashHex]=setting.split(':');let valid=false;
+ if(username.length<=100&&password.length<=200&&saltHex&&hashHex&&/^[a-f0-9]{32}$/.test(saltHex)&&/^[a-f0-9]{128}$/.test(hashHex)) {
+  const provided=scryptSync(password,Buffer.from(saltHex,'hex'),64);
+  valid=timingSafeEqual(provided,Buffer.from(hashHex,'hex'))&&(!!fixture||username===process.env.CABO_TEST_LOGIN_USERNAME);
+ }
+ if(!valid){const current=failures.get(key);failures.set(key,{count:(current?.until??0)>Date.now()?(current?.count??0)+1:1,until:Date.now()+15*60_000});res.status(401).json({error:'Incorrect username or password'});return;}
+ failures.delete(key);
+ const profile=fixture?{id:fixture.userId,email:fixture.email,firstName:fixture.firstName,lastName:fixture.lastName}:{id:'cabo-isolated-test-learner',firstName:'CABO',lastName:'Tester'};
+ const [account]=await db.insert(usersTable).values(profile).onConflictDoUpdate({target:usersTable.id,set:{firstName:profile.firstName,lastName:profile.lastName}}).returning();
+ const sid=await createSession({user:{id:account.id,email:account.email,firstName:account.firstName,lastName:account.lastName,profileImageUrl:account.profileImageUrl},access_token:'test-local'});
+ setSessionCookie(res,sid);res.json({ok:true});
+});
+router.post('/test-logout',async(req:Request,res:Response)=>{
+ if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return;}
+ await clearSession(res,getSessionId(req));res.json({ok:true});
+});
 router.get('/auth/user', (req: Request, res: Response) => {
   res.json(
     GetCurrentAuthUserResponse.parse({

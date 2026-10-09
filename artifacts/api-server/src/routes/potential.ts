@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, count } from "drizzle-orm";
 import { z } from "zod/v4";
 import { employerPilotEnabled, validDecision, canReadGrant, disclosedEvidenceCategories } from "../lib/consentPolicy";
-import { db, usersTable, organizationsTable, organizationMembersTable, potentialProfilesTable, potentialEvidenceTable, careerOpportunitiesTable, employerAccessRequestsTable, employerAccessAuditTable } from "@workspace/db";
+import { db, usersTable, organizationsTable, organizationMembersTable, potentialProfilesTable, potentialEvidenceTable, careerOpportunitiesTable, employerAccessRequestsTable, employerAccessAuditTable, learnerJourneysTable, learnerMilestonesTable } from "@workspace/db";
 const router:IRouter=Router();
 const pos=z.coerce.number().int().positive();
 function identity(req:Request,res:Response):string|null {
@@ -87,5 +87,20 @@ router.get("/organizations/:orgId/potential-access/:requestId",async(req,res)=>{
  const evidence=all.filter(e=>disclosedEvidenceCategories(request.scope as "professional"|"portfolio").includes(e.category));
  await db.insert(employerAccessAuditTable).values({requestId:request.id,actorId:user,action:"viewed"});
  res.json({profile:profile??null,evidence,scope:request.scope,expiresAt:request.expiresAt});
+});
+
+// Private, read-only summary powering the learner's growth dashboard.
+// No rankings, inferred personality traits, or employer disclosures.
+router.get("/development/overview",async(req,res)=>{
+ const user=identity(req,res);if(!user)return;
+ const [profile]=await db.select({headline:potentialProfilesTable.headline,aspirations:potentialProfilesTable.aspirations}).from(potentialProfilesTable).where(eq(potentialProfilesTable.userId,user)).limit(1);
+ const [evidence,journal,milestones,requests]=await Promise.all([
+  db.select({category:potentialEvidenceTable.category,total:count()}).from(potentialEvidenceTable).where(eq(potentialEvidenceTable.userId,user)).groupBy(potentialEvidenceTable.category),
+  db.select({total:count()}).from(learnerJourneysTable).where(eq(learnerJourneysTable.userId,user)),
+  db.select({total:count()}).from(learnerMilestonesTable).where(eq(learnerMilestonesTable.userId,user)),
+  db.select({total:count()}).from(employerAccessRequestsTable).where(and(eq(employerAccessRequestsTable.personId,user),eq(employerAccessRequestsTable.status,"pending")))
+ ]);
+ res.setHeader("Cache-Control","no-store");
+ res.json({profile:profile??{headline:"",aspirations:""},evidence:Object.fromEntries(evidence.map(e=>[e.category,e.total])),learningStages:journal[0]?.total??0,milestones:milestones[0]?.total??0,pendingAccessRequests:requests[0]?.total??0});
 });
 export default router;

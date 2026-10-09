@@ -1,11 +1,23 @@
 import { Router, type IRouter } from "express";
 import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, academicAssessmentsTable, academicGradesTable, academicGradeEventsTable, academicExamLinksTable, academicExamReviewsTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamAttemptsTable, writtenExamsTable, courseEnrollmentsTable, organizationMembersTable } from "@workspace/db";
+import { db, academicAssessmentsTable, academicGradesTable, academicGradeEventsTable, academicExamLinksTable, academicExamReviewsTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamAttemptsTable, writtenExamsTable, courseEnrollmentsTable, organizationMembersTable,courseStaffAssignmentsTable } from "@workspace/db";
+import {isPlatformSuperadmin} from "../lib/portalAccess";
+import {auditSuperadmin} from "../lib/platformAudit";
 const router:IRouter=Router();
 const positive=z.coerce.number().int().positive();
 const staff=["owner","admin","teacher","assessor"];
-async function permitted(org:number,user:string){const [m]=await db.select().from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org),eq(organizationMembersTable.userId,user))).limit(1);return m&&staff.includes(m.role)}
+async function permitted(org:number,user:string){
+ if(isPlatformSuperadmin(user)){await auditSuperadmin(user,"academic_exam_access",org);return true;}
+ const [m]=await db.select().from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org),eq(organizationMembersTable.userId,user))).limit(1);return !!m&&staff.includes(m.role)
+}
+async function allowedCourses(org:number,user:string){
+ if(isPlatformSuperadmin(user))return null;
+ const [m]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org),eq(organizationMembersTable.userId,user))).limit(1);
+ if(m&&["owner","admin"].includes(m.role))return null;
+ const rows=await db.select({courseId:courseStaffAssignmentsTable.courseId}).from(courseStaffAssignmentsTable).where(and(eq(courseStaffAssignmentsTable.organizationId,org),eq(courseStaffAssignmentsTable.staffId,user)));
+ return new Set(rows.map(r=>r.courseId));
+}
 router.post("/organizations/:orgId/academic/assessments/:assessmentId/link-exam",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const org=positive.safeParse(req.params.orgId),id=positive.safeParse(req.params.assessmentId),body=z.object({assignmentId:z.number().int().positive()}).safeParse(req.body);
@@ -14,6 +26,7 @@ router.post("/organizations/:orgId/academic/assessments/:assessmentId/link-exam"
  const [a]=await db.select().from(academicAssessmentsTable).where(and(eq(academicAssessmentsTable.id,id.data),eq(academicAssessmentsTable.organizationId,org.data))).limit(1);
  const [assignment]=await db.select().from(examAssignmentsTable).where(and(eq(examAssignmentsTable.id,body.data.assignmentId),eq(examAssignmentsTable.organizationId,org.data))).limit(1);
  if(!a||!assignment){res.sendStatus(404);return}
+ const scoped=await allowedCourses(org.data,req.user!.id);if(scoped&&!scoped.has(a.courseId)){res.sendStatus(403);return}
  const [exam]=await db.select().from(writtenExamsTable).where(eq(writtenExamsTable.id,assignment.examId)).limit(1);
  if(!exam){res.sendStatus(404);return}
  try {const [link]=await db.insert(academicExamLinksTable).values({assessmentId:a.id,assignmentId:assignment.id}).returning();res.status(201).json(link)}
@@ -23,14 +36,16 @@ router.get("/organizations/:orgId/academic/pending-exams",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const org=positive.safeParse(req.params.orgId);if(!org.success){res.sendStatus(400);return}
  if(!await permitted(org.data,req.user!.id)){res.sendStatus(403);return}
- const records=await db.select({linkId:academicExamLinksTable.id,assessmentId:academicAssessmentsTable.id,assessmentTitle:academicAssessmentsTable.title,learnerId:assignmentSubmissionsTable.userId,attemptId:writtenExamAttemptsTable.id,score:writtenExamAttemptsTable.percentage,awardedMarks:writtenExamAttemptsTable.awardedMarks,maxMarks:writtenExamAttemptsTable.maxMarks,reviewRequired:writtenExamAttemptsTable.reviewRequired,feedback:writtenExamAttemptsTable.feedback,answers:writtenExamAttemptsTable.answers})
+ const records=await db.select({linkId:academicExamLinksTable.id,courseId:academicAssessmentsTable.courseId,assessmentId:academicAssessmentsTable.id,assessmentTitle:academicAssessmentsTable.title,learnerId:assignmentSubmissionsTable.userId,attemptId:writtenExamAttemptsTable.id,score:writtenExamAttemptsTable.percentage,awardedMarks:writtenExamAttemptsTable.awardedMarks,maxMarks:writtenExamAttemptsTable.maxMarks,reviewRequired:writtenExamAttemptsTable.reviewRequired,feedback:writtenExamAttemptsTable.feedback,answers:writtenExamAttemptsTable.answers})
  .from(academicExamLinksTable).innerJoin(academicAssessmentsTable,eq(academicAssessmentsTable.id,academicExamLinksTable.assessmentId))
  .innerJoin(assignmentSubmissionsTable,eq(assignmentSubmissionsTable.assignmentId,academicExamLinksTable.assignmentId))
  .innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId))
  .where(eq(academicAssessmentsTable.organizationId,org.data)).orderBy(desc(writtenExamAttemptsTable.completedAt));
+ const scope=await allowedCourses(org.data,req.user!.id);
+ const viewable=scope?records.filter(r=>scope.has(r.courseId)):records;
  const fullReviews=records.length?await db.select().from(academicExamReviewsTable):[];
  const ids=new Set(fullReviews.map(r=>r.attemptId));
- res.json(records.map(r=>({...r,reviewed:ids.has(r.attemptId)})));
+ res.json(viewable.map(({courseId,...r})=>({...r,reviewed:ids.has(r.attemptId)})));
 });
 router.post("/organizations/:orgId/academic/attempts/:attemptId/publish",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
@@ -44,6 +59,7 @@ router.post("/organizations/:orgId/academic/attempts/:attemptId/publish",async(r
  .innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId))
  .where(and(eq(academicAssessmentsTable.organizationId,org.data),eq(writtenExamAttemptsTable.id,attemptId.data))).limit(1);
  if(!row){res.sendStatus(404);return}
+ const permittedCourses=await allowedCourses(org.data,req.user!.id);if(permittedCourses&&!permittedCourses.has(row.assessment.courseId)){res.sendStatus(403);return}
  if(body.data.marks>row.assessment.maxMarks){res.status(400).json({error:"Marks exceed assessment maximum"});return}
  const [enrolled]=await db.select().from(courseEnrollmentsTable).where(and(eq(courseEnrollmentsTable.courseId,row.assessment.courseId),eq(courseEnrollmentsTable.userId,row.submission.userId))).limit(1);
  if(!enrolled){res.status(409).json({error:"Learner must be enrolled in this subject"});return}

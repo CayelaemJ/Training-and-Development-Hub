@@ -9,6 +9,12 @@ import OrganizationsPage from '@/pages/organizations';
 import AcademicsPage from '@/pages/academics';
 import PotentialPage from '@/pages/potential';
 import LearnerJourneyPage from '@/pages/learner-journey';
+import InstitutionRecordsPage from '@/pages/institution-records';
+import GovernancePage from '@/pages/governance';
+import RoleHomePage from '@/pages/role-home';
+import PlatformAdminPage from '@/pages/platform-admin';
+import SchoolOperationsPage from '@/pages/school-operations';
+import CareerPassportPage from '@/pages/career-passport';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -27,8 +33,30 @@ import { formatDistanceToNow, format } from 'date-fns';
 
 const queryClient = new QueryClient();
 
+type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
+const allowedNav:Record<PortalKind,string[]>={
+ superadmin:['/','/school-operations','/career-passport','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ national_director:['/','/organizations','/governance'],
+ provincial_director:['/','/organizations','/governance'],
+ district_director:['/','/organizations','/governance'],
+ group_executive:['/','/organizations','/governance'],
+ governing_body_chair:['/','/organizations','/governance'],
+ headmaster:['/','/school-operations','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/','/organizations','/academics','/governance','/institution-records'],
+ department_head:['/','/organizations','/academics','/governance','/written-exams'],
+ grade_head:['/','/organizations','/academics','/governance'],
+ administrator:['/','/organizations','/governance'],
+ teacher:['/','/school-operations','/organizations','/materials','/written-exams'],
+ assessor:['/','/organizations','/written-exams'],
+ parent:['/','/institution-records'],
+ learner:['/','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+};
 const navItems = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
+  { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
+  { href: '/school-operations', label: 'School operations', icon: BookOpen },
+  { href: '/career-passport', label: 'Careers & passport', icon: Target },
+  { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
   { href: '/quizzes', label: 'Practice tests', icon: BrainCircuit },
   { href: '/written-exams', label: 'Written exams', icon: FileText },
@@ -36,6 +64,8 @@ const navItems = [
   { href: '/academics', label: 'Academics', icon: BookOpen },
   { href: '/potential', label: 'My potential', icon: Target },
   { href: '/learner-journey', label: 'My journey', icon: GraduationCap },
+  { href: '/institution-records', label: 'Institutions', icon: BookOpen },
+  { href: '/governance', label: 'Governance', icon: GraduationCap },
 ];
 
 function BusyScreen() {
@@ -44,6 +74,21 @@ function BusyScreen() {
 
 function SignedOut() {
   const { login } = useAuth();
+  const [username,setUsername] = useState('');
+  const [password,setPassword] = useState('');
+  const [signInError,setSignInError] = useState('');
+  const [submitting,setSubmitting] = useState(false);
+  const isolatedTest = import.meta.env.VITE_CABO_TEST_LOGIN === 'true';
+  async function testSignIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);setSignInError('');
+    try {
+      const response = await fetch('/api/test-login', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({username,password})});
+      if(!response.ok){const result=await response.json().catch(()=>({}));throw new Error(result.error ?? 'Sign-in failed')}
+      window.location.assign('/');
+    } catch(error) {setSignInError(error instanceof Error?error.message:'Sign-in failed');}
+    finally {setSubmitting(false);}
+  }
   return <main className="auth-screen">
     <div className="auth-brand"><Mark /><span>Training & Development Hub</span></div>
     <section className="auth-panel">
@@ -51,7 +96,12 @@ function SignedOut() {
       <p className="eyebrow">A clearer way to study</p>
       <h1 className="font-display">Make your notes<br />work harder.</h1>
       <p className="auth-copy">Turn the material you already have into focused practice. Pick up where you left off, whenever you’re ready.</p>
-      <button className="button button-primary auth-login" onClick={login} data-testid="button-login">Continue to Training & Development Hub <ArrowRight size={17} /></button>
+      {isolatedTest ? <form onSubmit={testSignIn} className="space-y-3" aria-label="CABO test sign-in">
+        <label className="block text-sm">Username<input autoComplete="username" required value={username} onChange={event=>setUsername(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-3 text-foreground" /></label>
+        <label className="block text-sm">Password<input type="password" autoComplete="current-password" required value={password} onChange={event=>setPassword(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-3 text-foreground" /></label>
+        {signInError && <p role="alert" className="text-sm text-red-700">{signInError}</p>}
+        <button type="submit" disabled={submitting} className="button button-primary auth-login" data-testid="button-login">{submitting?'Signing in…':'Sign in to CABO test hub'} <ArrowRight size={17} /></button>
+      </form> : <button className="button button-primary auth-login" onClick={login} data-testid="button-login">Continue to Training & Development Hub <ArrowRight size={17} /></button>}
       <div className="auth-foot"><span>Private by design</span><span className="auth-dot" /><span>Your materials stay yours</span></div>
     </section>
     <p className="auth-aside">A study companion, not another distraction.</p>
@@ -66,7 +116,11 @@ function AuthGate() {
 
 function Router() {
   return <RoutedErrorBoundary><Switch>
-    <Route path="/" component={DashboardPage} />
+    <Route path="/" component={RoleHomePage} />
+    <Route path="/platform-admin" component={PlatformAdminPage} />
+    <Route path="/school-operations" component={SchoolOperationsPage} />
+    <Route path="/career-passport" component={CareerPassportPage} />
+    <Route path="/study-overview" component={DashboardPage} />
     <Route path="/materials" component={MaterialsPage} />
     <Route path="/materials/:id" component={MaterialConfigurePage} />
     <Route path="/quizzes" component={QuizzesPage} />
@@ -75,28 +129,33 @@ function Router() {
     <Route path="/academics" component={AcademicsPage} />
     <Route path="/potential" component={PotentialPage} />
     <Route path="/learner-journey" component={LearnerJourneyPage} />
+    <Route path="/institution-records" component={InstitutionRecordsPage} />
+    <Route path="/governance" component={GovernancePage} />
     <Route path="/quiz/:id" component={QuizPage} />
     <Route component={NotFound} />
   </Switch></RoutedErrorBoundary>;
 }
 
 function AppShell({ user, logout }: { user: any; logout: () => void }) {
+  const signOut = import.meta.env.VITE_CABO_TEST_LOGIN === 'true' ? async () => { await fetch('/api/test-logout',{method:'POST',credentials:'include'});window.location.assign('/'); } : logout;
   const [location] = useLocation();
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
+  useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
       <Link href="/" className="brand"><Mark /><span>Training & Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
-        {navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
+        {navItems.filter(item=>portalRole!==null&&allowedNav[portalRole]?.includes(item.href)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
         <div className="side-note"><span className="note-mark"><Target size={17} /></span><p>Small sessions add up.<br /><strong>Keep your rhythm.</strong></p></div>
         <div className="profile-row">
           <div className="avatar">{initials}</div>
           <div className="profile-copy"><strong>{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Learner'}</strong><span>{user?.email || 'Your account'}</span></div>
-          <button className="icon-button logout-button" onClick={logout} aria-label="Log out" title="Log out" data-testid="button-logout"><LogOut size={16} /></button>
+          <button className="icon-button logout-button" onClick={signOut} aria-label="Log out" title="Log out" data-testid="button-logout"><LogOut size={16} /></button>
         </div>
       </div>
     </aside>
@@ -134,6 +193,24 @@ function EmptyState({ icon: Icon, title, description, action }: { icon: any; tit
   return <div className="empty-state"><div className="empty-art"><span className="empty-orbit orbit-a" /><span className="empty-orbit orbit-b" /><span className="empty-icon"><Icon size={25} /></span></div><h3 className="font-display">{title}</h3><p>{description}</p>{action}</div>;
 }
 
+type GrowthSummary={profile:{headline:string;aspirations:string};evidence:Record<string,number>;learningStages:number;milestones:number;pendingAccessRequests:number};
+function GrowthSnapshot() {
+  const [data,setData]=useState<GrowthSummary|null>(null);
+  const [error,setError]=useState(false);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{let active=true;fetch('/api/development/overview',{credentials:'include',cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Could not fetch growth profile');return r.json()}).then((x:GrowthSummary)=>{if(active)setData(x)}).catch(()=>{if(active)setError(true)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[]);
+  const evidenceTotal=Object.values(data?.evidence??{}).reduce((sum,n)=>sum+n,0);
+  return <section className="growth-section" aria-label="Personal development overview">
+    <div className="growth-header"><div><p className="eyebrow">YOUR LONG-TERM JOURNEY</p><h2 className="font-display">More than a test score.</h2><p>Build a record of what you learn, make and achieve over time. Your information is private and remains under your control.</p></div><Link href="/learner-journey" className="button button-outline">View my journey <ArrowRight size={15}/></Link></div>
+    {loading?<p className="growth-empty">Loading your development snapshot…</p>:error?<p role="status" className="growth-empty">Development totals aren't available right now. You can still open your profile and learning history.</p>:<div className="growth-metrics">
+      <div><strong>{data?.learningStages??0}</strong><span>Learning stages</span></div>
+      <div><strong>{data?.milestones??0}</strong><span>Milestones</span></div>
+      <div><strong>{evidenceTotal}</strong><span>Portfolio entries</span></div>
+      <div><strong>{data?.pendingAccessRequests??0}</strong><span>Permission requests</span></div>
+    </div>}
+    <div className="growth-actions"><Link href="/potential">Develop my potential <ArrowUpRight size={15}/></Link><Link href="/institution-records">School & guardian records <ArrowUpRight size={15}/></Link></div>
+  </section>;
+}
 function DashboardPage() {
   const dashboard = useGetDashboard();
   const materials = useListMaterials();
@@ -146,6 +223,7 @@ function DashboardPage() {
       <Metric label="Sessions completed" value={dashboard.data?.completedAttempts ?? 0} icon={CheckCircle2} note="Every attempt counts" accent="gold" />
       <Metric label="Average score" value={dashboard.data?.averageScore == null ? '—' : `${Math.round(dashboard.data.averageScore)}%`} icon={Target} note="Across completed sessions" accent="blue" />
     </div>}
+    <GrowthSnapshot />
     <section className="dashboard-lower">
       <div className="section-panel recent-panel">
         <div className="section-head"><div><p className="eyebrow">Keep the momentum</p><h2 className="font-display">Recent practice</h2></div><Link href="/quizzes" className="text-link">All tests <ArrowRight size={15} /></Link></div>

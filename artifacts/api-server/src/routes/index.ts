@@ -9,6 +9,10 @@ import academicRouter from "./academic";
 import academicExamLinksRouter from "./academicExamLinks";
 import potentialRouter from "./potential";
 import learnerJourneyRouter from "./learnerJourney";
+import institutionRecordsRouter from "./institutionRecords";
+import managementHierarchyRouter from "./managementHierarchy";
+import rolePortalsRouter from "./rolePortals";
+import educationTalentRouter from "./educationTalent";
 
 const router: IRouter = Router();
 
@@ -22,5 +26,9 @@ router.use(academicRouter);
 router.use(academicExamLinksRouter);
 router.use(potentialRouter);
 router.use(learnerJourneyRouter);
+router.use(institutionRecordsRouter);
+router.use(managementHierarchyRouter);
+router.use(rolePortalsRouter);
+router.use(educationTalentRouter);
 
 export default router;

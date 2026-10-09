@@ -2,6 +2,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, desc, count, avg } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, usersTable, organizationsTable, organizationMembersTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
+import { isPlatformSuperadmin } from "../lib/portalAccess";
+import { auditSuperadmin } from "../lib/platformAudit";
 const router: IRouter=Router();
 const num=z.coerce.number().int().positive();
 function me(req:Request,res:Response):string|null {if (!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null;} return req.user!.id;}
@@ -10,11 +12,19 @@ async function member(orgId:number,userId:string) {
 }
 async function guard(req:Request,res:Response,orgId:number,roles?:string[]) {
  const user=me(req,res);if(!user)return null;
+ const elevated=isPlatformSuperadmin(user);
+ if(elevated){await auditSuperadmin(user,"organization_access",orgId);return {role:"owner",organizationId:orgId,userId:user};}
  const m=await member(orgId,user);if(!m||roles&&!roles.includes(m.role)){res.status(403).json({error:"Not authorised in this organization"});return null;}return m;
 }
 const staff=["owner","admin","teacher","assessor"];
+const managers=["owner","admin"];
 router.get("/organizations",async(req,res)=>{
  const id=me(req,res);if(!id)return;
+ if(isPlatformSuperadmin(id)){
+  const all=await db.select({id:organizationsTable.id,name:organizationsTable.name}).from(organizationsTable);
+  await auditSuperadmin(id,"organizations_list");
+  res.setHeader("Cache-Control","no-store");res.json(all.map(o=>({...o,role:"owner"})));return;
+ }
  const rows=await db.select({id:organizationsTable.id,name:organizationsTable.name,role:organizationMembersTable.role}).from(organizationMembersTable).innerJoin(organizationsTable,eq(organizationsTable.id,organizationMembersTable.organizationId)).where(eq(organizationMembersTable.userId,id));
  res.json(rows);
 });
@@ -30,7 +40,7 @@ router.post("/organizations",async(req,res)=>{
 });
 router.get("/organizations/:orgId/members",async(req,res)=>{
  const id=num.safeParse(req.params.orgId);if(!id.success){res.sendStatus(400);return;}
- if(!await guard(req,res,id.data))return;
+ if(!await guard(req,res,id.data,managers))return;
  res.json(await db.select({userId:organizationMembersTable.userId,role:organizationMembersTable.role,email:usersTable.email,firstName:usersTable.firstName,lastName:usersTable.lastName}).from(organizationMembersTable).innerJoin(usersTable,eq(usersTable.id,organizationMembersTable.userId)).where(eq(organizationMembersTable.organizationId,id.data)));
 });
 router.post("/organizations/:orgId/members",async(req,res)=>{
@@ -38,7 +48,7 @@ router.post("/organizations/:orgId/members",async(req,res)=>{
  const body=z.object({email:z.email(),role:z.enum(["admin","teacher","assessor","learner"])}).safeParse(req.body);
  if(!oid.success||!body.success){res.status(400).json({error:"Invalid member details"});return;}
  if(!await guard(req,res,oid.data,["owner","admin"]))return;
- if(body.data.role==="admin" && (await member(oid.data,req.user!.id))?.role!=="owner"){res.sendStatus(403);return;}
+ if(body.data.role==="admin" && !isPlatformSuperadmin(req.user!.id) && (await member(oid.data,req.user!.id))?.role!=="owner"){res.sendStatus(403);return;}
  const [person]=await db.select().from(usersTable).where(eq(usersTable.email,body.data.email)).limit(1);
  if(!person){res.status(404).json({error:"User must sign up before they can be added"});return;}
  try {await db.insert(organizationMembersTable).values({organizationId:oid.data,userId:person.id,role:body.data.role});res.status(201).json({userId:person.id,role:body.data.role});}
@@ -46,19 +56,19 @@ router.post("/organizations/:orgId/members",async(req,res)=>{
 });
 router.get("/organizations/:orgId/groups",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data))return;
+ if(!await guard(req,res,oid.data,managers))return;
  res.json(await db.select().from(learnerGroupsTable).where(eq(learnerGroupsTable.organizationId,oid.data)));
 });
 router.post("/organizations/:orgId/groups",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),body=z.object({name:z.string().trim().min(2).max(200)}).safeParse(req.body);
  if(!oid.success||!body.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [row]=await db.insert(learnerGroupsTable).values({organizationId:oid.data,name:body.data.name}).returning();res.status(201).json(row);
 });
 router.post("/organizations/:orgId/groups/:groupId/learners",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),gid=num.safeParse(req.params.groupId),body=z.object({userId:z.string().min(1)}).safeParse(req.body);
  if(!oid.success||!gid.success||!body.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [group]=await db.select().from(learnerGroupsTable).where(and(eq(learnerGroupsTable.id,gid.data),eq(learnerGroupsTable.organizationId,oid.data))).limit(1);
  const learner=await member(oid.data,body.data.userId);
  if(!group||!learner||learner.role!=="learner"){res.status(400).json({error:"Group or learner not eligible"});return;}
@@ -68,7 +78,7 @@ router.post("/organizations/:orgId/groups/:groupId/learners",async(req,res)=>{
 router.get("/organizations/:orgId/groups/:groupId/learners",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),gid=num.safeParse(req.params.groupId);
  if(!oid.success||!gid.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [group]=await db.select().from(learnerGroupsTable).where(and(eq(learnerGroupsTable.id,gid.data),eq(learnerGroupsTable.organizationId,oid.data))).limit(1);
  if(!group){res.sendStatus(404);return;}
  res.json(await db.select({userId:usersTable.id,email:usersTable.email}).from(learnerGroupMembersTable).innerJoin(usersTable,eq(usersTable.id,learnerGroupMembersTable.userId)).where(eq(learnerGroupMembersTable.groupId,gid.data)));
@@ -76,7 +86,7 @@ router.get("/organizations/:orgId/groups/:groupId/learners",async(req,res)=>{
 router.post("/organizations/:orgId/assignments",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),body=z.object({groupId:z.number().int().positive(),examId:z.number().int().positive(),dueAt:z.iso.datetime().optional()}).safeParse(req.body);
  if(!oid.success||!body.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [group]=await db.select().from(learnerGroupsTable).where(and(eq(learnerGroupsTable.id,body.data.groupId),eq(learnerGroupsTable.organizationId,oid.data))).limit(1);
  const [exam]=await db.select().from(writtenExamsTable).where(and(eq(writtenExamsTable.id,body.data.examId),eq(writtenExamsTable.userId,req.user!.id))).limit(1);
  if(!group||!exam){res.status(400).json({error:"Group or exam not available"});return;}
@@ -85,7 +95,7 @@ router.post("/organizations/:orgId/assignments",async(req,res)=>{
 });
 router.get("/organizations/:orgId/assignments",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data))return;
+ if(!await guard(req,res,oid.data,managers))return;
  res.json(await db.select().from(examAssignmentsTable).where(eq(examAssignmentsTable.organizationId,oid.data)).orderBy(desc(examAssignmentsTable.createdAt)));
 });
 router.get("/my-assignments",async(req,res)=>{
@@ -101,7 +111,7 @@ router.get("/my-assignments",async(req,res)=>{
 });
 router.get("/organizations/:orgId/dashboard",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [members]=await db.select({value:count()}).from(organizationMembersTable).where(eq(organizationMembersTable.organizationId,oid.data));
  const [groups]=await db.select({value:count()}).from(learnerGroupsTable).where(eq(learnerGroupsTable.organizationId,oid.data));
  const [assignments]=await db.select({value:count()}).from(examAssignmentsTable).where(eq(examAssignmentsTable.organizationId,oid.data));
@@ -110,14 +120,14 @@ router.get("/organizations/:orgId/dashboard",async(req,res)=>{
 });
 router.get("/organizations/:orgId/submissions",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  res.json(await db.select({id:assignmentSubmissionsTable.id,assignmentId:assignmentSubmissionsTable.assignmentId,userId:assignmentSubmissionsTable.userId,attemptId:assignmentSubmissionsTable.attemptId,percentage:writtenExamAttemptsTable.percentage,awardedMarks:writtenExamAttemptsTable.awardedMarks,maxMarks:writtenExamAttemptsTable.maxMarks,feedback:writtenExamAttemptsTable.feedback,answers:writtenExamAttemptsTable.answers}).from(assignmentSubmissionsTable).innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId)).innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId)).where(eq(examAssignmentsTable.organizationId,oid.data)));
 });
 router.post("/organizations/:orgId/submissions/:submissionId/overrides",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),sid=num.safeParse(req.params.submissionId);
  const body=z.object({questionIndex:z.number().int().min(0),awardedMarks:z.number().min(0),reason:z.string().trim().min(5).max(2000)}).safeParse(req.body);
  if(!oid.success||!sid.success||!body.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [submission]=await db.select({attempt:writtenExamAttemptsTable,exam:writtenExamsTable}).from(assignmentSubmissionsTable)
  .innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId))
  .innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId))
@@ -130,7 +140,7 @@ router.post("/organizations/:orgId/submissions/:submissionId/overrides",async(re
 router.get("/organizations/:orgId/submissions/:submissionId/overrides",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),sid=num.safeParse(req.params.submissionId);
  if(!oid.success||!sid.success){res.sendStatus(400);return;}
- if(!await guard(req,res,oid.data,staff))return;
+ if(!await guard(req,res,oid.data,managers))return;
  const [s]=await db.select({id:assignmentSubmissionsTable.id}).from(assignmentSubmissionsTable).innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId)).where(and(eq(assignmentSubmissionsTable.id,sid.data),eq(examAssignmentsTable.organizationId,oid.data))).limit(1);
  if(!s){res.sendStatus(404);return;}
  res.json(await db.select().from(assessorOverridesTable).where(eq(assessorOverridesTable.submissionId,sid.data)).orderBy(desc(assessorOverridesTable.createdAt)));

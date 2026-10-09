@@ -104,3 +104,19 @@ This next product module introduces a private potential profile, self-reported g
 ## My journey (development)
 
 A private and explicitly self-reported Grade RR–12-to-university learning timeline and personal milestones feature is available in the **My journey** navigation area. See [Lifelong Learner Identity](docs/LIFELONG_LEARNER_IDENTITY.md) for strict provenance and future guardian/institutional verification requirements.
+
+## Institution enrolment and guardian invitations (pilot)
+
+The **Institutions** workspace offers institution-admin-attested enrolments, learner-initiated school-transfer requests and guardian invitations. This does **not** yet constitute official school accreditation, verified legal guardianship or automatic sharing of academic records. See [documentation](docs/INSTITUTION_TRANSFERS_AND_GUARDIANS.md).
+
+## Role-based education governance (pilot)
+
+The **Governance** workspace supports tenant-scoped national, provincial, district, group, school, department, grade and classroom reporting units with delegated leadership assignments. The API enforces rank and organisational scope. This pilot does not grant parent access to child records or automatically elevate academic API permissions. See [Governance Hierarchy](docs/GOVERNANCE_HIERARCHY.md).
+
+## Role-based portals (testing)
+
+The home dashboard now adapts to CABO's institutional hierarchy, with distinct experiences for national/provincial/district leadership, headmasters, educators, learners, parents and an isolated Railway test superadmin. Academic grading and assessment review access is restricted to assigned courses or authorised administrators. See [Role-Based Portals](docs/ROLE_BASED_PORTALS.md).
+
+## Phases 1–4 implementation tracker
+
+CABO's development branch includes new school attendance/notices, a candidate application workflow and a private six-month **development review** passport. Employer-facing application submission and psychometric disclosure stay gated pending independent eligibility, professional and legal review. See [Phases 1–4 delivery register](docs/PHASES_1_TO_4_DELIVERY_REGISTER.md) for what is implemented vs. still required.
