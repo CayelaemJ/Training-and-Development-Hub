@@ -14,7 +14,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') ||
       req.mode === 'navigate' || req.destination === 'document') return;
-  if (!['script', 'style', 'font', 'image'].includes(req.destination)) return;
+  // Never cache dynamic user-uploaded images or authenticated content.\n  if (!url.pathname.startsWith('/assets/') && !url.pathname.startsWith('/icons/') && url.pathname !== '/favicon.svg') return;\n  if (!['script', 'style', 'font', 'image'].includes(req.destination)) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
