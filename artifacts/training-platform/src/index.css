@@ -981,3 +981,82 @@
  .growth-header .button { width:100%; justify-content:center; }
 }
 @media (max-width:380px) { .growth-metrics strong {font-size:1.6rem;} .growth-metrics span{font-size:.72rem;} }
+
+
+/* Session controls: desktop sidebar and always-reachable mobile header. */
+.sidebar-signout {
+  width: 100%;
+  min-height: 43px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 1px solid #405149;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: transparent;
+  color: #e0e8df;
+  font: 600 12px/1.4 var(--app-font-sans);
+  cursor: pointer;
+}
+.sidebar-signout:hover:not(:disabled) { background: #2e4338; }
+.sidebar-signout:disabled, .topbar-signout:disabled { opacity: .6; cursor: wait; }
+.sidebar-signout:focus-visible, .topbar-signout:focus-visible { outline: 3px solid #a0c9a8; outline-offset: 2px; }
+.topbar-signout { display: none; }
+.signout-error {
+  padding: 12px 18px;
+  color: #75352a;
+  background: #fbede7;
+  border-bottom: 1px solid #e8c5b8;
+  font: 500 13px/1.5 var(--app-font-sans);
+}
+.signout-error button { margin-left: 8px; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.signed-out-screen {
+  min-height: 100dvh;
+  padding: calc(32px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  background: #f7f5ee;
+}
+.signed-out-card {
+  width: min(100%, 470px);
+  background: #fffefa;
+  border: 1px solid #e4dfd2;
+  border-radius: 12px;
+  padding: clamp(25px, 5vw, 48px);
+  box-shadow: 0 8px 32px rgba(22,36,28,.04);
+}
+.signed-out-card > img { display: block; margin-bottom: 40px; }
+.signed-out-card .eyebrow { color: #93633e; }
+.signed-out-card h1 {
+  margin: 0;
+  color: #23372b;
+  font: 500 clamp(30px, 5vw, 42px)/1.18 var(--app-font-serif);
+  letter-spacing: -.045em;
+}
+.signed-out-card > p:not(.eyebrow) { margin: 15px 0 25px; color: #69796a; font-size: 14px; line-height: 1.65; }
+.signed-out-return { min-height: 48px; width: 100%; justify-content: space-between; }
+.signed-out-footer { display: block; border-top: 1px solid #e8e4d9; margin-top: 25px; padding-top: 16px; color: #879287; font-size: 11px; }
+@media (max-width: 760px) {
+  .topbar-signout {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 9px;
+    border: 1px solid #cad4c8;
+    border-radius: 7px;
+    background: #fbfaf5;
+    color: #244a35;
+    font: 600 12px/1.3 var(--app-font-sans);
+    cursor: pointer;
+  }
+  .topbar-right { gap: 10px; }
+  .topbar .avatar-small { width: 29px; height: 29px; flex-basis: 29px; }
+}
+@media (max-width: 375px) {
+  .topbar-signout { padding: 0 8px; }
+  .topbar-signout span { display: none; }
+  .topbar-right { gap: 7px; }
+}
