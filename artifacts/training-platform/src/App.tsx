@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
+import CaboAccessLanding from '@/components/cabo-access-landing';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
@@ -72,46 +73,10 @@ function BusyScreen() {
   return <div className="min-h-[100dvh] grid place-items-center"><div className="flex items-center gap-3 text-muted-foreground"><span className="skeleton-dot" /><span>Getting your study space ready</span></div></div>;
 }
 
-function SignedOut() {
-  const { login } = useAuth();
-  const [username,setUsername] = useState('');
-  const [password,setPassword] = useState('');
-  const [signInError,setSignInError] = useState('');
-  const [submitting,setSubmitting] = useState(false);
-  const isolatedTest = import.meta.env.VITE_CABO_TEST_LOGIN === 'true';
-  async function testSignIn(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);setSignInError('');
-    try {
-      const response = await fetch('/api/test-login', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({username,password})});
-      if(!response.ok){const result=await response.json().catch(()=>({}));throw new Error(result.error ?? 'Sign-in failed')}
-      window.location.assign('/');
-    } catch(error) {setSignInError(error instanceof Error?error.message:'Sign-in failed');}
-    finally {setSubmitting(false);}
-  }
-  return <main className="auth-screen">
-    <div className="auth-brand"><Mark /><span>Training & Development Hub</span></div>
-    <section className="auth-panel">
-      <div className="auth-symbol"><GraduationCap size={26} /></div>
-      <p className="eyebrow">A clearer way to study</p>
-      <h1 className="font-display">Make your notes<br />work harder.</h1>
-      <p className="auth-copy">Turn the material you already have into focused practice. Pick up where you left off, whenever you’re ready.</p>
-      {isolatedTest ? <form onSubmit={testSignIn} className="space-y-3" aria-label="CABO test sign-in">
-        <label className="block text-sm">Username<input autoComplete="username" required value={username} onChange={event=>setUsername(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-3 text-foreground" /></label>
-        <label className="block text-sm">Password<input type="password" autoComplete="current-password" required value={password} onChange={event=>setPassword(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-3 text-foreground" /></label>
-        {signInError && <p role="alert" className="text-sm text-red-700">{signInError}</p>}
-        <button type="submit" disabled={submitting} className="button button-primary auth-login" data-testid="button-login">{submitting?'Signing in…':'Sign in to CABO test hub'} <ArrowRight size={17} /></button>
-      </form> : <button className="button button-primary auth-login" onClick={login} data-testid="button-login">Continue to Training & Development Hub <ArrowRight size={17} /></button>}
-      <div className="auth-foot"><span>Private by design</span><span className="auth-dot" /><span>Your materials stay yours</span></div>
-    </section>
-    <p className="auth-aside">A study companion, not another distraction.</p>
-  </main>;
-}
-
 function AuthGate() {
   const auth = useAuth();
   if (auth.isLoading) return <BusyScreen />;
-  return auth.isAuthenticated ? <AppShell user={auth.user} logout={auth.logout} /> : <SignedOut />;
+  return auth.isAuthenticated ? <AppShell user={auth.user} logout={auth.logout} /> : <CaboAccessLanding />;
 }
 
 function Router() {
