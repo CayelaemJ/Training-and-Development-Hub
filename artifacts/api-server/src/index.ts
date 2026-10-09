@@ -22,4 +22,8 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  if (process.env.RAILWAY_ENVIRONMENT_NAME === "testing" && process.env.ENABLE_CABO_DEMO_SEED === "true") {
+    import("./lib/demoSeed").then(({ seedCaboDemo }) => seedCaboDemo())
+      .catch(err => logger.error({ err }, "CABO demo fixture seeding failed"));
+  }
 });
