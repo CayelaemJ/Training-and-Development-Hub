@@ -20,6 +20,13 @@ export async function groqSmokeTest(): Promise<void> {
     maxRetries: 0,
   });
   try {
+    const models = await client.models.list();
+    const available = models.data.map(x => x.id).sort();
+    logger.info({ count: available.length, modelIds: available.slice(0, 40) }, "CABO Groq accessible models");
+    if (!available.includes(model)) {
+      logger.error({ model, count: available.length }, "CABO Groq configured model unavailable");
+      return;
+    }
     const response = await client.chat.completions.create({
       model,
       messages: [
