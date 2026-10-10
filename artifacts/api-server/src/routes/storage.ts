@@ -1,9 +1,12 @@
 import { Readable } from 'stream';
+import { randomUUID } from 'node:crypto';
+import express from 'express';
+import { and,eq } from 'drizzle-orm';
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from '@workspace/api-zod';
-import { db, uploadIntentsTable } from '@workspace/db';
+import { db, uploadIntentsTable, materialUploadBlobsTable } from '@workspace/db';
 import { Router, type IRouter, type Request, type Response } from 'express';
 
 import { ObjectPermission } from '../lib/objectAcl';
@@ -69,11 +72,12 @@ router.post(
         return;
       }
 
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath =
-        objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const railwayFallback = process.env.RAILWAY_ENVIRONMENT_NAME === 'testing';
+      const objectPath = railwayFallback ? `/railway-uploads/${randomUUID()}` : '';
+      const uploadURL = railwayFallback ? `/api/storage/uploads/railway/${objectPath.split('/').pop()}` : await objectStorageService.getObjectEntityUploadURL();
+      const finalObjectPath = railwayFallback ? objectPath : objectStorageService.normalizeObjectEntityPath(uploadURL);
       await db.insert(uploadIntentsTable).values({
-        objectPath,
+        objectPath: finalObjectPath,
         userId: req.user.id,
         fileName: name,
         contentType,
@@ -83,7 +87,7 @@ router.post(
       res.json(
         RequestUploadUrlResponse.parse({
           uploadURL,
-          objectPath,
+          objectPath: finalObjectPath,
         }),
       );
     } catch (error) {
@@ -92,6 +96,26 @@ router.post(
     }
   },
 );
+
+/**
+ * Private, same-origin, short-lived upload destination for Railway TESTING only.
+ * Binary bytes stay in the isolated PostgreSQL database until material creation.
+ * This avoids Replit's unavailable localhost object-storage sidecar on Railway.
+ */
+router.put('/storage/uploads/railway/:id',express.raw({type:'*/*',limit:'20mb'}),async(req,res)=>{
+ if(!hasAuthenticatedSession(req)){res.status(401).json({error:'Unauthorized'});return}
+ if(process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return}
+ const identifier=req.params.id;
+ if(typeof identifier!=='string'||!/^[a-f0-9-]{36}$/.test(identifier)){res.sendStatus(400);return}
+ const objectPath='/railway-uploads/'+identifier;
+ const [intent]=await db.select().from(uploadIntentsTable).where(and(eq(uploadIntentsTable.objectPath,objectPath),eq(uploadIntentsTable.userId,req.user.id))).limit(1);
+ if(!intent){res.sendStatus(404);return}
+ const bytes=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);
+ if(!bytes.length||bytes.length!==intent.sizeBytes){res.status(400).json({error:'Upload size mismatch'});return}
+ if(Date.now()-intent.createdAt.getTime()>15*60_000){res.status(410).json({error:'Upload expired; request a new URL'});return}
+ await db.insert(materialUploadBlobsTable).values({objectPath,userId:req.user.id,bytes}).onConflictDoNothing();
+ res.sendStatus(204);
+});
 
 /**
  * GET /storage/public-objects/*

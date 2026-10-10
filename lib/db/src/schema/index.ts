@@ -18,3 +18,5 @@ export * from './courseStaff';
 
 export * from './schoolOperations';
 export * from './talentPassport';
+
+export * from './materialUploadBlobs';
