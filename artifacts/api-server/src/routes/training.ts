@@ -28,6 +28,7 @@ import {
   quizzesTable,
   studyMaterialsTable,
   uploadIntentsTable,
+  materialUploadBlobsTable,
   type StoredFeedback,
   type StoredQuestion,
 } from "@workspace/db";
@@ -173,10 +174,10 @@ router.post("/materials", async (req, res): Promise<void> => {
   }
 
   try {
-    const objectFile = await objectStorageService.getObjectEntityFile(
-      intent.objectPath,
-    );
-    const buffer = await readObjectBuffer(objectFile.createReadStream());
+    const local = intent.objectPath.startsWith('/railway-uploads/');
+    const [blob] = local ? await db.select().from(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,intent.objectPath),eq(materialUploadBlobsTable.userId,req.user.id))).limit(1) : [];
+    const buffer = local ? blob?.bytes : await readObjectBuffer((await objectStorageService.getObjectEntityFile(intent.objectPath)).createReadStream());
+    if (!buffer) { res.status(400).json({error:'Upload not received. Please retry.'}); return; }
     if (buffer.byteLength !== intent.sizeBytes) {
       res.status(400).json({ error: "The uploaded file size does not match." });
       return;
@@ -189,7 +190,7 @@ router.post("/materials", async (req, res): Promise<void> => {
       return;
     }
 
-    await objectStorageService.trySetObjectEntityAclPolicy(intent.objectPath, {
+    if (!local) await objectStorageService.trySetObjectEntityAclPolicy(intent.objectPath, {
       owner: req.user.id,
       visibility: "private",
     });
@@ -258,10 +259,12 @@ router.delete("/materials/:id", async (req, res): Promise<void> => {
   }
 
   try {
-    const file = await objectStorageService.getObjectEntityFile(
-      material.objectPath,
-    );
-    await file.delete({ ignoreNotFound: true });
+    if (material.objectPath.startsWith('/railway-uploads/')) {
+      await db.delete(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,material.objectPath),eq(materialUploadBlobsTable.userId,req.user.id)));
+    } else {
+      const file = await objectStorageService.getObjectEntityFile(material.objectPath);
+      await file.delete({ ignoreNotFound: true });
+    }
   } catch (error) {
     req.log.error({ err: error, materialId: material.id }, "File deletion failed");
     res.status(500).json({ error: "Could not remove the uploaded file." });
@@ -316,10 +319,10 @@ router.post("/materials/:id/quizzes", async (req, res): Promise<void> => {
 
   let sourceText: string;
   try {
-    const file = await objectStorageService.getObjectEntityFile(
-      material.objectPath,
-    );
-    const buffer = await readObjectBuffer(file.createReadStream());
+    const local = material.objectPath.startsWith('/railway-uploads/');
+    const [blob] = local ? await db.select().from(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,material.objectPath),eq(materialUploadBlobsTable.userId,req.user.id))).limit(1) : [];
+    const buffer = local ? blob?.bytes : await readObjectBuffer((await objectStorageService.getObjectEntityFile(material.objectPath)).createReadStream());
+    if (!buffer) throw new Error('Uploaded file not found');
     sourceText = await extractMaterialText(material.fileName, buffer);
   } catch (error) {
     req.log.error({ err: error, materialId: material.id }, "Material could not be read for quiz generation");
