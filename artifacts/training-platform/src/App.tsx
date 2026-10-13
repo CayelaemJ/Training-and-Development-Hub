@@ -138,6 +138,8 @@ function AppShell({ user }: { user: any }) {
     }
   }
   const [location] = useLocation();
+  const [mobileMenuOpen,setMobileMenuOpen] = useState(false);
+  useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
   const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
@@ -173,6 +175,17 @@ function AppShell({ user }: { user: any }) {
         </div>
       </header>
       {signOutError && <div className="signout-error" role="alert">{signOutError} <button type="button" onClick={signOut}>Retry sign out</button></div>}
+      {portalRole && (portalRole === 'parent' || portalRole === 'learner') && <nav className="mobile-family-nav" aria-label="Mobile primary navigation">
+        {(portalRole === 'parent'
+          ? [{href:'/',label:'Home',icon:LayoutDashboard},{href:'/institution-records',label:'My children',icon:GraduationCap}]
+          : [{href:'/',label:'Home',icon:LayoutDashboard},{href:'/school-operations',label:'School',icon:Clock3},{href:'/materials',label:'Study',icon:BookOpen},{href:'/quizzes',label:'Practice',icon:BrainCircuit}]
+        ).map(({href,label,icon:Icon}) => <Link key={href} href={href} aria-current={location===href?'page':undefined} className={`mobile-family-tab ${location===href?'active':''}`}><Icon size={21} strokeWidth={1.8} aria-hidden="true"/><span>{label}</span></Link>)}
+        <button type="button" className="mobile-family-tab" aria-expanded={mobileMenuOpen} aria-controls="mobile-family-more" onClick={()=>setMobileMenuOpen(value=>!value)}><Plus size={21} aria-hidden="true"/><span>More</span></button>
+      </nav>}
+      {mobileMenuOpen && portalRole && (portalRole === 'parent' || portalRole === 'learner') && <div className="mobile-family-more" id="mobile-family-more">
+        <div className="mobile-family-more-heading"><strong>Explore your workspace</strong><button type="button" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}><X size={20}/></button></div>
+        {navItems.filter(item=>allowedNav[portalRole].includes(item.href)).map(({href,label,icon:Icon})=><Link key={href} href={href} onClick={()=>setMobileMenuOpen(false)} className="mobile-family-more-link"><Icon size={18} aria-hidden="true"/>{label}<ChevronRight size={16} aria-hidden="true"/></Link>)}
+      </div>}
       <main className="main-content"><Router /></main>
       <footer className="footer cabo-product-footer"><Mark /><span>Training &amp; Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
     </div>
