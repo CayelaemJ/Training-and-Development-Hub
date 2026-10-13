@@ -1128,3 +1128,24 @@
  .app-frame:has(.mobile-family-nav) .main-content {padding-inline:10px;}
  .mobile-family-tab {font-size:9px;gap:2px;}
 }
+
+
+/* Universal role navigation: the previous mobile sidebar could contain 15+ links
+   and overflow beyond the screen, making its last links inaccessible. */
+@media (max-width:760px) {
+  .app-frame > .sidebar { display:none !important; }
+  .mobile-family-nav {
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:2px;
+    max-width:100vw;
+    overflow:hidden;
+    box-sizing:border-box;
+  }
+  .mobile-family-tab { width:100%; min-width:0; max-width:100%; white-space:normal; }
+  .mobile-family-tab span { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mobile-family-more { box-sizing:border-box; max-width:100vw; }
+  .app-main { width:100%; min-width:0; max-width:100vw; }
+  .main-content { padding-bottom:calc(116px + env(safe-area-inset-bottom)); }
+  .topbar { min-width:0; }
+}
