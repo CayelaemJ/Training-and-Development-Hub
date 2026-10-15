@@ -21,6 +21,7 @@ import institutionSetupRouter from "./institutionSetup";
 import schoolProgressionRouter from "./schoolProgression";
 import admissionsRouter from "./admissions";
 import reportCardsRouter from "./reportCards";
+import demoShowcaseRouter from "./demoShowcase";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(institutionSetupRouter);
 router.use(schoolProgressionRouter);
 router.use(admissionsRouter);
 router.use(reportCardsRouter);
+router.use(demoShowcaseRouter);
 
 export default router;
