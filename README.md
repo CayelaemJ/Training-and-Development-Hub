@@ -207,3 +207,32 @@ From the isolated testing superadmin screen:
 - Public institution registry must be sourced from current DHET directories and periodically verified. The application database starts empty rather than fabricating an official admissions partnership or programme catalogue.
 
 **Social impact priorities:** reduce repeat capture, mobile data burden and travel to institutions, support low-connectivity draft preparation and accessible multilingual instructions, provide honest application receipts and reduce financial barriers. These are product objectives, not yet fully built.
+
+### Presentation-ready synthetic school showcase
+
+The isolated Railway `testing` deployment can populate its database with **explicitly fictional** institutions and student records. Sign in as the designated test superadmin, open **Platform administration**, then click **Load synthetic school showcase**. The loader is accessible only in the isolated testing environment when `ENABLE_CABO_DEMO_SEED=true`; repeat requests are idempotent and do not intentionally overwrite live records.
+
+Demo entities:
+- **CABO DEMO | Early Learning Centre** — Grade R, pre-primary development and early learning.
+- **CABO DEMO | Tshwane Primary** — Grade 5, academic subject marks, attendance, family meetings and intervention support.
+- **CABO DEMO | Pretoria Secondary** — Grade 11, academic reports, skills and university pathways.
+- **CABO DEMO | University of Future Skills** — two fictitious published programme examples for the CABO Apply flow; it is **not accredited** and has no real admissions agreement.
+
+The loader adds synthetic learners, staff, pending guardian links (no automatic access to child records), term assessments with mock marks, attendance entries, notices and institutional activities. All fake records use `CABO DEMO` labels or reserved `example.invalid` emails. It does not create real school registration, national identity, university eligibility or authorised guardian rights.
+
+For presentations:
+1. Show the **Superadmin Command Centre** and prepare the demo dataset.
+2. Open **Reports & statistics** for each demo school, change the academic year to **2026**, and show attendance and grade distribution.
+3. Enter a synthetic learner account ID from the seeded demo reference to view a **draft report-card preview** (not an official report card). Example: `cabo-demo-child-5a` at **CABO DEMO | Tshwane Primary**.
+4. Open **School stages** to show pre-primary, primary and high-school intervention data.
+5. Open **Institution hub** to explore timetable, parent meetings, sports, bursaries and institutional governance proposals.
+6. Open **CABO Apply** to find the fictional university programmes and demonstrate a private application draft; no real university receives it.
+7. Discuss the future consent-based qualifications and talent passport roadmap without claiming live psychometric or employer integrations.
+
+Developer API routes:
+- `GET /api/organizations/:orgId/analytics?year=2026`: institution-admin statistics.
+- `GET /api/organizations/:orgId/reports/:learnerId?year=2026`: authorised draft report-card preview.
+- `GET /api/reports/me?organizationId=...&year=2026`: learner's own preview.
+- `POST /api/platform/demo/seed`: isolated test superadmin only.
+
+**Limits:** this is a demonstration of connected school workflows, not an official SA-SAMS replacement, nationally accredited credentials, complete QR/offline timetabling, verified university integrations or live qualified psychological assessment. Independent multi-role browser testing, real integrations and external approval remain release gates.
