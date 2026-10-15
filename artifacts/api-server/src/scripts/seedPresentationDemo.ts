@@ -1,9 +1,6 @@
 import {and,eq} from "drizzle-orm";
 import {db,usersTable,organizationsTable,organizationMembersTable,verifiedEnrollmentsTable,academicSettingsTable,academicCoursesTable,academicPeriodsTable,academicAssessmentsTable,academicGradesTable,schoolAttendanceTable,schoolNoticesTable,schoolStageProgressTable,hubRecordsTable,institutionSetupTable} from "@workspace/db";
 /** Run explicitly only on the isolated Railway TEST database, never production. */
-if(process.env.RAILWAY_ENVIRONMENT_NAME!=="testing"||process.env.ENABLE_CABO_DEMO_SEED!=="true"){
- throw new Error("Demo seed requires isolated Railway testing and explicit ENABLE_CABO_DEMO_SEED=true");
-}
 const operator="cabo-isolated-test-learner";
 
 async function user(id:string,firstName:string,lastName:string){
@@ -23,6 +20,7 @@ async function makeCourse(org:number,code:string,name:string,grade:string){
  return prior?.id??(await db.insert(academicCoursesTable).values({organizationId:org,name,code,level:grade}).returning())[0].id;
 }
 export async function seedPresentationDemo(){
+ if(process.env.RAILWAY_ENVIRONMENT_NAME!=="testing"||process.env.ENABLE_CABO_DEMO_SEED!=="true")throw new Error("Isolated demo seeding is not enabled");
  await user(operator,"CABO","Tester");
  const schools=[
   {name:"CABO DEMO | Early Learning Centre",type:"preprimary",grade:"R",learners:[["cabo-demo-child-r","Amara","Dlamini"]],subjects:[["LIT","Early Language"],["NUM","Early Numeracy"]]},
