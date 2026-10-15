@@ -9,7 +9,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 const router: IRouter = Router();
 const store = new ObjectStorageService();
 const USE_GROQ = Boolean(process.env.GROQ_API_KEY);
-const MODEL = USE_GROQ ? (process.env.GROQ_EXAM_MODEL || "llama-3.3-70b-versatile") : (process.env.OPENAI_EXAM_MODEL || "gpt-5.4-mini");
+const MODEL = USE_GROQ ? (process.env.GROQ_EXAM_MODEL || "openai/gpt-oss-120b") : (process.env.OPENAI_EXAM_MODEL || "gpt-5.4-mini");
 const hasAiKey = () => Boolean(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY);
 const generationInput = z.object({
   questionCount: z.number().int().min(1).max(15).default(5),
