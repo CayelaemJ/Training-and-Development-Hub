@@ -22,6 +22,7 @@ import HubModulesPage from '@/pages/hub-modules';
 import SchoolStagesPage from '@/pages/school-stages';
 import InstitutionSetupPage from '@/pages/institution-setup';
 import SchoolProgressionPage from '@/pages/school-progression';
+import CaboApplyPage from '@/pages/cabo-apply';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -42,7 +43,7 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/organizations','/governance'],
  provincial_director:['/','/organizations','/governance'],
  district_director:['/','/organizations','/governance'],
@@ -56,11 +57,12 @@ const allowedNav:Record<PortalKind,string[]>={
  teacher:['/','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
  assessor:['/','/organizations','/written-exams'],
  parent:['/','/development-plan','/sports-development','/institution-records'],
- learner:['/','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ learner:['/','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
+  { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
@@ -110,6 +112,7 @@ function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={RoleHomePage} />
     <Route path="/hub-modules" component={HubModulesPage} />
+    <Route path="/cabo-apply" component={CaboApplyPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
