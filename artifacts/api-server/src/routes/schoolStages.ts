@@ -39,7 +39,7 @@ router.post("/organizations/:orgId/school-stages/progress",async(req,res)=>{
  if(!mayWriteSchoolProgress(await role(org.data,user))){res.sendStatus(403);return}
  if(phaseForGrade(body.data.grade)!==body.data.phase||!validPhaseDomain(body.data.phase,body.data.domain)){res.status(400).json({error:"Grade or developmental domain does not match the school phase"});return}
  if(!await activeEnrollment(org.data,body.data.learnerId,body.data.grade,body.data.academicYear)){res.status(409).json({error:"An active, grade-matched institution enrolment is required"});return}
- const [record]=await db.insert(schoolStageProgressTable).values({...body.data,organizationId:org.data,recordedBy:user}).returning();
+ const [record]=await db.insert(schoolStageProgressTable).values({learnerId:body.data.learnerId,grade:body.data.grade,academicYear:body.data.academicYear,stage:body.data.phase,domain:body.data.domain,title:body.data.title,observation:body.data.observation,nextStep:body.data.nextStep,progress:body.data.progress,organizationId:org.data,recordedBy:user}).returning();
  res.status(201).json({id:record.id,phase:record.stage,grade:record.grade,progress:record.progress});
 });
 router.patch("/organizations/:orgId/school-stages/progress/:recordId",async(req,res)=>{
