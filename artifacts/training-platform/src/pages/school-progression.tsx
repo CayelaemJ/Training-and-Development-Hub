@@ -9,7 +9,7 @@ async function api<T>(path:string,method="GET",body?:object):Promise<T>{
  return response.json();
 }
 export default function SchoolProgressionPage(){
- const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(""),[year,setYear]=useState(new Date().getFullYear()),[rows,setRows]=useState<Candidate[]>([]),[error,setError]=useState(""),[message,setMessage]=useState(""),[saving,setSaving]=useState<number|null>(null);
+ const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(""),[year,setYear]=useState(new Date().getFullYear()),[rows,setRows]=useState<Candidate[]>([]),[history,setHistory]=useState<Decision[]>([]),[error,setError]=useState(""),[message,setMessage]=useState(""),[saving,setSaving]=useState<number|null>(null);
  useEffect(()=>{api<Org[]>("/organizations").then(list=>{setOrgs(list.filter(x=>["owner","admin"].includes(x.role)));if(list.length)setOrg(String(list.find(x=>["owner","admin"].includes(x.role))?.id??""))}).catch(e=>setError(e.message))},[]);
  async function reload(){if(!org){setRows([]);setHistory([]);return}const [candidates,decisions]=await Promise.all([api<Candidate[]>("/organizations/"+org+"/progression/candidates?year="+year),api<Decision[]>("/organizations/"+org+"/progression/history")]);setRows(candidates);setHistory(decisions)}
  useEffect(()=>{reload().catch(e=>setError(e.message))},[org,year]);
