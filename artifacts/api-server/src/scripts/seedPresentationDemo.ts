@@ -5,7 +5,7 @@ if(process.env.RAILWAY_ENVIRONMENT_NAME!=="testing"||process.env.ENABLE_CABO_DEM
  throw new Error("Demo seed requires isolated Railway testing and explicit ENABLE_CABO_DEMO_SEED=true");
 }
 const operator="cabo-isolated-test-learner";
-const today=new Date("2026-09-15T10:00:00Z");
+
 async function user(id:string,firstName:string,lastName:string){
  await db.insert(usersTable).values({id,firstName,lastName,email:id+"@example.invalid"}).onConflictDoNothing();
  return id;
@@ -22,7 +22,7 @@ async function makeCourse(org:number,code:string,name:string,grade:string){
  const [prior]=await db.select({id:academicCoursesTable.id}).from(academicCoursesTable).where(and(eq(academicCoursesTable.organizationId,org),eq(academicCoursesTable.code,code),eq(academicCoursesTable.level,grade))).limit(1);
  return prior?.id??(await db.insert(academicCoursesTable).values({organizationId:org,name,code,level:grade}).returning())[0].id;
 }
-async function main(){
+export async function seedPresentationDemo(){
  await user(operator,"CABO","Tester");
  const schools=[
   {name:"CABO DEMO | Early Learning Centre",type:"preprimary",grade:"R",learners:[["cabo-demo-child-r","Amara","Dlamini"]],subjects:[["LIT","Early Language"],["NUM","Early Numeracy"]]},
@@ -74,4 +74,4 @@ async function main(){
  }
  console.log("CABO DEMO seed completed. NO real learner records.");
 }
-main().catch(e=>{console.error(e);process.exitCode=1});
+
