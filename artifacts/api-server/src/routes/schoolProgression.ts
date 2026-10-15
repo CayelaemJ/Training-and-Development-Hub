@@ -1,7 +1,7 @@
 import {Router,type IRouter} from "express";
 import {and,desc,eq} from "drizzle-orm";
 import {z} from "zod/v4";
-import {db,verifiedEnrollmentsTable,organizationMembersTable} from "@workspace/db";
+import {db,verifiedEnrollmentsTable,organizationMembersTable,schoolProgressionEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {phaseForGrade} from "../lib/schoolStagePolicy";
 import {nextSchoolGrade,canProgressToYear} from "../lib/schoolProgressionPolicy";
@@ -30,9 +30,17 @@ router.post("/organizations/:orgId/progression/:enrollmentId",async(req,res)=>{
   if(existing)return {error:"Next-year enrollment already exists"} as const;
   const [created]=await tx.insert(verifiedEnrollmentsTable).values({organizationId:org.data,learnerId:current.learnerId,stage:next,academicYear:body.data.targetYear,recordedBy:req.user!.id,status:"active"}).returning();
   await tx.update(verifiedEnrollmentsTable).set({status:"completed",updatedAt:new Date()}).where(eq(verifiedEnrollmentsTable.id,current.id));
+  await tx.insert(schoolProgressionEventsTable).values({organizationId:org.data,priorEnrollmentId:current.id,newEnrollmentId:created.id,learnerId:current.learnerId,fromGrade:current.stage,toGrade:next,decision:body.data.decision,approvedBy:req.user!.id});
   return {id:created.id,learnerId:created.learnerId,fromGrade:current.stage,toGrade:next,academicYear:created.academicYear} as const;
  });
  if("error" in result){res.status(409).json({error:result.error});return}
  res.status(201).json(result);
+});
+router.get("/organizations/:orgId/progression/history",async(req,res)=>{
+ if(!req.isAuthenticated()){res.sendStatus(401);return}
+ const org=id.safeParse(req.params.orgId);if(!org.success){res.sendStatus(400);return}
+ if(!await manager(org.data,req.user.id)){res.sendStatus(403);return}
+ const entries=await db.select().from(schoolProgressionEventsTable).where(eq(schoolProgressionEventsTable.organizationId,org.data)).orderBy(desc(schoolProgressionEventsTable.approvedAt)).limit(100);
+ res.setHeader("Cache-Control","private, no-store");res.json(entries);
 });
 export default router;
