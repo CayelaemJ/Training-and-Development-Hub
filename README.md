@@ -195,3 +195,15 @@ From the isolated testing superadmin screen:
 - Test rules in `schoolProgressionPolicy.test.mjs`; independently authenticated end-to-end role, race-condition and cross-school checks remain outstanding.
 
 **Progression audit extension:** `GET /api/organizations/:orgId/progression/history` is restricted to school owners/admins and lists recorded, time-stamped promotion/repeat decisions. The progression transaction writes the new enrolment, marks the prior enrolment completed, and inserts an audit event atomically. It also rejects any existing active target-year grade for the same learner and institution. This records administrator decisions but does not implement a CAPS/IEB promotion-policy adjudicator or official school-leaving certification.
+
+### CABO Apply — university application gateway (pilot)
+
+- Student portal: `/cabo-apply`. A candidate can browse directory entries, select a published programme, create a private draft and track a handoff.
+- API: `GET /api/admissions/institutions`, `GET /api/admissions/programmes?institutionId=...`, `POST /api/admissions/applications`, `GET /api/admissions/applications/me`, `PATCH /api/admissions/applications/:applicationId`.
+- Test-superadmin maintenance: `POST /api/platform/admissions/institutions` creates **directory-only** entries; `POST /api/platform/admissions/programmes` creates **draft** programmes. Entries are not official partnerships and programmes cannot be advertised as open until independently verified and published through a reviewed workflow.
+- Candidate statuses: `draft → ready_for_handoff → external_submission_recorded`. The candidate must supply a reference obtained from the official receiving system; this is **self-reported**, not receipt verification or a university decision. Partner-originated review and offer updates are intentionally not implemented until a signed admissions integration and appropriately scoped partner identities exist.
+- No blanket sharing of learner history, school attendance, guardianship or psychological records. University access must be explicit, purpose-bound, revocable and audited in a future partner gateway.
+- South Africa already has CAO and university-specific application channels; avoid duplicate submissions. Obtain signed API agreements before direct submission. The user must use the official portal for deadlines, fees and current requirements.
+- Public institution registry must be sourced from current DHET directories and periodically verified. The application database starts empty rather than fabricating an official admissions partnership or programme catalogue.
+
+**Social impact priorities:** reduce repeat capture, mobile data burden and travel to institutions, support low-connectivity draft preparation and accessible multilingual instructions, provide honest application receipts and reduce financial barriers. These are product objectives, not yet fully built.
