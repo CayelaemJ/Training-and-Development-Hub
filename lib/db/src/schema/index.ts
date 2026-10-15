@@ -28,3 +28,5 @@ export * from './schoolStages';
 export * from './aiMetrics';
 
 export * from './institutionSetup';
+
+export * from './schoolProgressionEvents';
