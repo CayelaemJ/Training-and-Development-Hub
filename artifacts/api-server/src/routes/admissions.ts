@@ -63,7 +63,7 @@ router.patch("/admissions/applications/:applicationId",async(req,res)=>{
   await tx.insert(admissionEventsTable).values({applicationId:record.id,actorId:user,fromStatus:record.status,toStatus:updated.status});
   return {id:updated.id,status:updated.status,universitySubmissionVerified:false} as const;
  });
- if("error" in result){res.status(result.code).json({error:result.error});return}
+ if("error" in result){res.status(result.code??400).json({error:result.error});return}
  res.json(result);
 });
 export default router;
