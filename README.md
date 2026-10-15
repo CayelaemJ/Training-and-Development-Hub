@@ -193,3 +193,5 @@ From the isolated testing superadmin screen:
 - Grade 12 does not automatically promote to university or issue an NSC credential; a separate verified school-leaving and university admission process is required.
 - Promotion is an explicit school decision, not an AI recommendation. Real CAPS/IEB promotion criteria, moderation, appeal, signatures and guardian notices must be implemented before official use.
 - Test rules in `schoolProgressionPolicy.test.mjs`; independently authenticated end-to-end role, race-condition and cross-school checks remain outstanding.
+
+**Progression audit extension:** `GET /api/organizations/:orgId/progression/history` is restricted to school owners/admins and lists recorded, time-stamped promotion/repeat decisions. The progression transaction writes the new enrolment, marks the prior enrolment completed, and inserts an audit event atomically. It also rejects any existing active target-year grade for the same learner and institution. This records administrator decisions but does not implement a CAPS/IEB promotion-policy adjudicator or official school-leaving certification.
