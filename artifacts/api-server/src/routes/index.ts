@@ -16,6 +16,7 @@ import educationTalentRouter from "./educationTalent";
 import developmentPlansRouter from "./developmentPlans";
 import hubModulesRouter from "./hubModules";
 import schoolStagesRouter from "./schoolStages";
+import mlopsRouter from "./mlops";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(educationTalentRouter);
 router.use(developmentPlansRouter);
 router.use(hubModulesRouter);
 router.use(schoolStagesRouter);
+router.use(mlopsRouter);
 
 export default router;
