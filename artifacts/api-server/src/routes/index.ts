@@ -15,6 +15,7 @@ import rolePortalsRouter from "./rolePortals";
 import educationTalentRouter from "./educationTalent";
 import developmentPlansRouter from "./developmentPlans";
 import hubModulesRouter from "./hubModules";
+import schoolStagesRouter from "./schoolStages";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(rolePortalsRouter);
 router.use(educationTalentRouter);
 router.use(developmentPlansRouter);
 router.use(hubModulesRouter);
+router.use(schoolStagesRouter);
 
 export default router;
