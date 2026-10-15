@@ -22,3 +22,5 @@ export * from './talentPassport';
 export * from './materialUploadBlobs';
 
 export * from './hubRecords';
+
+export * from './schoolStages';
