@@ -20,6 +20,7 @@ import mlopsRouter from "./mlops";
 import institutionSetupRouter from "./institutionSetup";
 import schoolProgressionRouter from "./schoolProgression";
 import admissionsRouter from "./admissions";
+import reportCardsRouter from "./reportCards";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(mlopsRouter);
 router.use(institutionSetupRouter);
 router.use(schoolProgressionRouter);
 router.use(admissionsRouter);
+router.use(reportCardsRouter);
 
 export default router;
