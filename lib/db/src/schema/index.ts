@@ -24,3 +24,5 @@ export * from './materialUploadBlobs';
 export * from './hubRecords';
 
 export * from './schoolStages';
+
+export * from './aiMetrics';
