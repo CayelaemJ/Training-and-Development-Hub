@@ -28,6 +28,8 @@ router.post("/organizations/:orgId/progression/:enrollmentId",async(req,res)=>{
   if(!next)return {error:"The learner has completed the final school grade; use the school-leaving workflow"} as const;
   const [existing]=await tx.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,current.learnerId),eq(verifiedEnrollmentsTable.stage,next),eq(verifiedEnrollmentsTable.academicYear,body.data.targetYear))).limit(1);
   if(existing)return {error:"Next-year enrollment already exists"} as const;
+  const [activeSameYear]=await tx.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,current.learnerId),eq(verifiedEnrollmentsTable.academicYear,body.data.targetYear),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
+  if(activeSameYear)return {error:"Learner already has an active enrolment at this school for the target year"} as const;
   const [created]=await tx.insert(verifiedEnrollmentsTable).values({organizationId:org.data,learnerId:current.learnerId,stage:next,academicYear:body.data.targetYear,recordedBy:req.user!.id,status:"active"}).returning();
   await tx.update(verifiedEnrollmentsTable).set({status:"completed",updatedAt:new Date()}).where(eq(verifiedEnrollmentsTable.id,current.id));
   await tx.insert(schoolProgressionEventsTable).values({organizationId:org.data,priorEnrollmentId:current.id,newEnrollmentId:created.id,learnerId:current.learnerId,fromGrade:current.stage,toGrade:next,decision:body.data.decision,approvedBy:req.user!.id});
