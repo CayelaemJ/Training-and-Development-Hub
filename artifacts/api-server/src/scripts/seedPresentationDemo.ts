@@ -1,5 +1,5 @@
 import {and,eq} from "drizzle-orm";
-import {db,usersTable,organizationsTable,organizationMembersTable,verifiedEnrollmentsTable,academicSettingsTable,academicCoursesTable,academicPeriodsTable,academicAssessmentsTable,academicGradesTable,schoolAttendanceTable,schoolNoticesTable,schoolStageProgressTable,hubRecordsTable,institutionSetupTable} from "@workspace/db";
+import {db,usersTable,organizationsTable,organizationMembersTable,verifiedEnrollmentsTable,academicSettingsTable,academicCoursesTable,academicPeriodsTable,academicAssessmentsTable,academicGradesTable,schoolAttendanceTable,schoolNoticesTable,schoolStageProgressTable,hubRecordsTable,institutionSetupTable,admissionInstitutionsTable,admissionProgrammesTable,guardianRelationshipsTable} from "@workspace/db";
 /** Run explicitly only on the isolated Railway TEST database, never production. */
 const operator="cabo-isolated-test-learner";
 
@@ -29,12 +29,16 @@ export async function seedPresentationDemo(){
  ] as const;
  for(const s of schools){
   const org=await school(s.name,s.type);
+  const educator=await user("cabo-demo-teacher-"+s.type,"Demo","Educator");
+  await db.insert(organizationMembersTable).values({organizationId:org,userId:educator,role:"teacher"}).onConflictDoNothing();
   const existingPeriod=await db.select({id:academicPeriodsTable.id}).from(academicPeriodsTable).where(and(eq(academicPeriodsTable.organizationId,org),eq(academicPeriodsTable.name,"CABO DEMO Term 3"),eq(academicPeriodsTable.year,2026))).limit(1);
   const period=existingPeriod[0]?.id??(await db.insert(academicPeriodsTable).values({organizationId:org,name:"CABO DEMO Term 3",year:2026}).returning())[0].id;
   const courses=[] as {id:number;name:string}[];
   for(const [code,name] of s.subjects){courses.push({id:await makeCourse(org,code,name,s.grade),name})}
   for(const [i,[uid,first,last]] of s.learners.entries()){
    await user(uid,first,last);
+   const guardian=await user("cabo-demo-guardian-"+uid,"Demo","Guardian");
+   await db.insert(guardianRelationshipsTable).values({learnerId:uid,guardianId:guardian,status:"pending"}).onConflictDoNothing();
    await db.insert(organizationMembersTable).values({organizationId:org,userId:uid,role:"learner"}).onConflictDoNothing();
    await db.insert(verifiedEnrollmentsTable).values({organizationId:org,learnerId:uid,stage:s.grade,academicYear:2026,status:"active",recordedBy:operator}).onConflictDoNothing();
    for(const [j,course] of courses.entries()){
@@ -70,6 +74,13 @@ export async function seedPresentationDemo(){
   }
   console.log("Seeded synthetic demonstration school:",s.name);
  }
- console.log("CABO DEMO seed completed. NO real learner records.");
+ const universityName="CABO DEMO | University of Future Skills";
+ const [existingUni]=await db.select({id:admissionInstitutionsTable.id}).from(admissionInstitutionsTable).where(eq(admissionInstitutionsTable.name,universityName)).limit(1);
+ const universityId=existingUni?.id??(await db.insert(admissionInstitutionsTable).values({name:universityName,officialUrl:"https://www.gov.za",province:"Gauteng",route:"handoff",verification:"directory_only"}).returning())[0].id;
+ for(const [name,qualification] of [["CABO DEMO Computer Science","Bachelor of Science"],["CABO DEMO Education & Development","Bachelor of Education"]] as const){
+  const [existingProgramme]=await db.select({id:admissionProgrammesTable.id}).from(admissionProgrammesTable).where(and(eq(admissionProgrammesTable.institutionId,universityId),eq(admissionProgrammesTable.name,name))).limit(1);
+  if(!existingProgramme)await db.insert(admissionProgrammesTable).values({institutionId:universityId,name,qualification,faculty:"Synthetic demonstration",requirements:"SYNTHETIC DEMO - not an accredited course or admissions offer",status:"published"});
+ }
+ console.log("CABO DEMO seed completed. NO real learner records or university partnerships.");
 }
 
