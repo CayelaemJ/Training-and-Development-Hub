@@ -30,3 +30,5 @@ export * from './aiMetrics';
 export * from './institutionSetup';
 
 export * from './schoolProgressionEvents';
+
+export * from './admissions';
