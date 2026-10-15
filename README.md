@@ -173,3 +173,14 @@ Do not run `drizzle-kit push` against an institutional production database. Use 
 
 ### Current gaps (not yet complete)
 Verified national institution directory and government interoperability; production identity and parental verification; class scheduling collision resolution; real-time notifications, offline sync and outbox delivery; approved academic credentials; full university registrar workflows; external SIS integration; signed professional assessment governance; comprehensive audit and monitoring. See [national architecture](docs/NATIONAL_EDUCATION_ARCHITECTURE.md) and [connected hub sprint register](docs/CONNECTED_HUB_SPRINTS.md).
+
+### Groq model compatibility and live MLOps check (October 2026)
+The free/developer-tier Groq model `llama-3.3-70b-versatile` was retired in August 2026. Set `GROQ_EXAM_MODEL=openai/gpt-oss-120b` (or another model confirmed active for the account); the CABO default now matches. This is a Groq-hosted open-weight model ID, **not** an OpenAI API credential.
+
+From the isolated testing superadmin screen:
+1. Open **Platform administration → AI operations & model reliability**.
+2. Click **Test live AI connection** to trigger `POST /api/platform/mlops/smoke-test`.
+3. The server submits an entirely synthetic, non-learner prompt, checks for the expected response and records a content-free success/failure metric. The endpoint is restricted to the isolated-test superadmin and rate-limited to one request per minute.
+4. A successful smoke test validates only provider connectivity and basic generation, not child-safety, learning quality, model calibration or end-to-end grading.
+
+`GET /api/ai/capabilities` and `GET /api/platform/mlops` remain available as authenticated configuration and private monitoring endpoints. Model API keys remain server-only.
