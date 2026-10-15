@@ -20,3 +20,5 @@ export * from './schoolOperations';
 export * from './talentPassport';
 
 export * from './materialUploadBlobs';
+
+export * from './hubRecords';
