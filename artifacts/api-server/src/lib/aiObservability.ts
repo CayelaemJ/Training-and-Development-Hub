@@ -6,5 +6,5 @@ export async function recordAiMetric(operation:AiOperation,provider:string,model
 }
 export function aiConfiguration(){
  const groq=!!process.env.GROQ_API_KEY,openai=!!process.env.OPENAI_API_KEY;
- return {configured:groq||openai,preferredProvider:groq?"groq":openai?"openai":"none",developmentModel:groq?(process.env.GROQ_EXAM_MODEL||"llama-3.3-70b-versatile"):(process.env.OPENAI_EXAM_MODEL||"gpt-5.4-mini")};
+ return {configured:groq||openai,preferredProvider:groq?"groq":openai?"openai":"none",developmentModel:groq?(process.env.GROQ_EXAM_MODEL||"openai/gpt-oss-120b"):(process.env.OPENAI_EXAM_MODEL||"gpt-5.4-mini")};
 }
