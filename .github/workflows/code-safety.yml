@@ -1,0 +1,57 @@
+name: Learning Hub code safety
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-hub-safety-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: TypeScript, policy tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run learning policy regression tests
+        run: node --test artifacts/api-server/src/tests/consentPolicy.test.mjs artifacts/api-server/src/tests/hierarchyPolicy.test.mjs artifacts/api-server/src/tests/platformPolicy.test.mjs artifacts/api-server/src/tests/careerPolicy.test.mjs artifacts/api-server/src/tests/testPrincipals.test.mjs
+      - name: Check all TypeScript workspaces
+        run: pnpm run typecheck
+      - name: Verify production build
+        run: pnpm run build
+        env:
+          PORT: "5000"
+          BASE_PATH: "/"
+
+  secrets:
+    name: Scan leaked secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  static-security:
+    name: Semgrep static security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Semgrep
+        run: pipx install semgrep
+      - name: Scan source for security vulnerabilities
+        run: semgrep scan --config p/javascript --config p/typescript --error --exclude node_modules --exclude dist --exclude build .
