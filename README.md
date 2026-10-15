@@ -184,3 +184,12 @@ From the isolated testing superadmin screen:
 4. A successful smoke test validates only provider connectivity and basic generation, not child-safety, learning quality, model calibration or end-to-end grading.
 
 `GET /api/ai/capabilities` and `GET /api/platform/mlops` remain available as authenticated configuration and private monitoring endpoints. Model API keys remain server-only.
+
+### Grade RR–12 year-end learner progression (new)
+- School owners/admins use **Year-end progression** at `/school-progression` to review the school's active enrolments for a chosen year.
+- `GET /api/organizations/:orgId/progression/candidates?year=2026` returns permitted year-end progression candidates.
+- `POST /api/organizations/:orgId/progression/:enrollmentId` accepts `{"targetYear":2027,"decision":"promote"}` or `"repeat"`.
+- API verifies institutional authority, active enrolment and sequential years, then **transactionally** creates the new active year record and completes the previous record. The prior academic history is preserved. Duplicate next-year records are rejected.
+- Grade 12 does not automatically promote to university or issue an NSC credential; a separate verified school-leaving and university admission process is required.
+- Promotion is an explicit school decision, not an AI recommendation. Real CAPS/IEB promotion criteria, moderation, appeal, signatures and guardian notices must be implemented before official use.
+- Test rules in `schoolProgressionPolicy.test.mjs`; independently authenticated end-to-end role, race-condition and cross-school checks remain outstanding.
