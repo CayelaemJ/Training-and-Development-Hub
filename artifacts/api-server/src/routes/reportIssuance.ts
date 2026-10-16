@@ -81,7 +81,12 @@ router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
  const id=positive.safeParse(req.params.reportId);if(!id.success){res.sendStatus(400);return}
  const [item]=await db.select().from(issuedSchoolReportsTable).where(eq(issuedSchoolReportsTable.id,id.data)).limit(1);
  if(!item){res.sendStatus(404);return}
- if(req.user.id!==item.learnerId&&!await schoolManager(item.organizationId,req.user.id)){res.sendStatus(403);return}
+ if(req.user.id!==item.learnerId&&!await schoolManager(item.organizationId,req.user.id)){
+  const [relation]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,item.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
+  const [authority]=relation?await db.select({id:guardianVerificationEventsTable.id}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,relation.id),eq(guardianVerificationEventsTable.organizationId,item.organizationId),eq(guardianVerificationEventsTable.decision,"verified"))).limit(1):[];
+  const [enrolled]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,item.organizationId),eq(verifiedEnrollmentsTable.learnerId,item.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
+  if(!relation||!authority||!enrolled){res.sendStatus(403);return}
+ }
  const hashValid=contentDigest(item.snapshot)===item.contentHash;
  let signatureValid=false;
  if(item.signature&&item.signingKeyId){
