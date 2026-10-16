@@ -74,7 +74,15 @@ router.post(
 
       const railwayFallback = process.env.RAILWAY_ENVIRONMENT_NAME === 'testing';
       const objectPath = railwayFallback ? `/railway-uploads/${randomUUID()}` : '';
-      const uploadURL = railwayFallback ? `/api/storage/uploads/railway/${objectPath.split('/').pop()}` : await objectStorageService.getObjectEntityUploadURL();
+      // Return an absolute same-origin URL: the API response schema requires a URL, not a relative path.
+      // The request host keeps demo uploads on the same origin so session cookies accompany the PUT.
+      const host = req.get('host');
+      if (railwayFallback && (!host || !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(host))) {
+        res.status(400).json({error:'Invalid upload host'}); return;
+      }
+      const uploadURL = railwayFallback
+        ? new URL(`/api/storage/uploads/railway/${objectPath.split('/').pop()}`, `https://${host}`).toString()
+        : await objectStorageService.getObjectEntityUploadURL();
       const finalObjectPath = railwayFallback ? objectPath : objectStorageService.normalizeObjectEntityPath(uploadURL);
       await db.insert(uploadIntentsTable).values({
         objectPath: finalObjectPath,
