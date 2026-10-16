@@ -32,6 +32,7 @@ import assessmentQuestionBankRouter from "./assessmentQuestionBank";
 import assessmentPapersRouter from "./assessmentPapers";
 import educationCommandRouter from "./educationCommand";
 import admissionEvidenceRouter from "./admissionEvidence";
+import demoAdmissionsInboxRouter from "./demoAdmissionsInbox";
 
 const router: IRouter = Router();
 
@@ -68,5 +69,6 @@ router.use(assessmentQuestionBankRouter);
 router.use(assessmentPapersRouter);
 router.use(educationCommandRouter);
 router.use(admissionEvidenceRouter);
+router.use(demoAdmissionsInboxRouter);
 
 export default router;
