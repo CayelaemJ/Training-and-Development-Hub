@@ -27,6 +27,7 @@ import guardianVerificationRouter from "./guardianVerification";
 import reportIssuanceRouter from "./reportIssuance";
 import attendanceSyncRouter from "./attendanceSync";
 import academicIntelligenceRouter from "./academicIntelligence";
+import timetableRouter from "./timetable";
 
 const router: IRouter = Router();
 
@@ -58,5 +59,6 @@ router.use(guardianVerificationRouter);
 router.use(reportIssuanceRouter);
 router.use(attendanceSyncRouter);
 router.use(academicIntelligenceRouter);
+router.use(timetableRouter);
 
 export default router;

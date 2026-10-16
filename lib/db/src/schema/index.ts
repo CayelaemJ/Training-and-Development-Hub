@@ -36,3 +36,5 @@ export * from './admissions';
 export * from './guardianVerification';
 
 export * from './schoolReportIssuance';
+
+export * from './schoolTimetable';
