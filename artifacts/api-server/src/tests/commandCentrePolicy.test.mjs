@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import {safeAggregate,canSeeSchoolRollup} from "../lib/commandCentrePolicy.ts";
+test("small school populations remain suppressed",()=>{assert.equal(safeAggregate(1),null);assert.equal(safeAggregate(9),null);assert.equal(safeAggregate(10),10)});
+test("district office needs an explicit school-specific grant",()=>{assert.equal(canSeeSchoolRollup(null,[],false),false);assert.equal(canSeeSchoolRollup("learner",[],false),false);assert.equal(canSeeSchoolRollup(null,["district_director"],false),true);assert.equal(canSeeSchoolRollup("owner",[],false),true)});
