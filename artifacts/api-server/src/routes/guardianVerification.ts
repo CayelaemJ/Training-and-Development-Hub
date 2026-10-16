@@ -3,6 +3,7 @@ import {and,eq} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,guardianRelationshipsTable,guardianVerificationEventsTable,verifiedEnrollmentsTable,organizationMembersTable,usersTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
+import {canVerifyGuardian,canRevokeGuardian,type GuardianStatus} from "../lib/guardianPolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 async function canManage(org:number,user:string){
  if(isPlatformSuperadmin(user))return true;
@@ -34,8 +35,8 @@ router.post("/organizations/:orgId/guardian-reviews/:relationshipId",async(req,r
   if(!link)return {error:"not_found"} as const;
   const [enrolled]=await tx.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,link.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
   if(!enrolled)return {error:"not_enrolled"} as const;
-  if(data.data.decision==="verified"&&link.status!=="accepted")return {error:"guardian_must_accept_first"} as const;
-  if(data.data.decision==="revoked"&&link.status!=="verified")return {error:"not_verified"} as const;
+  if(data.data.decision==="verified"&&!canVerifyGuardian(link.status as GuardianStatus,data.data.evidenceReviewed,!!enrolled))return {error:"guardian_must_accept_first"} as const;
+  if(data.data.decision==="revoked"&&!canRevokeGuardian(link.status as GuardianStatus,!!enrolled))return {error:"not_verified"} as const;
   await tx.update(guardianRelationshipsTable).set({status:data.data.decision,respondedAt:new Date()}).where(eq(guardianRelationshipsTable.id,link.id));
   await tx.insert(guardianVerificationEventsTable).values({relationshipId:link.id,organizationId:org.data,reviewedBy:req.user!.id,decision:data.data.decision});
   return {id:link.id,status:data.data.decision} as const;
