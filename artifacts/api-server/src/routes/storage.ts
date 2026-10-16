@@ -10,6 +10,7 @@ import { db, uploadIntentsTable, materialUploadBlobsTable } from '@workspace/db'
 import { Router, type IRouter, type Request, type Response } from 'express';
 
 import { ObjectPermission } from '../lib/objectAcl';
+import { railwayUploadUrl } from '../lib/railwayUploadUrl';
 import {
   ObjectNotFoundError,
   ObjectStorageService,
@@ -81,7 +82,7 @@ router.post(
         res.status(400).json({error:'Invalid upload host'}); return;
       }
       const uploadURL = railwayFallback
-        ? new URL(`/api/storage/uploads/railway/${objectPath.split('/').pop()}`, `https://${host}`).toString()
+        ? railwayUploadUrl(host!, objectPath)
         : await objectStorageService.getObjectEntityUploadURL();
       const finalObjectPath = railwayFallback ? objectPath : objectStorageService.normalizeObjectEntityPath(uploadURL);
       await db.insert(uploadIntentsTable).values({
