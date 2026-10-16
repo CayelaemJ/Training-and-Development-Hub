@@ -263,3 +263,12 @@ Candidates may download a minimal JSON university application evidence packet fr
 
 ### Credentialed browser origin hardening
 The API no longer reflects arbitrary credentialed CORS origins. Allowed origins are the Railway deployment's `https://$RAILWAY_PUBLIC_DOMAIN` and exact HTTPS origins in optional `CABO_ALLOWED_ORIGINS` (comma-separated). Local Vite HTTP origins are permitted **only outside production**. Mutating browser requests from untrusted `Origin` headers receive HTTP 403. Basic anti-content-type sniffing, referrer and frame-deny headers are emitted. These protections are defense-in-depth; session management, CSRF threat modelling, reverse-proxy host validation, MFA, independent penetration testing and privacy compliance must still be verified.
+
+### Offline attendance, substitution and AI resilience (October 2026)
+School Operations now provides an **opt-in** browser attendance queue using IndexedDB for temporary interruptions. Entries are associated with the signed-in staff account, and may be retried against the institutional `/attendance/sync` endpoint. The server deduplicates matching entries and returns explicit manual-review conflicts without overwriting recorded attendance. Use the **Erase local drafts** action after using a shared device. Local IndexedDB data is **not encrypted** and must not be used on unmanaged/shared devices with real learner information until an approved secure offline storage solution is in place.
+
+Institution owners/admins can now assign temporary teacher substitutes through `PATCH /api/organizations/:orgId/timetable/:slotId/substitution`. The API verifies authorised replacement staffing, checks timetable clashes and records the change in the school substitution audit history. It is a pilot and does not yet send substitute notifications.
+
+The development-plan service now returns an explicitly labelled, deterministic **non-AI template** when an upstream model is not configured or temporarily fails. The UI distinguishes it from AI-generated drafts. Human approval remains mandatory.
+
+An eight-workstream read-only authenticated smoke script is included under `scripts/verify-cabo-eight-workstreams.mjs`. See [Release Gates 1–8](docs/RELEASE_GATES_1_TO_8.md) for what is implemented, what has been verified, and what still requires external agreements or production safety validation.
