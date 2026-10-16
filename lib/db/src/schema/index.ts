@@ -34,3 +34,5 @@ export * from './schoolProgressionEvents';
 export * from './admissions';
 
 export * from './guardianVerification';
+
+export * from './schoolReportIssuance';
