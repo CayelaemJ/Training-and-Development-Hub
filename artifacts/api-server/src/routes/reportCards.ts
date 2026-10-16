@@ -48,7 +48,7 @@ router.get("/organizations/:orgId/analytics",async(req,res)=>{
  if(!org.success||!year.success){res.sendStatus(400);return}
  if(!await schoolManager(org.data,req.user.id)){res.sendStatus(403);return}
  const enrolled=await db.select({learnerId:verifiedEnrollmentsTable.learnerId,grade:verifiedEnrollmentsTable.stage}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.academicYear,year.data),eq(verifiedEnrollmentsTable.status,"active")));
- const attendance=await db.select({status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(eq(schoolAttendanceTable.organizationId,org.data),gte(schoolAttendanceTable.day,year.data+"-01-01"),lt(schoolAttendanceTable.day,(year.data+1)+"-01-01")));
+ const attendance=await db.select({status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(and(eq(schoolAttendanceTable.organizationId,org.data),gte(schoolAttendanceTable.day,year.data+"-01-01"),lt(schoolAttendanceTable.day,(year.data+1)+"-01-01")));
  const byGrade:Record<string,number>={};for(const x of enrolled)byGrade[x.grade]=(byGrade[x.grade]??0)+1;
  const present=attendance.filter(x=>x.status==="present"||x.status==="late").length;
  res.setHeader("Cache-Control","private, no-store");
