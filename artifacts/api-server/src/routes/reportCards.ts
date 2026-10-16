@@ -3,6 +3,7 @@ import {and,eq,gte,lt} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,academicCoursesTable,academicAssessmentsTable,academicGradesTable,academicPeriodsTable,organizationMembersTable,verifiedEnrollmentsTable,usersTable,schoolAttendanceTable,guardianRelationshipsTable,guardianVerificationEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
+import {canReadChildReport,type GuardianStatus} from "../lib/guardianPolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 async function schoolManager(org:number,user:string){
  if(isPlatformSuperadmin(user))return true;
@@ -46,14 +47,14 @@ router.get("/guardian/reports/:learnerId",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const org=id.safeParse(req.query.organizationId),year=z.coerce.number().int().min(2000).max(2200).safeParse(req.query.year);
  if(!org.success||!year.success){res.sendStatus(400);return}
- const [verified]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,req.params.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
+ const [verified]=await db.select({id:guardianRelationshipsTable.id,status:guardianRelationshipsTable.status}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,req.params.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
  if(!verified){res.sendStatus(403);return}
  const [authority]=await db.select({id:guardianVerificationEventsTable.id}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,verified.id),eq(guardianVerificationEventsTable.organizationId,org.data),eq(guardianVerificationEventsTable.decision,"verified"))).limit(1);
  if(!authority){res.sendStatus(403);return}
  const report=await gather(org.data,req.params.learnerId,year.data);
  if(!report){res.sendStatus(404);return}
  const [enrollment]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,req.params.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
- if(!enrollment){res.sendStatus(403);return}
+ if(!canReadChildReport(verified.status as GuardianStatus,!!authority,!!enrollment)){res.sendStatus(403);return}
  res.setHeader("Cache-Control","private, no-store");res.json({...report,visibility:"verified_guardian",status:"draft_preview",official:false});
 });
 router.get("/organizations/:orgId/analytics",async(req,res)=>{
