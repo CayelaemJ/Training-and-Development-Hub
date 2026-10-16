@@ -32,3 +32,5 @@ export * from './institutionSetup';
 export * from './schoolProgressionEvents';
 
 export * from './admissions';
+
+export * from './guardianVerification';
