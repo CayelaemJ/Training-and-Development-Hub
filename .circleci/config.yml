@@ -1,0 +1,60 @@
+version: 2.1
+
+jobs:
+  secrets_scan:
+    docker:
+      - image: cimg/base:stable
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Gitleaks working-tree secrets scan
+          command: |
+            set -euo pipefail
+            VERSION=8.24.3
+            curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tgz
+            mkdir -p /tmp/gitleaks-bin
+            tar -xzf /tmp/gitleaks.tgz -C /tmp/gitleaks-bin gitleaks
+            /tmp/gitleaks-bin/gitleaks dir --redact --exit-code 1 .
+
+  trivy_scan:
+    docker:
+      - image: cimg/base:stable
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Trivy source security scan
+          command: |
+            set -euo pipefail
+            curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh -o /tmp/install-trivy.sh
+            sh /tmp/install-trivy.sh -b /tmp v0.67.2
+            /tmp/trivy fs --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --skip-dirs node_modules --skip-dirs dist .
+
+  quality:
+    docker:
+      - image: cimg/node:22.14
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Install reproducible dependencies
+          command: corepack enable && corepack prepare pnpm@10.28.2 --activate && pnpm install --frozen-lockfile
+      - run:
+          name: Build and static type validation
+          command: pnpm run build
+      - run:
+          name: Unit tests with JUnit report
+          command: |
+            mkdir -p test-results
+            pnpm -r --if-present run test
+      - store_test_results:
+          path: test-results
+          when: always
+
+workflows:
+  pull_request_quality:
+    jobs:
+      - secrets_scan
+      - trivy_scan
+      - quality
