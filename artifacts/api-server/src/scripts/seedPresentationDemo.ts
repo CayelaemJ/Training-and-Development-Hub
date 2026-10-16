@@ -1,4 +1,5 @@
 import {and,eq} from "drizzle-orm";
+import {configuredPrincipals} from "../lib/testPrincipals";
 import {db,usersTable,organizationsTable,organizationMembersTable,verifiedEnrollmentsTable,academicSettingsTable,academicCoursesTable,academicPeriodsTable,academicAssessmentsTable,academicGradesTable,schoolAttendanceTable,schoolNoticesTable,schoolStageProgressTable,hubRecordsTable,institutionSetupTable,admissionInstitutionsTable,admissionProgrammesTable,guardianRelationshipsTable} from "@workspace/db";
 /** Run explicitly only on the isolated Railway TEST database, never production. */
 const operator="cabo-isolated-test-learner";
@@ -22,6 +23,10 @@ async function makeCourse(org:number,code:string,name:string,grade:string){
 export async function seedPresentationDemo(){
  if(process.env.RAILWAY_ENVIRONMENT_NAME!=="testing"||process.env.ENABLE_CABO_DEMO_SEED!=="true")throw new Error("Isolated demo seeding is not enabled");
  await user(operator,"CABO","Tester");
+ const principals=configuredPrincipals(process.env.CABO_TEST_USERS_JSON);
+ // Use already-configured, independently authenticated test accounts; never create passwords in demo data.
+ const roleFixture=(kind:string,phase:string)=>principals.find(p=>p.username.startsWith("cabo_"+kind+"_")&&p.username.includes(phase))??principals.find(p=>p.username.startsWith("cabo_"+kind+"_"));
+ for(const p of principals)await db.insert(usersTable).values({id:p.userId,firstName:p.firstName,lastName:p.lastName,email:p.email}).onConflictDoNothing();
  const schools=[
   {name:"CABO DEMO | Early Learning Centre",type:"preprimary",grade:"R",learners:[["cabo-demo-child-r","Amara","Dlamini"]],subjects:[["LIT","Early Language"],["NUM","Early Numeracy"]]},
   {name:"CABO DEMO | Tshwane Primary",type:"primary",grade:"5",learners:[["cabo-demo-child-5a","Lerato","Mokoena"],["cabo-demo-child-5b","Thabo","Ndlovu"]],subjects:[["MAT","Mathematics"],["ENG","English Home Language"],["NST","Natural Sciences"]]},
@@ -29,7 +34,10 @@ export async function seedPresentationDemo(){
  ] as const;
  for(const s of schools){
   const org=await school(s.name,s.type);
-  const educator=await user("cabo-demo-teacher-"+s.type,"Demo","Educator");
+  const educatorFixture=roleFixture("teacher",s.type);
+  const educator=educatorFixture?.userId??await user("cabo-demo-teacher-"+s.type,"Demo","Educator");
+  const headmaster=roleFixture("headmaster",s.type);
+  if(headmaster)await db.insert(organizationMembersTable).values({organizationId:org,userId:headmaster.userId,role:"owner"}).onConflictDoNothing();
   await db.insert(organizationMembersTable).values({organizationId:org,userId:educator,role:"teacher"}).onConflictDoNothing();
   const existingPeriod=await db.select({id:academicPeriodsTable.id}).from(academicPeriodsTable).where(and(eq(academicPeriodsTable.organizationId,org),eq(academicPeriodsTable.name,"CABO DEMO Term 3"),eq(academicPeriodsTable.year,2026))).limit(1);
   const period=existingPeriod[0]?.id??(await db.insert(academicPeriodsTable).values({organizationId:org,name:"CABO DEMO Term 3",year:2026}).returning())[0].id;
@@ -37,7 +45,10 @@ export async function seedPresentationDemo(){
   for(const [code,name] of s.subjects){courses.push({id:await makeCourse(org,code,name,s.grade),name})}
   for(const [i,[uid,first,last]] of s.learners.entries()){
    await user(uid,first,last);
-   const guardian=await user("cabo-demo-guardian-"+uid,"Demo","Guardian");
+   const learnerFixture=roleFixture("learner",s.type);
+   if(learnerFixture&&i===0){await db.insert(organizationMembersTable).values({organizationId:org,userId:learnerFixture.userId,role:"learner"}).onConflictDoNothing();await db.insert(verifiedEnrollmentsTable).values({organizationId:org,learnerId:learnerFixture.userId,stage:s.grade,academicYear:2026,status:"active",recordedBy:operator}).onConflictDoNothing();}
+   const guardianFixture=roleFixture("parent",s.type);
+   const guardian=guardianFixture?.userId??await user("cabo-demo-guardian-"+uid,"Demo","Guardian");
    await db.insert(guardianRelationshipsTable).values({learnerId:uid,guardianId:guardian,status:"pending"}).onConflictDoNothing();
    await db.insert(organizationMembersTable).values({organizationId:org,userId:uid,role:"learner"}).onConflictDoNothing();
    await db.insert(verifiedEnrollmentsTable).values({organizationId:org,learnerId:uid,stage:s.grade,academicYear:2026,status:"active",recordedBy:operator}).onConflictDoNothing();
