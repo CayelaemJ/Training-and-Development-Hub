@@ -18,7 +18,7 @@ router.post("/organizations/:orgId/report-issuance",async(req,res)=>{
  const result=await db.transaction(async tx=>{
   const existing=await tx.select({version:issuedSchoolReportsTable.version,status:issuedSchoolReportsTable.status}).from(issuedSchoolReportsTable).where(and(eq(issuedSchoolReportsTable.organizationId,org.data),eq(issuedSchoolReportsTable.learnerId,body.data.learnerId),eq(issuedSchoolReportsTable.academicYear,body.data.academicYear))).orderBy(desc(issuedSchoolReportsTable.version));
   if(existing.some(r=>["submitted","approved","issued"].includes(r.status)))return {error:"A pending or issued report version already exists"} as const;
-  const [item]=await tx.insert(issuedSchoolReportsTable).values({organizationId:org.data,learnerId:body.data.learnerId,academicYear:body.data.academicYear,version:(existing[0]?.version??0)+1,status:"submitted",snapshot,contentHash:hash,submittedBy:req.user!.id}).returning();
+  const [item]=await tx.insert(issuedSchoolReportsTable).values({organizationId:org.data,learnerId:body.data.learnerId,academicYear:body.data.academicYear,version:(existing[0]?.version??0)+1,status:"submitted",snapshot,contentHash:hash,digestAlgorithm:"canonical-json-v2",submittedBy:req.user!.id}).returning();
   await tx.insert(schoolReportEventsTable).values({reportId:item.id,actorId:req.user!.id,action:"submitted"});
   return {id:item.id,status:item.status,version:item.version,hash:item.contentHash} as const;
  });
@@ -48,7 +48,7 @@ router.post("/organizations/:orgId/report-issuance/:reportId/decision",async(req
   const status={approve:"approved",reject:"rejected",issue:"issued",revoke:"revoked"}[action];
   let signature:string|null=null,signingKeyId:string|null=null;
   if(action==="issue"){
-   if(contentDigest(item.snapshot)!==item.contentHash)return {error:"Snapshot content failed integrity verification",code:409} as const;
+   if(item.digestAlgorithm!=="canonical-json-v2"||contentDigest(item.snapshot)!==item.contentHash)return {error:"Report uses an unverifiable legacy digest or content failed integrity verification; regenerate the report",code:409} as const;
    const signer=configuredReportSigner();
    if(signer){signature=signer.signData(signingPayload(item.organizationId,item.learnerId,item.academicYear,item.version,item.contentHash));signingKeyId=signer.keyId}
   }
@@ -87,9 +87,9 @@ router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
   const [enrolled]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,item.organizationId),eq(verifiedEnrollmentsTable.learnerId,item.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
   if(!relation||!authority||!enrolled){res.sendStatus(403);return}
  }
- const hashValid=contentDigest(item.snapshot)===item.contentHash;
+ const hashValid=item.digestAlgorithm==="canonical-json-v2"?contentDigest(item.snapshot)===item.contentHash:null;
  let signatureValid=false;
- if(item.signature&&item.signingKeyId){
+ if(hashValid===true&&item.signature&&item.signingKeyId){
   const signer=configuredReportSigner();
   const registered=process.env.CABO_REPORT_PUBLIC_KEYS_JSON;
   let trusted:Record<string,string>={};
@@ -98,6 +98,6 @@ router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
   if(pem)signatureValid=verifyReportSignature(signingPayload(item.organizationId,item.learnerId,item.academicYear,item.version,item.contentHash),item.signature,pem);
  }
  res.setHeader("Cache-Control","private, no-store");
- res.json({id:item.id,status:item.status,hashValid,cryptographicallySigned:!!item.signature,signatureValid,signingKeyId:item.signingKeyId,issuerIdentityAccredited:false,warning:"Signature proves configured key possession, not DBE/IEB accreditation or school authority."});
+ res.json({id:item.id,status:item.status,hashValid,digestAlgorithm:item.digestAlgorithm,cryptographicallySigned:!!item.signature,signatureValid,signingKeyId:item.signingKeyId,issuerIdentityAccredited:false,warning:"Signature proves configured key possession, not DBE/IEB accreditation or school authority."});
 });
 export default router;
