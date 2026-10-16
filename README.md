@@ -236,3 +236,13 @@ Developer API routes:
 - `POST /api/platform/demo/seed`: isolated test superadmin only.
 
 **Limits:** this is a demonstration of connected school workflows, not an official SA-SAMS replacement, nationally accredited credentials, complete QR/offline timetabling, verified university integrations or live qualified psychological assessment. Independent multi-role browser testing, real integrations and external approval remain release gates.
+
+### School report-card issuance workflow (testing prototype)
+CABO separates calculated report previews from frozen, versioned, internally approved report records:
+1. An institution owner/admin submits a learner's report via `POST /api/organizations/:orgId/report-issuance`. The API requires published assessment results and a matching school enrolment, freezes the calculated snapshot and stores a SHA-256 content fingerprint.
+2. A **different** institution administrator reviews the submitted record, then approves or rejects it with an audited action using `POST /api/organizations/:orgId/report-issuance/:reportId/decision`. Rejections require a reason.
+3. An authorised manager may `issue` an approved report or `revoke` an issued record with a reason. The original report snapshot is not modified.
+4. Learners see only their own issued versions via `GET /api/report-issuance/me`; appropriately verified guardians see only school-specific authorised child reports via `GET /api/guardian/issued-reports/:learnerId?organizationId=...`. The report management queue is private to school owners/admins.
+5. School users access the queue at `/report-issuance` and learners see issued snapshots in `/education-reports`.
+
+**Important:** SHA-256 is an integrity fingerprint, **not** an asymmetric cryptographic signature or proof of government/IEB accreditation. This workflow is a testing prototype. External verification, signing-key infrastructure, independent review/identity verification, signatures, province-specific approval policies, correction appeals, full historical reporting and separate-role browser tests remain outstanding. Do not present the records as legally certified qualifications.
