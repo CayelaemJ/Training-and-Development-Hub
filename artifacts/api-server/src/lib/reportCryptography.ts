@@ -1,7 +1,14 @@
 import {createHash,createPrivateKey,createPublicKey,sign,verify} from "node:crypto";
 const context="CABO-SCHOOL-REPORT-V1";
+export function canonicalJson(value:unknown):string{
+ if(value===null||typeof value!=="object")return JSON.stringify(value);
+ if(Array.isArray(value))return "["+value.map(canonicalJson).join(",")+"]";
+ const record=value as Record<string,unknown>;
+ const pairs=Object.keys(record).sort().filter(key=>record[key]!==undefined).map(key=>JSON.stringify(key)+":"+canonicalJson(record[key]));
+ return "{"+pairs.join(",")+"}";
+}
 export function contentDigest(snapshot:unknown):string{
- return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+ return createHash("sha256").update(canonicalJson(snapshot)).digest("hex");
 }
 export function signingPayload(org:number,learner:string,year:number,version:number,digest:string):Buffer{
  if(!Number.isSafeInteger(org)||!Number.isSafeInteger(year)||!Number.isSafeInteger(version)||!learner||!(/^[a-f0-9]{64}$/i.test(digest)))throw Error("Invalid signing payload");
