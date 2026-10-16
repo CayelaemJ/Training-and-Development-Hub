@@ -28,3 +28,10 @@ test("unsigned pilot reports are not falsely represented as signed",()=>{
  assert.equal(configuredReportSigner(),null);
  if(original!==undefined)process.env.CABO_REPORT_SIGNING_PRIVATE_KEY_PKCS8_B64=original;
 });
+
+test("canonical digest survives JSONB-like object key reordering",()=>{
+ const a={grade:"5",year:2026,subjects:[{name:"Mathematics",percentage:80}]};
+ const b={subjects:[{percentage:80,name:"Mathematics"}],year:2026,grade:"5"};
+ assert.equal(contentDigest(a),contentDigest(b));
+ assert.notEqual(contentDigest(a),contentDigest({grade:"5",year:2026,subjects:[{name:"Mathematics",percentage:81}]}));
+});
