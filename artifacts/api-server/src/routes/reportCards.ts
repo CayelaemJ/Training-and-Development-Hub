@@ -1,7 +1,7 @@
 import {Router,type IRouter} from "express";
 import {and,eq,gte,lt} from "drizzle-orm";
 import {z} from "zod/v4";
-import {db,academicCoursesTable,academicAssessmentsTable,academicGradesTable,academicPeriodsTable,organizationMembersTable,verifiedEnrollmentsTable,usersTable,schoolAttendanceTable,guardianRelationshipsTable} from "@workspace/db";
+import {db,academicCoursesTable,academicAssessmentsTable,academicGradesTable,academicPeriodsTable,organizationMembersTable,verifiedEnrollmentsTable,usersTable,schoolAttendanceTable,guardianRelationshipsTable,guardianVerificationEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 async function schoolManager(org:number,user:string){
@@ -48,6 +48,8 @@ router.get("/guardian/reports/:learnerId",async(req,res)=>{
  if(!org.success||!year.success){res.sendStatus(400);return}
  const [verified]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,req.params.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
  if(!verified){res.sendStatus(403);return}
+ const [authority]=await db.select({id:guardianVerificationEventsTable.id}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,verified.id),eq(guardianVerificationEventsTable.organizationId,org.data),eq(guardianVerificationEventsTable.decision,"verified"))).limit(1);
+ if(!authority){res.sendStatus(403);return}
  const report=await gather(org.data,req.params.learnerId,year.data);
  if(!report){res.sendStatus(404);return}
  const [enrollment]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,req.params.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
