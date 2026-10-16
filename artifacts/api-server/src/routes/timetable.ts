@@ -1,7 +1,7 @@
 import {Router,type IRouter} from "express";
 import {and,eq,sql} from "drizzle-orm";
 import {z} from "zod/v4";
-import {db,schoolTimetableSlotsTable,organizationMembersTable} from "@workspace/db";
+import {db,schoolTimetableSlotsTable,organizationMembersTable,timetableSubstitutionEventsTable} from "@workspace/db";
 import {clashes,validSlot,type TimetableSlot} from "../lib/timetablePolicy";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
@@ -35,5 +35,29 @@ router.post("/organizations/:orgId/timetable",async(req,res)=>{
  });
  if("conflicts" in result){res.status(409).json({error:"Teacher/room/class timetable conflict",conflicts:result.conflicts});return}
  res.status(201).json(result.slot);
+});
+
+router.patch("/organizations/:orgId/timetable/:slotId/substitution",async(req,res)=>{
+ if(!req.isAuthenticated()){res.sendStatus(401);return}
+ const org=id.safeParse(req.params.orgId),slotId=id.safeParse(req.params.slotId);
+ const body=z.object({replacementTeacherId:z.string().min(1),reason:z.string().trim().min(5).max(1000)}).safeParse(req.body);
+ if(!org.success||!slotId.success||!body.success){res.status(400).json({error:"A replacement teacher and reason are required"});return}
+ if(!["owner","admin"].includes(await membership(org.data,req.user.id)??"")){res.sendStatus(403);return}
+ const [teacher]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,body.data.replacementTeacherId))).limit(1);
+ if(!teacher||!["teacher","owner","admin"].includes(teacher.role)){res.status(409).json({error:"Replacement must be authorised school staff"});return}
+ const result=await db.transaction(async tx=>{
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(17042, ${org.data})`);
+  const [slot]=await tx.select().from(schoolTimetableSlotsTable).where(and(eq(schoolTimetableSlotsTable.organizationId,org.data),eq(schoolTimetableSlotsTable.id,slotId.data))).for("update").limit(1);
+  if(!slot)return {error:"not_found"} as const;
+  if(slot.status==="cancelled"||slot.teacherId===body.data.replacementTeacherId)return {error:"invalid_replacement"} as const;
+  const sameDay=await tx.select().from(schoolTimetableSlotsTable).where(and(eq(schoolTimetableSlotsTable.organizationId,org.data),eq(schoolTimetableSlotsTable.academicYear,slot.academicYear),eq(schoolTimetableSlotsTable.day,slot.day)));
+  const clashesFound=sameDay.filter(other=>other.id!==slot.id&&other.status!=="cancelled"&&clashes({...slot,teacherId:body.data.replacementTeacherId},other as TimetableSlot).includes("teacher"));
+  if(clashesFound.length)return {error:"replacement_teacher_has_conflict"} as const;
+  await tx.update(schoolTimetableSlotsTable).set({teacherId:body.data.replacementTeacherId}).where(eq(schoolTimetableSlotsTable.id,slot.id));
+  await tx.insert(timetableSubstitutionEventsTable).values({slotId:slot.id,originalTeacherId:slot.teacherId,replacementTeacherId:body.data.replacementTeacherId,changedBy:req.user!.id,reason:body.data.reason});
+  return {id:slot.id,replacementTeacherId:body.data.replacementTeacherId,status:slot.status} as const;
+ });
+ if("error" in result){res.status(result.error==="not_found"?404:409).json(result);return}
+ res.json(result);
 });
 export default router;

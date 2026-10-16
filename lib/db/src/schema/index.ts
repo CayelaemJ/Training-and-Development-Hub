@@ -40,3 +40,5 @@ export * from './schoolReportIssuance';
 export * from './schoolTimetable';
 
 export * from './assessmentQuestionBank';
+
+export * from './timetableSubstitutions';
