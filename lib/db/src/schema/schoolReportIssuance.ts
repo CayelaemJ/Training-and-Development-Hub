@@ -10,6 +10,8 @@ export const issuedSchoolReportsTable=pgTable("issued_school_reports",{
  status:varchar("status",{length:20}).notNull().default("submitted"),
  snapshot:jsonb("snapshot").notNull(),
  contentHash:varchar("content_hash",{length:64}).notNull(),
+ signature:text("signature"),
+ signingKeyId:varchar("signing_key_id",{length:64}),
  submittedBy:varchar("submitted_by").notNull().references(()=>usersTable.id),
  reviewedBy:varchar("reviewed_by").references(()=>usersTable.id),
  issuedAt:timestamp("issued_at",{withTimezone:true}),

@@ -1,6 +1,6 @@
 import {Router,type IRouter} from "express";
 import {and,desc,eq} from "drizzle-orm";
-import {createHash} from "node:crypto";
+import {contentDigest,configuredReportSigner,signingPayload,verifyReportSignature} from "../lib/reportCryptography";
 import {z} from "zod/v4";
 import {db,issuedSchoolReportsTable,schoolReportEventsTable,guardianRelationshipsTable,guardianVerificationEventsTable,verifiedEnrollmentsTable} from "@workspace/db";
 import {gather,schoolManager} from "./reportCards";
@@ -14,7 +14,7 @@ router.post("/organizations/:orgId/report-issuance",async(req,res)=>{
  if(!await schoolManager(org.data,req.user.id)){res.sendStatus(403);return}
  const snapshot=await gather(org.data,body.data.learnerId,body.data.academicYear);
  if(!snapshot||snapshot.subjects.length===0){res.status(409).json({error:"Published assessments and valid enrolment are needed"});return}
- const hash=createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+ const hash=contentDigest(snapshot);
  const result=await db.transaction(async tx=>{
   const existing=await tx.select({version:issuedSchoolReportsTable.version,status:issuedSchoolReportsTable.status}).from(issuedSchoolReportsTable).where(and(eq(issuedSchoolReportsTable.organizationId,org.data),eq(issuedSchoolReportsTable.learnerId,body.data.learnerId),eq(issuedSchoolReportsTable.academicYear,body.data.academicYear))).orderBy(desc(issuedSchoolReportsTable.version));
   if(existing.some(r=>["submitted","approved","issued"].includes(r.status)))return {error:"A pending or issued report version already exists"} as const;
@@ -46,9 +46,15 @@ router.post("/organizations/:orgId/report-issuance/:reportId/decision",async(req
   if(action==="approve"&&item.submittedBy===req.user!.id)return {error:"A second authorised reviewer must approve",code:403} as const;
   if((action==="reject"||action==="revoke")&&!body.data.reason)return {error:"A reason is required",code:400} as const;
   const status={approve:"approved",reject:"rejected",issue:"issued",revoke:"revoked"}[action];
-  const [updated]=await tx.update(issuedSchoolReportsTable).set({status,reviewedBy:action==="approve"?req.user!.id:item.reviewedBy,issuedAt:action==="issue"?new Date():item.issuedAt}).where(eq(issuedSchoolReportsTable.id,item.id)).returning();
+  let signature:string|null=null,signingKeyId:string|null=null;
+  if(action==="issue"){
+   if(contentDigest(item.snapshot)!==item.contentHash)return {error:"Snapshot content failed integrity verification",code:409} as const;
+   const signer=configuredReportSigner();
+   if(signer){signature=signer.signData(signingPayload(item.organizationId,item.learnerId,item.academicYear,item.version,item.contentHash));signingKeyId=signer.keyId}
+  }
+  const [updated]=await tx.update(issuedSchoolReportsTable).set({status,reviewedBy:action==="approve"?req.user!.id:item.reviewedBy,issuedAt:action==="issue"?new Date():item.issuedAt,signature:action==="issue"?signature:item.signature,signingKeyId:action==="issue"?signingKeyId:item.signingKeyId}).where(eq(issuedSchoolReportsTable.id,item.id)).returning();
   await tx.insert(schoolReportEventsTable).values({reportId:item.id,actorId:req.user!.id,action,reason:body.data.reason});
-  return {id:updated.id,status:updated.status,hash:updated.contentHash} as const;
+  return {id:updated.id,status:updated.status,hash:updated.contentHash,cryptographicallySigned:!!updated.signature} as const;
  });
  if("error" in result){res.status(result.code??400).json({error:result.error});return}
  res.json(result);
@@ -68,5 +74,30 @@ router.get("/guardian/issued-reports/:learnerId",async(req,res)=>{
  if(!authority||!enrolled){res.sendStatus(403);return}
  const rows=await db.select({id:issuedSchoolReportsTable.id,academicYear:issuedSchoolReportsTable.academicYear,contentHash:issuedSchoolReportsTable.contentHash,snapshot:issuedSchoolReportsTable.snapshot}).from(issuedSchoolReportsTable).where(and(eq(issuedSchoolReportsTable.organizationId,org.data),eq(issuedSchoolReportsTable.learnerId,req.params.learnerId),eq(issuedSchoolReportsTable.status,"issued")));
  res.setHeader("Cache-Control","private, no-store");res.json(rows);
+});
+
+router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
+ if(!req.isAuthenticated()){res.sendStatus(401);return}
+ const id=positive.safeParse(req.params.reportId);if(!id.success){res.sendStatus(400);return}
+ const [item]=await db.select().from(issuedSchoolReportsTable).where(eq(issuedSchoolReportsTable.id,id.data)).limit(1);
+ if(!item){res.sendStatus(404);return}
+ if(req.user.id!==item.learnerId&&!await schoolManager(item.organizationId,req.user.id)){
+  const [relation]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,item.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
+  const [authority]=relation?await db.select({id:guardianVerificationEventsTable.id}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,relation.id),eq(guardianVerificationEventsTable.organizationId,item.organizationId),eq(guardianVerificationEventsTable.decision,"verified"))).limit(1):[];
+  const [enrolled]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,item.organizationId),eq(verifiedEnrollmentsTable.learnerId,item.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
+  if(!relation||!authority||!enrolled){res.sendStatus(403);return}
+ }
+ const hashValid=contentDigest(item.snapshot)===item.contentHash;
+ let signatureValid=false;
+ if(item.signature&&item.signingKeyId){
+  const signer=configuredReportSigner();
+  const registered=process.env.CABO_REPORT_PUBLIC_KEYS_JSON;
+  let trusted:Record<string,string>={};
+  try{const obj=registered?JSON.parse(registered):{};if(obj&&typeof obj==="object"&&!Array.isArray(obj))trusted=obj}catch{}
+  const pem=trusted[item.signingKeyId]??(signer?.keyId===item.signingKeyId?signer.publicKeyPem:undefined);
+  if(pem)signatureValid=verifyReportSignature(signingPayload(item.organizationId,item.learnerId,item.academicYear,item.version,item.contentHash),item.signature,pem);
+ }
+ res.setHeader("Cache-Control","private, no-store");
+ res.json({id:item.id,status:item.status,hashValid,cryptographicallySigned:!!item.signature,signatureValid,signingKeyId:item.signingKeyId,issuerIdentityAccredited:false,warning:"Signature proves configured key possession, not DBE/IEB accreditation or school authority."});
 });
 export default router;
