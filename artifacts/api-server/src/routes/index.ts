@@ -24,6 +24,7 @@ import reportCardsRouter from "./reportCards";
 import demoShowcaseRouter from "./demoShowcase";
 import demoStatusRouter from "./demoStatus";
 import guardianVerificationRouter from "./guardianVerification";
+import reportIssuanceRouter from "./reportIssuance";
 
 const router: IRouter = Router();
 
@@ -52,5 +53,6 @@ router.use(reportCardsRouter);
 router.use(demoShowcaseRouter);
 router.use(demoStatusRouter);
 router.use(guardianVerificationRouter);
+router.use(reportIssuanceRouter);
 
 export default router;
