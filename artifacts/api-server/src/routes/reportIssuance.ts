@@ -50,7 +50,7 @@ router.post("/organizations/:orgId/report-issuance/:reportId/decision",async(req
   await tx.insert(schoolReportEventsTable).values({reportId:item.id,actorId:req.user!.id,action,reason:body.data.reason});
   return {id:updated.id,status:updated.status,hash:updated.contentHash} as const;
  });
- if("error" in result){res.status(result.code).json({error:result.error});return}
+ if("error" in result){res.status(result.code??400).json({error:result.error});return}
  res.json(result);
 });
 router.get("/report-issuance/me",async(req,res)=>{
