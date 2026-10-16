@@ -30,6 +30,7 @@ import academicIntelligenceRouter from "./academicIntelligence";
 import timetableRouter from "./timetable";
 import assessmentQuestionBankRouter from "./assessmentQuestionBank";
 import educationCommandRouter from "./educationCommand";
+import admissionEvidenceRouter from "./admissionEvidence";
 
 const router: IRouter = Router();
 
@@ -64,5 +65,6 @@ router.use(academicIntelligenceRouter);
 router.use(timetableRouter);
 router.use(assessmentQuestionBankRouter);
 router.use(educationCommandRouter);
+router.use(admissionEvidenceRouter);
 
 export default router;
