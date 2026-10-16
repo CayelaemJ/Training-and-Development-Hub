@@ -3,11 +3,12 @@ import {and,desc,eq} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,admissionApplicationsTable,admissionInstitutionsTable,admissionProgrammesTable,admissionEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
-import {admissionTransitionAllowed,type AdmissionStatus} from "../lib/admissionsPolicy";
+import {type AdmissionStatus} from "../lib/admissionsPolicy";
+import {syntheticCandidate,canAdvanceDemoApplication} from "../lib/demoAdmissionsPolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 const fictionalUniversity="CABO DEMO | University of Future Skills";
 function permitted(req:any):boolean{return req.isAuthenticated()&&isPlatformSuperadmin(req.user.id)&&process.env.RAILWAY_ENVIRONMENT_NAME==="testing"}
-function syntheticCandidate(id:string){return /^cabo-(?:demo-|fixture-|isolated-test-)/.test(id)}
+
 router.get("/platform/demo/admissions-inbox",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  if(!permitted(req)){res.sendStatus(403);return}
@@ -28,7 +29,7 @@ router.post("/platform/demo/admissions-inbox/:applicationId/decision",async(req,
   const [programme]=await tx.select({institutionId:admissionProgrammesTable.institutionId}).from(admissionProgrammesTable).where(eq(admissionProgrammesTable.id,record.programmeId)).limit(1);
   const [university]=programme?await tx.select({name:admissionInstitutionsTable.name}).from(admissionInstitutionsTable).where(eq(admissionInstitutionsTable.id,programme.institutionId)).limit(1):[];
   if(university?.name!==fictionalUniversity)return {error:"not_demo_university"} as const;
-  if(!admissionTransitionAllowed(record.status as AdmissionStatus,data.data.action))return {error:"invalid_transition"} as const;
+  if(!canAdvanceDemoApplication(record.candidateId,university.name,record.status as AdmissionStatus,data.data.action))return {error:"invalid_transition"} as const;
   const [updated]=await tx.update(admissionApplicationsTable).set({status:data.data.action,updatedAt:new Date()}).where(eq(admissionApplicationsTable.id,record.id)).returning();
   await tx.insert(admissionEventsTable).values({applicationId:record.id,actorId:req.user!.id,fromStatus:record.status,toStatus:updated.status});
   return {id:updated.id,status:updated.status,demoOnly:true,universityReceiptVerified:false} as const;
