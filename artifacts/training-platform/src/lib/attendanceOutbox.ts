@@ -1,5 +1,5 @@
 /** Browser-only attendance outbox. Learner IDs are sensitive: opt-in device storage only. */
-export type AttendanceDraft={organizationId:number;learnerId:string;day:string;status:"present"|"absent"|"late"|"excused";note:string;createdAt:string};
+export type AttendanceDraft={ownerId:string;organizationId:number;learnerId:string;day:string;status:"present"|"absent"|"late"|"excused";note:string;createdAt:string};
 const DB_NAME="cabo-attendance-drafts-v1",STORE="queue";
 function openDb():Promise<IDBDatabase>{
  return new Promise((resolve,reject)=>{
@@ -21,7 +21,7 @@ async function transaction<T>(mode:IDBTransactionMode,execute:(store:IDBObjectSt
   execute(store,x=>{value=x},reject);
  });
 }
-const key=(x:Pick<AttendanceDraft,"organizationId"|"learnerId"|"day">)=>[x.organizationId,x.learnerId,x.day].join(":");
+const key=(x:Pick<AttendanceDraft,"ownerId"|"organizationId"|"learnerId"|"day">)=>[x.ownerId,x.organizationId,x.learnerId,x.day].join(":");
 export async function listAttendanceDrafts():Promise<AttendanceDraft[]>{
  return transaction("readonly",(store,resolve,reject)=>{
   const request=store.getAll();request.onsuccess=()=>resolve((request.result as {key:string;data:AttendanceDraft}[]).map(x=>x.data));request.onerror=()=>reject(request.error);
