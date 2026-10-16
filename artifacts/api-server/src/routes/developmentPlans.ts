@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import OpenAI from "openai";
 import { z } from "zod/v4";
 import {recordAiMetric,aiConfiguration} from "../lib/aiObservability";
+import {draftPlanTemplate} from "../lib/planFallback";
 
 const router: IRouter = Router();
 const item = z.object({ area: z.enum(["academic","sport","creative","leadership","extracurricular"]), activity: z.string().trim().min(2).max(100), currentLevel: z.string().trim().max(280), strengths: z.string().trim().max(450), focus: z.string().trim().max(450) });
@@ -17,7 +18,7 @@ router.post("/development-plans/draft",async(req,res)=>{
  if(now-(lastRun.get(userId)??0)<60000){res.status(429).json({error:"You can generate one plan per minute. Please review your previous plan first."});return}
  const groq=process.env.GROQ_API_KEY;
  const openai=process.env.OPENAI_API_KEY;
- if(!groq&&!openai){res.status(503).json({error:"The AI planning service has not been configured"});return}
+ if(!groq&&!openai){res.json({plan:draftPlanTemplate(parsed.data),status:"draft",verified:false,generatedAt:new Date().toISOString(),source:"deterministic_template",providerAvailable:false});return}
  lastRun.set(userId,now);
  const provider=groq?"groq":"openai";const model=aiConfiguration().developmentModel;
  try {
@@ -34,7 +35,7 @@ router.post("/development-plans/draft",async(req,res)=>{
  } catch(e) {
   await recordAiMetric("development_plan",provider,model,"failure",now);
   console.error("Development plan generation failed",e instanceof Error?e.name:"unknown");
-  res.status(502).json({error:"Could not generate a development plan right now. Please retry later."});
+  res.json({plan:draftPlanTemplate(parsed.data),status:"draft",verified:false,generatedAt:new Date().toISOString(),source:"deterministic_template",providerAvailable:false,warning:"AI provider unavailable. This is a non-AI planning template requiring teacher review."});
  }
 });
 export default router;
