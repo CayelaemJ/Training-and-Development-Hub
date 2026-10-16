@@ -4,6 +4,7 @@ import {createHash} from "node:crypto";
 import {z} from "zod/v4";
 import {db,issuedSchoolReportsTable,schoolReportEventsTable,guardianRelationshipsTable,guardianVerificationEventsTable,verifiedEnrollmentsTable} from "@workspace/db";
 import {gather,schoolManager} from "./reportCards";
+import {mayChangeReport,type ReportStatus} from "../lib/reportIssuancePolicy";
 const router:IRouter=Router(),positive=z.coerce.number().int().positive();
 router.post("/organizations/:orgId/report-issuance",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
@@ -40,7 +41,7 @@ router.post("/organizations/:orgId/report-issuance/:reportId/decision",async(req
  const result=await db.transaction(async tx=>{
   const [item]=await tx.select().from(issuedSchoolReportsTable).where(and(eq(issuedSchoolReportsTable.organizationId,org.data),eq(issuedSchoolReportsTable.id,report.data))).for("update").limit(1);
   if(!item)return {error:"Report not found",code:404} as const;
-  const action=body.data.action,valid=(action==="approve"||action==="reject")&&item.status==="submitted"||action==="issue"&&item.status==="approved"||action==="revoke"&&item.status==="issued";
+  const action=body.data.action,valid=mayChangeReport(item.status as ReportStatus,action,item.submittedBy,req.user!.id,body.data.reason);
   if(!valid)return {error:"Invalid report transition",code:409} as const;
   if(action==="approve"&&item.submittedBy===req.user!.id)return {error:"A second authorised reviewer must approve",code:403} as const;
   if((action==="reject"||action==="revoke")&&!body.data.reason)return {error:"A reason is required",code:400} as const;
