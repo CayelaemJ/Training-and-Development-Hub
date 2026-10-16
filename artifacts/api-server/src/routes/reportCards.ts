@@ -5,12 +5,12 @@ import {db,academicCoursesTable,academicAssessmentsTable,academicGradesTable,aca
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {canReadChildReport,type GuardianStatus} from "../lib/guardianPolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
-async function schoolManager(org:number,user:string){
+export async function schoolManager(org:number,user:string){
  if(isPlatformSuperadmin(user))return true;
  const [m]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org),eq(organizationMembersTable.userId,user))).limit(1);
  return !!m&&["owner","admin"].includes(m.role);
 }
-async function gather(org:number,learner:string,year:number){
+export async function gather(org:number,learner:string,year:number){
  const enrolment=await db.select({stage:verifiedEnrollmentsTable.stage,academicYear:verifiedEnrollmentsTable.academicYear,status:verifiedEnrollmentsTable.status}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org),eq(verifiedEnrollmentsTable.learnerId,learner),eq(verifiedEnrollmentsTable.academicYear,year))).limit(1);
  if(!enrolment.length)return null;
  const marks=await db.select({subject:academicCoursesTable.name,courseId:academicCoursesTable.id,grade:academicCoursesTable.level,assessment:academicAssessmentsTable.title,weight:academicAssessmentsTable.weight,maxMarks:academicAssessmentsTable.maxMarks,marks:academicGradesTable.marks,period:academicPeriodsTable.name}).from(academicGradesTable)
