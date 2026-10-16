@@ -1,0 +1,4 @@
+import test from "node:test";import assert from "node:assert/strict";
+import {validAttendanceBatch,academicAttention} from "../lib/educationSignals.ts";
+test("offline replay batches require unique learner/date pairs",()=>{assert.equal(validAttendanceBatch([{learnerId:"a",day:"2026-10-16",status:"present"}]),true);assert.equal(validAttendanceBatch([{learnerId:"a",day:"2026-10-16",status:"present"},{learnerId:"a",day:"2026-10-16",status:"absent"}]),false);assert.equal(validAttendanceBatch([]),false)});
+test("educational signals are review flags, not automatic academic decisions",()=>{assert.equal(academicAttention([{percentage:48}],95),true);assert.equal(academicAttention([{percentage:78}],74),true);assert.equal(academicAttention([{percentage:78}],95),false);assert.equal(academicAttention([],null),false)});
