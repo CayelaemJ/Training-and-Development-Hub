@@ -1,5 +1,5 @@
 import {Router,type IRouter} from "express";
-import {and,eq} from "drizzle-orm";
+import {and,eq,sql} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,schoolTimetableSlotsTable,organizationMembersTable} from "@workspace/db";
 import {clashes,validSlot,type TimetableSlot} from "../lib/timetablePolicy";
@@ -26,7 +26,7 @@ router.post("/organizations/:orgId/timetable",async(req,res)=>{
  if(!staff||!["teacher","admin","owner"].includes(staff.role)){res.status(409).json({error:"Teacher must be authorised at the school"});return}
  const result=await db.transaction(async tx=>{
   // Lock the organisation row to serialize timetable writes for one school.
-  const locked=await tx.execute(z.any().parse(undefined) as any).catch(()=>null);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(17042, ${org.data})`);
   const existing=await tx.select().from(schoolTimetableSlotsTable).where(and(eq(schoolTimetableSlotsTable.organizationId,org.data),eq(schoolTimetableSlotsTable.academicYear,body.data.academicYear),eq(schoolTimetableSlotsTable.day,body.data.day)));
   const collisions=existing.filter(s=>s.status!=="cancelled"&&clashes(body.data,s as TimetableSlot).length>0).map(s=>({id:s.id,conflicts:clashes(body.data,s as TimetableSlot)}));
   if(collisions.length)return {conflicts:collisions} as const;
