@@ -28,6 +28,7 @@ import reportIssuanceRouter from "./reportIssuance";
 import attendanceSyncRouter from "./attendanceSync";
 import academicIntelligenceRouter from "./academicIntelligence";
 import timetableRouter from "./timetable";
+import assessmentQuestionBankRouter from "./assessmentQuestionBank";
 
 const router: IRouter = Router();
 
@@ -60,5 +61,6 @@ router.use(reportIssuanceRouter);
 router.use(attendanceSyncRouter);
 router.use(academicIntelligenceRouter);
 router.use(timetableRouter);
+router.use(assessmentQuestionBankRouter);
 
 export default router;
