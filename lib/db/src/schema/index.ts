@@ -42,3 +42,5 @@ export * from './schoolTimetable';
 export * from './assessmentQuestionBank';
 
 export * from './timetableSubstitutions';
+
+export * from './assessmentPapers';
