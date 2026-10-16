@@ -25,7 +25,7 @@ export async function seedPresentationDemo(){
  await user(operator,"CABO","Tester");
  const principals=configuredPrincipals(process.env.CABO_TEST_USERS_JSON);
  // Use already-configured, independently authenticated test accounts; never create passwords in demo data.
- const roleFixture=(kind:string,phase:string)=>principals.find(p=>p.username.startsWith("cabo_"+kind+"_")&&p.username.includes(phase))??principals.find(p=>p.username.startsWith("cabo_"+kind+"_"));
+ const roleFixture=(kind:string,phase:string)=>principals.find(p=>p.username.startsWith("cabo_"+kind+"_")&&p.username.includes(phase))??(phase==="primary"?principals.find(p=>p.username.startsWith("cabo_"+kind+"_")):undefined);
  for(const p of principals)await db.insert(usersTable).values({id:p.userId,firstName:p.firstName,lastName:p.lastName,email:p.email}).onConflictDoNothing();
  const schools=[
   {name:"CABO DEMO | Early Learning Centre",type:"preprimary",grade:"R",learners:[["cabo-demo-child-r","Amara","Dlamini"]],subjects:[["LIT","Early Language"],["NUM","Early Numeracy"]]},
@@ -48,6 +48,7 @@ export async function seedPresentationDemo(){
    const learnerFixture=roleFixture("learner",s.type);
    if(learnerFixture&&i===0){await db.insert(organizationMembersTable).values({organizationId:org,userId:learnerFixture.userId,role:"learner"}).onConflictDoNothing();await db.insert(verifiedEnrollmentsTable).values({organizationId:org,learnerId:learnerFixture.userId,stage:s.grade,academicYear:2026,status:"active",recordedBy:operator}).onConflictDoNothing();}
    const guardianFixture=roleFixture("parent",s.type);
+   if(guardianFixture&&learnerFixture&&i===0)await db.insert(guardianRelationshipsTable).values({learnerId:learnerFixture.userId,guardianId:guardianFixture.userId,status:"pending"}).onConflictDoNothing();
    const guardian=guardianFixture?.userId??await user("cabo-demo-guardian-"+uid,"Demo","Guardian");
    await db.insert(guardianRelationshipsTable).values({learnerId:uid,guardianId:guardian,status:"pending"}).onConflictDoNothing();
    await db.insert(organizationMembersTable).values({organizationId:org,userId:uid,role:"learner"}).onConflictDoNothing();
@@ -56,11 +57,11 @@ export async function seedPresentationDemo(){
     const title="CABO DEMO Continuous Assessment";
     const [assessment]=await db.select({id:academicAssessmentsTable.id}).from(academicAssessmentsTable).where(and(eq(academicAssessmentsTable.organizationId,org),eq(academicAssessmentsTable.courseId,course.id),eq(academicAssessmentsTable.periodId,period),eq(academicAssessmentsTable.title,title))).limit(1);
     const assessmentId=assessment?.id??(await db.insert(academicAssessmentsTable).values({organizationId:org,courseId:course.id,periodId:period,title,category:"classwork",maxMarks:100,weight:1,createdBy:operator}).returning())[0].id;
-    await db.insert(academicGradesTable).values({assessmentId,learnerId:uid,marks:66+((i*13+j*7+org)%28),status:"published",reviewedBy:operator,feedback:"SYNTHETIC DEMO RESULT · Not a real academic record"}).onConflictDoNothing();
+    for(const student of [uid,...(learnerFixture&&i===0?[learnerFixture.userId]:[])])await db.insert(academicGradesTable).values({assessmentId,learnerId:student,marks:66+((i*13+j*7+org)%28),status:"published",reviewedBy:operator,feedback:"SYNTHETIC DEMO RESULT · Not a real academic record"}).onConflictDoNothing();
    }
    for(let day=1;day<=10;day++){
     const date="2026-09-"+String(day).padStart(2,"0");
-    await db.insert(schoolAttendanceTable).values({organizationId:org,learnerId:uid,day:date,status:day===3+i?"absent":"present",note:"SYNTHETIC DEMO",recordedBy:operator}).onConflictDoNothing();
+    for(const student of [uid,...(learnerFixture&&i===0?[learnerFixture.userId]:[])])await db.insert(schoolAttendanceTable).values({organizationId:org,learnerId:student,day:date,status:day===3+i?"absent":"present",note:"SYNTHETIC DEMO",recordedBy:operator}).onConflictDoNothing();
    }
    const [prior]=await db.select({id:schoolStageProgressTable.id}).from(schoolStageProgressTable).where(and(eq(schoolStageProgressTable.organizationId,org),eq(schoolStageProgressTable.learnerId,uid),eq(schoolStageProgressTable.title,"CABO DEMO Learner development"))).limit(1);
    if(!prior)await db.insert(schoolStageProgressTable).values({organizationId:org,learnerId:uid,stage:s.type,grade:s.grade,academicYear:2026,domain:s.type==="preprimary"?"early_language":s.type==="primary"?"literacy":"study_skills",title:"CABO DEMO Learner development",observation:"Demonstrating consistent improvement in classroom activities (synthetic example).",nextStep:"Review practice activities with an educator.",progress:"developing",recordedBy:operator});
