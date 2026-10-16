@@ -26,6 +26,7 @@ import CaboApplyPage from '@/pages/cabo-apply';
 import EducationReportsPage from '@/pages/education-reports';
 import GuardianConnectPage from '@/pages/guardian-connect';
 import ReportIssuancePage from '@/pages/report-issuance';
+import SchoolIntelligencePage from '@/pages/school-intelligence';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -46,17 +47,17 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/organizations','/governance'],
  provincial_director:['/','/organizations','/governance'],
  district_director:['/','/organizations','/governance'],
  group_executive:['/','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ headmaster:['/','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
  deputy_headmaster:['/','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
  department_head:['/','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
  grade_head:['/','/school-stages','/hub-modules','/organizations','/academics','/governance'],
- administrator:['/','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ administrator:['/','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
  teacher:['/','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
  assessor:['/','/organizations','/written-exams'],
  parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
@@ -68,6 +69,7 @@ const navItems = [
   { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
   { href: '/education-reports', label: 'Reports & statistics', icon: BookOpen },
   { href: '/report-issuance', label: 'Issue report cards', icon: FileText },
+  { href: '/school-intelligence', label: 'School intelligence', icon: BookOpen },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
@@ -121,6 +123,7 @@ function Router() {
     <Route path="/cabo-apply" component={CaboApplyPage} />
     <Route path="/education-reports" component={EducationReportsPage} />
     <Route path="/report-issuance" component={ReportIssuancePage} />
+    <Route path="/school-intelligence" component={SchoolIntelligencePage} />
     <Route path="/guardian-connect" component={GuardianConnectPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />

@@ -246,3 +246,8 @@ CABO separates calculated report previews from frozen, versioned, internally app
 5. School users access the queue at `/report-issuance` and learners see issued snapshots in `/education-reports`.
 
 **Important:** SHA-256 is an integrity fingerprint, **not** an asymmetric cryptographic signature or proof of government/IEB accreditation. This workflow is a testing prototype. External verification, signing-key infrastructure, independent review/identity verification, signatures, province-specific approval policies, correction appeals, full historical reporting and separate-role browser tests remain outstanding. Do not present the records as legally certified qualifications.
+
+### School Intelligence and attendance sync (new development)
+School administrators use `/school-intelligence` to review academic support signals and attendance by year. Authenticated APIs: `GET /api/organizations/:orgId/academic-intelligence?year=2026`, `GET /api/organizations/:orgId/attendance/summary?year=2026` and `POST /api/organizations/:orgId/attendance/sync` with `{"entries":[{"learnerId":"...","day":"2026-10-16","status":"present"}]}`. Uploads are limited to 100 records, require an active year-matched school enrolment, and return per-row conflict statuses rather than overwriting marks. The client pilot includes manual JSON replay; **device-side durable offline capture, push notifications and QR attendance are not implemented**. Subject and attendance thresholds merely generate teacher-review signals, never automatic decisions.
+
+See [eight-workstream release and evidence register](docs/EIGHT_WORKSTREAM_RELEASE_GATES.md) before claiming completion or launching with real learners.
