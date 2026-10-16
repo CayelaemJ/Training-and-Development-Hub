@@ -25,6 +25,7 @@ import demoShowcaseRouter from "./demoShowcase";
 import demoStatusRouter from "./demoStatus";
 import guardianVerificationRouter from "./guardianVerification";
 import reportIssuanceRouter from "./reportIssuance";
+import attendanceSyncRouter from "./attendanceSync";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(demoShowcaseRouter);
 router.use(demoStatusRouter);
 router.use(guardianVerificationRouter);
 router.use(reportIssuanceRouter);
+router.use(attendanceSyncRouter);
 
 export default router;
