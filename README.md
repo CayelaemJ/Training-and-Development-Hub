@@ -120,3 +120,119 @@ The home dashboard now adapts to CABO's institutional hierarchy, with distinct e
 ## Phases 1–4 implementation tracker
 
 CABO's development branch includes new school attendance/notices, a candidate application workflow and a private six-month **development review** passport. Employer-facing application submission and psychometric disclosure stay gated pending independent eligibility, professional and legal review. See [Phases 1–4 delivery register](docs/PHASES_1_TO_4_DELIVERY_REGISTER.md) for what is implemented vs. still required.
+
+
+---
+
+## CABO Connected Education Ecosystem (current development)
+
+**Vision:** A portable, verified lifelong education identity spanning early-childhood development, primary/secondary schools, university/TVET and candidate-controlled professional talent. CABO is **not** an authorised replacement for SA-SAMS, LURITS or DBE national registers today. National ingestion and production release require official agreements, lawful processing and independent security audits.
+
+### Current technology and app
+- Frontend: React, Vite, TypeScript and mobile PWA under `artifacts/training-platform`.
+- Backend: Express API under `artifacts/api-server`.
+- Data: PostgreSQL with Drizzle schemas under `lib/db/src/schema`.
+- Deployment: isolated Railway testing environment backed by its own PostgreSQL.
+- AI: OpenAI-compatible SDK, with Groq selected when `GROQ_API_KEY` is provided, otherwise `OPENAI_API_KEY`. Model IDs use `GROQ_EXAM_MODEL` and `OPENAI_EXAM_MODEL` for the existing development-plan endpoint.
+
+### Education workflow modules
+- `/school-stages`: grade RR–R, 1–7 and 8–12 development observations; enrolment and organisation access enforced server-side.
+- `/school-operations`: institution notices and daily attendance.
+- `/academics`: courses, subjects, assessments, permitted course staffing and results.
+- `/hub-modules`: institution workflow registry for timetable, family meeting, academic intervention, bursary, sports, university module, governance, learning resources and integration proposals.
+- Records start in `draft`, then move through `submitted` → `approved` → `active` → `completed`. Every transition is logged with actor, old/new state and timestamp. Locked qualification and psychological-assessment issuance cannot be bypassed by the workflow engine.
+- `/governance`: institutional reporting hierarchy and delegated roles.
+- `/career-passport`: private skills-development evidence and a candidate application pilot. Employer-facing psychological sharing remains off.
+
+### API contracts added
+- `GET /api/hub/modules` — module registry.
+- `GET /api/organizations/:orgId/hub-records?kind=<module>` — scoped institution records.
+- `POST /api/organizations/:orgId/hub-records` — owner/admin creation.
+- `PATCH /api/organizations/:orgId/hub-records/:recordId/transition` — transactional approval workflow.
+- `GET /api/organizations/:orgId/hub-records/:recordId/history` — privacy-scoped transition history.
+- `GET /api/school-stages`, `GET /api/school-stages/me` — stage definitions and personal progress.
+- `POST /api/organizations/:orgId/school-stages/progress` — matching active enrolment required.
+- `GET /api/ai/capabilities` — authenticated AI provider configuration **without secrets**.
+- `GET /api/platform/mlops` — isolated-test superadmin only, seven-day model usage and latency metrics.
+
+### AI reliability and MLOps
+1. Configure provider credentials **only in Railway/server environment**; never add keys to GitHub or `VITE_*` variables.
+2. `POST /api/development-plans/draft` validates input, rate-limits calls, requests structured JSON and validates the model response. All AI recommendations are drafts subject to educator/guardian review.
+3. The server records model provider, model ID, operation, duration and success/failure into `ai_inference_metrics`, deliberately excluding learner prompts, answers and personal profiles.
+4. The superadmin can inspect aggregate errors/latency at `GET /api/platform/mlops`. A configured API key is **not** proof of successful inference; use an authenticated test call with synthetic data and verify the metrics.
+5. Before production: add per-model prompt versions, eval fixtures, PII-safe tracing policies, regression benchmark gates, budget/quotas, model rollback, provider failover and incident alerting.
+
+### Verification and local development
+```bash
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
+node --test artifacts/api-server/src/tests/hubPolicy.test.mjs artifacts/api-server/src/tests/hubWorkflow.test.mjs artifacts/api-server/src/tests/schoolStagePolicy.test.mjs
+```
+Do not run `drizzle-kit push` against an institutional production database. Use versioned reviewed migrations and backups, and validate independent role accounts before promotion. Railway testing uses controlled synthetic fixtures only.
+
+### Current gaps (not yet complete)
+Verified national institution directory and government interoperability; production identity and parental verification; class scheduling collision resolution; real-time notifications, offline sync and outbox delivery; approved academic credentials; full university registrar workflows; external SIS integration; signed professional assessment governance; comprehensive audit and monitoring. See [national architecture](docs/NATIONAL_EDUCATION_ARCHITECTURE.md) and [connected hub sprint register](docs/CONNECTED_HUB_SPRINTS.md).
+
+### Groq model compatibility and live MLOps check (October 2026)
+The free/developer-tier Groq model `llama-3.3-70b-versatile` was retired in August 2026. Set `GROQ_EXAM_MODEL=openai/gpt-oss-120b` (or another model confirmed active for the account); the CABO default now matches. This is a Groq-hosted open-weight model ID, **not** an OpenAI API credential.
+
+From the isolated testing superadmin screen:
+1. Open **Platform administration → AI operations & model reliability**.
+2. Click **Test live AI connection** to trigger `POST /api/platform/mlops/smoke-test`.
+3. The server submits an entirely synthetic, non-learner prompt, checks for the expected response and records a content-free success/failure metric. The endpoint is restricted to the isolated-test superadmin and rate-limited to one request per minute.
+4. A successful smoke test validates only provider connectivity and basic generation, not child-safety, learning quality, model calibration or end-to-end grading.
+
+`GET /api/ai/capabilities` and `GET /api/platform/mlops` remain available as authenticated configuration and private monitoring endpoints. Model API keys remain server-only.
+
+### Grade RR–12 year-end learner progression (new)
+- School owners/admins use **Year-end progression** at `/school-progression` to review the school's active enrolments for a chosen year.
+- `GET /api/organizations/:orgId/progression/candidates?year=2026` returns permitted year-end progression candidates.
+- `POST /api/organizations/:orgId/progression/:enrollmentId` accepts `{"targetYear":2027,"decision":"promote"}` or `"repeat"`.
+- API verifies institutional authority, active enrolment and sequential years, then **transactionally** creates the new active year record and completes the previous record. The prior academic history is preserved. Duplicate next-year records are rejected.
+- Grade 12 does not automatically promote to university or issue an NSC credential; a separate verified school-leaving and university admission process is required.
+- Promotion is an explicit school decision, not an AI recommendation. Real CAPS/IEB promotion criteria, moderation, appeal, signatures and guardian notices must be implemented before official use.
+- Test rules in `schoolProgressionPolicy.test.mjs`; independently authenticated end-to-end role, race-condition and cross-school checks remain outstanding.
+
+**Progression audit extension:** `GET /api/organizations/:orgId/progression/history` is restricted to school owners/admins and lists recorded, time-stamped promotion/repeat decisions. The progression transaction writes the new enrolment, marks the prior enrolment completed, and inserts an audit event atomically. It also rejects any existing active target-year grade for the same learner and institution. This records administrator decisions but does not implement a CAPS/IEB promotion-policy adjudicator or official school-leaving certification.
+
+### CABO Apply — university application gateway (pilot)
+
+- Student portal: `/cabo-apply`. A candidate can browse directory entries, select a published programme, create a private draft and track a handoff.
+- API: `GET /api/admissions/institutions`, `GET /api/admissions/programmes?institutionId=...`, `POST /api/admissions/applications`, `GET /api/admissions/applications/me`, `PATCH /api/admissions/applications/:applicationId`.
+- Test-superadmin maintenance: `POST /api/platform/admissions/institutions` creates **directory-only** entries; `POST /api/platform/admissions/programmes` creates **draft** programmes. Entries are not official partnerships and programmes cannot be advertised as open until independently verified and published through a reviewed workflow.
+- Candidate statuses: `draft → ready_for_handoff → external_submission_recorded`. The candidate must supply a reference obtained from the official receiving system; this is **self-reported**, not receipt verification or a university decision. Partner-originated review and offer updates are intentionally not implemented until a signed admissions integration and appropriately scoped partner identities exist.
+- No blanket sharing of learner history, school attendance, guardianship or psychological records. University access must be explicit, purpose-bound, revocable and audited in a future partner gateway.
+- South Africa already has CAO and university-specific application channels; avoid duplicate submissions. Obtain signed API agreements before direct submission. The user must use the official portal for deadlines, fees and current requirements.
+- Public institution registry must be sourced from current DHET directories and periodically verified. The application database starts empty rather than fabricating an official admissions partnership or programme catalogue.
+
+**Social impact priorities:** reduce repeat capture, mobile data burden and travel to institutions, support low-connectivity draft preparation and accessible multilingual instructions, provide honest application receipts and reduce financial barriers. These are product objectives, not yet fully built.
+
+### Presentation-ready synthetic school showcase
+
+The isolated Railway `testing` deployment can populate its database with **explicitly fictional** institutions and student records. Sign in as the designated test superadmin, open **Platform administration**, then click **Load synthetic school showcase**. The loader is accessible only in the isolated testing environment when `ENABLE_CABO_DEMO_SEED=true`; repeat requests are idempotent and do not intentionally overwrite live records.
+
+Demo entities:
+- **CABO DEMO | Early Learning Centre** — Grade R, pre-primary development and early learning.
+- **CABO DEMO | Tshwane Primary** — Grade 5, academic subject marks, attendance, family meetings and intervention support.
+- **CABO DEMO | Pretoria Secondary** — Grade 11, academic reports, skills and university pathways.
+- **CABO DEMO | University of Future Skills** — two fictitious published programme examples for the CABO Apply flow; it is **not accredited** and has no real admissions agreement.
+
+The loader adds synthetic learners, staff, pending guardian links (no automatic access to child records), term assessments with mock marks, attendance entries, notices and institutional activities. All fake records use `CABO DEMO` labels or reserved `example.invalid` emails. It does not create real school registration, national identity, university eligibility or authorised guardian rights.
+
+For presentations:
+1. Show the **Superadmin Command Centre** and prepare the demo dataset.
+2. Open **Reports & statistics** for each demo school, change the academic year to **2026**, and show attendance and grade distribution.
+3. Enter a synthetic learner account ID from the seeded demo reference to view a **draft report-card preview** (not an official report card). Example: `cabo-demo-child-5a` at **CABO DEMO | Tshwane Primary**.
+4. Open **School stages** to show pre-primary, primary and high-school intervention data.
+5. Open **Institution hub** to explore timetable, parent meetings, sports, bursaries and institutional governance proposals.
+6. Open **CABO Apply** to find the fictional university programmes and demonstrate a private application draft; no real university receives it.
+7. Discuss the future consent-based qualifications and talent passport roadmap without claiming live psychometric or employer integrations.
+
+Developer API routes:
+- `GET /api/organizations/:orgId/analytics?year=2026`: institution-admin statistics.
+- `GET /api/organizations/:orgId/reports/:learnerId?year=2026`: authorised draft report-card preview.
+- `GET /api/reports/me?organizationId=...&year=2026`: learner's own preview.
+- `POST /api/platform/demo/seed`: isolated test superadmin only.
+
+**Limits:** this is a demonstration of connected school workflows, not an official SA-SAMS replacement, nationally accredited credentials, complete QR/offline timetabling, verified university integrations or live qualified psychological assessment. Independent multi-role browser testing, real integrations and external approval remain release gates.

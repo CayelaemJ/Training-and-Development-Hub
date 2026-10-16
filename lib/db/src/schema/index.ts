@@ -20,3 +20,15 @@ export * from './schoolOperations';
 export * from './talentPassport';
 
 export * from './materialUploadBlobs';
+
+export * from './hubRecords';
+
+export * from './schoolStages';
+
+export * from './aiMetrics';
+
+export * from './institutionSetup';
+
+export * from './schoolProgressionEvents';
+
+export * from './admissions';

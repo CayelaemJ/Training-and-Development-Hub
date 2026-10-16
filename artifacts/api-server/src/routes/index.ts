@@ -14,6 +14,15 @@ import managementHierarchyRouter from "./managementHierarchy";
 import rolePortalsRouter from "./rolePortals";
 import educationTalentRouter from "./educationTalent";
 import developmentPlansRouter from "./developmentPlans";
+import hubModulesRouter from "./hubModules";
+import schoolStagesRouter from "./schoolStages";
+import mlopsRouter from "./mlops";
+import institutionSetupRouter from "./institutionSetup";
+import schoolProgressionRouter from "./schoolProgression";
+import admissionsRouter from "./admissions";
+import reportCardsRouter from "./reportCards";
+import demoShowcaseRouter from "./demoShowcase";
+import demoStatusRouter from "./demoStatus";
 
 const router: IRouter = Router();
 
@@ -32,5 +41,14 @@ router.use(managementHierarchyRouter);
 router.use(rolePortalsRouter);
 router.use(educationTalentRouter);
 router.use(developmentPlansRouter);
+router.use(hubModulesRouter);
+router.use(schoolStagesRouter);
+router.use(mlopsRouter);
+router.use(institutionSetupRouter);
+router.use(schoolProgressionRouter);
+router.use(admissionsRouter);
+router.use(reportCardsRouter);
+router.use(demoShowcaseRouter);
+router.use(demoStatusRouter);
 
 export default router;
