@@ -2,8 +2,11 @@ version: 2.1
 jobs:
   build_and_typecheck:
     docker:
-      - image: cimg/node:22.14
+      - image: cimg/node:24.11
     resource_class: small
+    environment:
+      PORT: "5000"
+      BASE_PATH: "/"
     steps:
       - checkout
       - run:
