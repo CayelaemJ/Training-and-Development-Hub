@@ -14,9 +14,14 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node --test artifacts/api-server/src/tests/consentPolicy.test.mjs artifacts/api-server/src/tests/hierarchyPolicy.test.mjs artifacts/api-server/src/tests/platformPolicy.test.mjs artifacts/api-server/src/tests/careerPolicy.test.mjs artifacts/api-server/src/tests/testPrincipals.test.mjs artifacts/api-server/src/tests/hubPolicy.test.mjs artifacts/api-server/src/tests/schoolStagePolicy.test.mjs artifacts/api-server/src/tests/hubWorkflow.test.mjs artifacts/api-server/src/tests/schoolProgressionPolicy.test.mjs artifacts/api-server/src/tests/admissionsPolicy.test.mjs artifacts/api-server/src/tests/railwayUploadUrl.test.mjs artifacts/api-server/src/tests/assessmentPaperPolicy.test.mjs artifacts/api-server/src/tests/reportCryptography.test.mjs artifacts/api-server/src/tests/planFallback.test.mjs artifacts/api-server/src/tests/guardianPolicy.test.mjs artifacts/api-server/src/tests/reportIssuancePolicy.test.mjs artifacts/api-server/src/tests/educationSignals.test.mjs artifacts/api-server/src/tests/timetablePolicy.test.mjs artifacts/api-server/src/tests/assessmentQuestionPolicy.test.mjs artifacts/api-server/src/tests/commandCentrePolicy.test.mjs artifacts/api-server/src/tests/admissionEvidencePolicy.test.mjs artifacts/api-server/src/tests/originPolicy.test.mjs
+      - run: node --test artifacts/api-server/src/tests/*.test.mjs
+      - run: node scripts/test-learner-support.mjs
       - run: pnpm run typecheck
       - run: pnpm run build
         env:
           PORT: "5000"
           BASE_PATH: "/"
+      - name: Install browser runtime
+        run: pnpm --filter @workspace/scripts exec playwright install --with-deps chromium
+      - name: Browser and mobile release checks
+        run: node scripts/run-learner-success-browser.mjs

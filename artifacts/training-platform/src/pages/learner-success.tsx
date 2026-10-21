@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 type Org = { id: number; name: string; role: string };
 type Outcome = { baseline: number; followup: number; improvementPp: number };
 type Ticket = {
@@ -140,12 +145,17 @@ export default function LearnerSuccessPage() {
     enabled: !!org && tab === "accountability",
     refetchInterval: 30000,
   });
-  const passport = useQuery({
+  const passport = useInfiniteQuery({
     queryKey: ["learner-passport"],
-    queryFn: () => api<Passport>("/learner-passport/me"),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      api<Passport>("/learner-passport/me?after=" + pageParam),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: tab === "dna" || tab === "passport",
     refetchInterval: 30000,
   });
+  const passportItems = passport.data?.pages.flatMap((p) => p.items) ?? [];
+  const dnaItems = passport.data?.pages.flatMap((p) => p.learningDNA) ?? [];
   const refresh = useCallback(async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["support-queue"] }),
@@ -302,28 +312,30 @@ export default function LearnerSuccessPage() {
           </button>
         </p>
       )}
+      {["support", "accountability", "framework"].includes(tab) && (
+        <label className="block text-sm">
+          School
+          <select
+            className={field}
+            value={org}
+            onChange={(e) => {
+              setOrg(e.target.value);
+              setSelected(null);
+              setAfter(0);
+              setCourse("");
+            }}
+          >
+            <option value="">Choose school</option>
+            {orgs.data?.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {tab === "support" && (
         <>
-          <label className="block text-sm">
-            School
-            <select
-              className={field}
-              value={org}
-              onChange={(e) => {
-                setOrg(e.target.value);
-                setSelected(null);
-                setAfter(0);
-                setCourse("");
-              }}
-            >
-              <option value="">Choose school</option>
-              {orgs.data?.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
           {options.data?.role === "learner" && (
             <form
               className="grid gap-3 rounded-2xl border p-5 sm:grid-cols-2"
@@ -749,7 +761,7 @@ export default function LearnerSuccessPage() {
           </p>
           {passport.isLoading ? (
             <p>Loading your concept evidence…</p>
-          ) : !passport.data?.learningDNA.length ? (
+          ) : !dnaItems.length ? (
             <p className="rounded-xl border p-5">
               No educator-reviewed concept evidence yet.
             </p>
@@ -757,10 +769,7 @@ export default function LearnerSuccessPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               {Object.values(
                 Object.fromEntries(
-                  passport.data.learningDNA.map((d) => [
-                    d.courseId + ":" + d.concept,
-                    d,
-                  ]),
+                  dnaItems.map((d) => [d.courseId + ":" + d.concept, d]),
                 ),
               ).map((d) => (
                 <article
@@ -826,7 +835,18 @@ export default function LearnerSuccessPage() {
           </p>
         </section>
       )}
-      {tab === "framework" && <FrameworkEditor org={org} />}
+      {(tab === "dna" || tab === "passport") && passport.hasNextPage && (
+        <button
+          className={button}
+          disabled={passport.isFetchingNextPage}
+          onClick={() => void passport.fetchNextPage()}
+        >
+          {passport.isFetchingNextPage
+            ? "Loading history…"
+            : "Load more progress records"}
+        </button>
+      )}
+      {tab === "framework" && <FrameworkEditor key={org} org={org} />}
       {tab === "passport" && (
         <section className="space-y-4">
           <h2 className="font-display text-2xl">Your Learner Passport</h2>
@@ -844,7 +864,7 @@ export default function LearnerSuccessPage() {
             Download private passport (JSON)
           </button>
           {downloadError && <p role="alert">{downloadError}</p>}
-          {passport.data?.items.map((x) => (
+          {passportItems.map((x) => (
             <article key={x.id} className="rounded-xl border p-5">
               <h3 className="font-semibold">{x.concept}</h3>
               <p className="text-sm">
@@ -859,14 +879,18 @@ export default function LearnerSuccessPage() {
               )}
             </article>
           ))}
-          {passport.data?.nextCursor && (
-            <p className="text-sm">
-              Showing the first 100 records. Full historical export is not yet
-              available in this pilot.
+          {!passport.isLoading && !passportItems.length && (
+            <p>
+              No progress records yet. Your reviewed support journey will appear
+              here.
             </p>
           )}
+          <p className="text-sm">
+            Showing {passportItems.length} records. Downloads include all
+            available pages within the pilot export limit.
+          </p>
           <p className="text-xs text-muted-foreground">
-            {passport.data?.interpretation}
+            {passport.data?.pages[0]?.interpretation}
           </p>
         </section>
       )}
@@ -911,6 +935,19 @@ function FrameworkEditor({ org }: { org: string }) {
       }>("/organizations/" + org + "/education-framework"),
     enabled: !!org,
   });
+  useEffect(() => {
+    const value = current.data?.current;
+    if (!value) return;
+    setCountry(value.countryCode);
+    setCode(value.frameworkCode);
+    setName(value.name);
+    setZone(value.timeZone);
+    setLanguages(value.languages.join(", "));
+    setLevels(value.settings.levels.join(", "));
+    setVersion(value.settings.curriculumVersion);
+    setNotes(value.settings.notes);
+    setScale(JSON.stringify(value.settings.gradingScale, null, 2));
+  }, [current.data?.current?.id]);
   const save = useMutation({
     mutationFn: () => {
       let parsed: unknown;
