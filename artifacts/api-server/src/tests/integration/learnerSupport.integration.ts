@@ -1,3 +1,5 @@
+import institutionRecordsRouter from "../../routes/institutionRecords";
+import progressionRouter from "../../routes/schoolProgression";
 // Synthetic HTTP/database tests. Bundle with @workspace/db aliased to supportTestDb.ts.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -11,6 +13,8 @@ CREATE TABLE organization_members(organization_id integer,user_id varchar,role v
 CREATE TABLE academic_courses(id integer PRIMARY KEY,organization_id integer,name varchar,code varchar,level varchar,credits integer,created_at timestamptz DEFAULT now());
 CREATE TABLE academic_enrollments(id serial PRIMARY KEY,course_id integer,user_id varchar,created_at timestamptz DEFAULT now());
 CREATE TABLE course_staff_assignments(organization_id integer,course_id integer,staff_id varchar,assigned_by varchar,assigned_at timestamptz DEFAULT now());
+CREATE TABLE verified_enrollments(id serial PRIMARY KEY,organization_id integer,learner_id varchar,stage varchar(28),academic_year integer,status varchar DEFAULT 'active',recorded_by varchar,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),UNIQUE(organization_id,learner_id,stage,academic_year));
+CREATE TABLE school_progression_events(id serial PRIMARY KEY,organization_id integer,prior_enrollment_id integer,new_enrollment_id integer,learner_id varchar,from_grade varchar(28),to_grade varchar(28),decision varchar,approved_by varchar,approved_at timestamptz DEFAULT now());
 CREATE TABLE academic_assessments(id integer PRIMARY KEY,organization_id integer,course_id integer,category varchar,max_marks real,title varchar);
 CREATE TABLE academic_grades(id integer PRIMARY KEY,assessment_id integer,learner_id varchar,marks real,status varchar,updated_at timestamptz DEFAULT now());
 INSERT INTO users(id) VALUES ('child-a'),('child-b'),('teacher-a'),('teacher-b'),('head-a'); INSERT INTO organizations VALUES(1),(2);
@@ -35,7 +39,13 @@ app.use((req, res, next) => {
   req.isAuthenticated = (() => !!req.user) as any;
   next();
 });
-app.use("/api", router, frameworkRouter);
+app.use(
+  "/api",
+  router,
+  frameworkRouter,
+  institutionRecordsRouter,
+  progressionRouter,
+);
 const server = app.listen(0, "127.0.0.1");
 await new Promise<void>((r) => server.once("listening", r));
 const address = server.address() as { port: number };
@@ -81,6 +91,38 @@ try {
   assert.equal(
     (await call("teacher-b", "/organizations/1/education-framework")).status,
     403,
+  );
+  const enrollment = await call(
+    "head-a",
+    "/organizations/1/verified-enrollments",
+    { learnerId: "child-a", stage: "Form 1", academicYear: 2026 },
+  );
+  assert.equal(enrollment.status, 201);
+  assert.equal(
+    (
+      await call("head-a", "/organizations/1/verified-enrollments", {
+        learnerId: "child-a",
+        stage: "Grade 99",
+        academicYear: 2026,
+      })
+    ).status,
+    400,
+  );
+  const promoted = await call(
+    "head-a",
+    "/organizations/1/progression/" + enrollment.data.id,
+    { targetYear: 2027, decision: "promote" },
+  );
+  assert.equal(promoted.status, 201);
+  assert.equal(promoted.data.toGrade, "Form 2");
+  assert.equal(
+    (
+      await call("head-a", "/organizations/1/progression/" + promoted.data.id, {
+        targetYear: 2028,
+        decision: "promote",
+      })
+    ).status,
+    409,
   );
   const body = {
     courseId: 1,

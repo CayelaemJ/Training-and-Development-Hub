@@ -3,10 +3,11 @@ import { and, desc, eq, or } from "drizzle-orm";
 import { z } from "zod/v4";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
 import { auditSuperadmin } from "../lib/platformAudit";
-import { db, usersTable, organizationsTable, organizationMembersTable, verifiedEnrollmentsTable, schoolTransfersTable, guardianRelationshipsTable } from "@workspace/db";
+import { db, educationFrameworkVersionsTable, usersTable, organizationsTable, organizationMembersTable, verifiedEnrollmentsTable, schoolTransfersTable, guardianRelationshipsTable } from "@workspace/db";
 const router:IRouter=Router();
 const id=z.coerce.number().int().positive();
-const stage=z.enum(["RR","R","1","2","3","4","5","6","7","8","9","10","11","12","university","college","training"]);
+const legacyStages=["RR","R","1","2","3","4","5","6","7","8","9","10","11","12","university","college","training"];
+const stage=z.string().trim().min(1).max(28);
 function current(req:Request,res:Response):string|null{
  if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null}return req.user!.id;
 }
@@ -32,6 +33,9 @@ router.post("/organizations/:orgId/verified-enrollments",async(req,res)=>{
  const org=id.safeParse(req.params.orgId),body=z.object({learnerId:z.string().min(1),stage,academicYear:z.number().int().min(1900).max(2200)}).safeParse(req.body);
  if(!org.success||!body.success){res.sendStatus(400);return}
  if(!await canRecord(org.data,user)){res.sendStatus(403);return}
+ const [framework]=process.env.ENABLE_LEARNER_SUCCESS_LOOP==="true"?await db.select().from(educationFrameworkVersionsTable).where(eq(educationFrameworkVersionsTable.organizationId,org.data)).orderBy(desc(educationFrameworkVersionsTable.id)).limit(1):[];
+ const permittedStages=framework?.settings.levels??legacyStages;
+ if(!permittedStages.includes(body.data.stage)){res.status(400).json({error:"Choose a stage from this school's configured framework"});return;}
  const learner=await membership(org.data,body.data.learnerId);
  if(!learner||learner.role!=="learner"){res.status(409).json({error:"Learner must first be enrolled as an organisation member"});return}
  const [record]=await db.insert(verifiedEnrollmentsTable).values({organizationId:org.data,recordedBy:user,...body.data}).onConflictDoNothing().returning();

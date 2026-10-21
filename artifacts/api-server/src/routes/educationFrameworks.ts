@@ -28,7 +28,7 @@ const config = z
     timeZone: z.string().max(80).refine(validTimeZone),
     languages: z.array(z.string().max(40).refine(validLanguage)).min(1).max(12),
     settings: z.object({
-      levels: z.array(z.string().trim().min(1).max(80)).min(1).max(40),
+      levels: z.array(z.string().trim().min(1).max(28)).min(1).max(40).refine(levels=>new Set(levels).size===levels.length),
       curriculumVersion: z.string().trim().min(1).max(120),
       notes: z.string().max(2000),
       gradingScale: z

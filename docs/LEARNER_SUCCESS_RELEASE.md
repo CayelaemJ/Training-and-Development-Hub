@@ -13,7 +13,7 @@
 - Guided learning help: opt-in, minimal-topic AI drafts validated server-side, bounded provider-call deadlines and a labelled non-AI template during outages. No learner profile, conversation or raw support question is sent. A topic filter is defence in depth, not proof of de-identification. Enable external AI only after the school approves provider processing; never place personal details in topic labels.
 - Country-neutral, append-only school framework versions: country code, curriculum identifier/version, grade labels, grading bands, BCP47 languages and IANA timezone. Botswana PSLE/JCE/BGCSE and other school frameworks can be labelled/configured. Existing support records retain their framework version.
 
-Existing grade progression and national-administration modules still contain South African assumptions. This release does **not** implement official Botswana promotion/certification rules, automatic grading-band application to every legacy report, national curriculum validation or worldwide regulatory compliance. Configure and validate the school framework before a pilot. Language configuration does not translate the interface.
+School enrolment and explicit administrator progression now accept the configured ordered level labels, including Botswana Standard/Form labels, and reject unconfigured stages. Institution setup accepts international regions and curriculum codes. Specialist school-stage and national-administration modules still contain South African assumptions. This release does **not** implement official Botswana promotion/certification rules, automatic grading-band application to every legacy report, national curriculum validation or worldwide regulatory compliance. Configure and validate the school framework before a pilot. Language configuration does not translate the interface.
 
 ## API
 
@@ -90,3 +90,7 @@ A free Render service is suitable for a limited pilot, not an always-on national
 ## Remaining flagship and later work
 
 Real authentication/guardian browser tests, privacy/legal review, official curriculum concept registry, calibrated concept-level assessments, attachment scanning, reporting misconduct and safeguarding escalation, durable notifications, response-time targets, secure tutoring sessions, complete longitudinal/sports passport, verified transfer consent, translated/age-adaptive UI, full AI safety evaluations and restore/load testing remain outstanding. Do not claim the full master brief is complete.
+
+## Dependency scan follow-up
+
+The production scan found an inherited critical `proxy-addr` advisory and a moderate `uuid` advisory. Workspace overrides pin the published patched versions (2.0.8 and 11.1.1). A moderate `sprintf-js` advisory remains through mammoth → argparse; the advisory offers no patched release. Do not claim a clean security scan. Review that transitive path and document reachability before real learner rollout.

@@ -1,7 +1,8 @@
+import {configuredNextLevel} from "../lib/frameworkPolicy";
 import {Router,type IRouter} from "express";
 import {and,desc,eq} from "drizzle-orm";
 import {z} from "zod/v4";
-import {db,verifiedEnrollmentsTable,organizationMembersTable,schoolProgressionEventsTable} from "@workspace/db";
+import {db,educationFrameworkVersionsTable,verifiedEnrollmentsTable,organizationMembersTable,schoolProgressionEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {phaseForGrade} from "../lib/schoolStagePolicy";
 import {nextSchoolGrade,canProgressToYear} from "../lib/schoolProgressionPolicy";
@@ -13,7 +14,8 @@ router.get("/organizations/:orgId/progression/candidates",async(req,res)=>{
  if(!org.success||!year.success){res.sendStatus(400);return}
  if(!await manager(org.data,req.user.id)){res.sendStatus(403);return}
  const rows=await db.select({id:verifiedEnrollmentsTable.id,learnerId:verifiedEnrollmentsTable.learnerId,stage:verifiedEnrollmentsTable.stage,academicYear:verifiedEnrollmentsTable.academicYear}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.academicYear,year.data),eq(verifiedEnrollmentsTable.status,"active"))).orderBy(desc(verifiedEnrollmentsTable.id));
- res.setHeader("Cache-Control","private, no-store");res.json(rows.filter(r=>phaseForGrade(r.stage)!==null).map(r=>({...r,nextGrade:nextSchoolGrade(r.stage)})));
+ const [framework]=process.env.ENABLE_LEARNER_SUCCESS_LOOP==="true"?await db.select().from(educationFrameworkVersionsTable).where(eq(educationFrameworkVersionsTable.organizationId,org.data)).orderBy(desc(educationFrameworkVersionsTable.id)).limit(1):[];
+ res.setHeader("Cache-Control","private, no-store");res.json(rows.filter(r=>framework?framework.settings.levels.includes(r.stage):phaseForGrade(r.stage)!==null).map(r=>({...r,frameworkVersionId:framework?.id??null,nextGrade:framework?configuredNextLevel(framework.settings.levels,r.stage):nextSchoolGrade(r.stage)})));
 });
 router.post("/organizations/:orgId/progression/:enrollmentId",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
@@ -24,7 +26,9 @@ router.post("/organizations/:orgId/progression/:enrollmentId",async(req,res)=>{
   const [current]=await tx.select().from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.id,enrollment.data),eq(verifiedEnrollmentsTable.organizationId,org.data))).for("update").limit(1);
   if(!current||current.status!=="active")return {error:"Enrollment is no longer active"} as const;
   if(!canProgressToYear(current.academicYear,body.data.targetYear))return {error:"Target year must follow the current academic year"} as const;
-  const next=body.data.decision==="repeat"?current.stage:nextSchoolGrade(current.stage);
+  const [framework]=process.env.ENABLE_LEARNER_SUCCESS_LOOP==="true"?await tx.select().from(educationFrameworkVersionsTable).where(eq(educationFrameworkVersionsTable.organizationId,org.data)).orderBy(desc(educationFrameworkVersionsTable.id)).limit(1):[];
+  if(framework&&!framework.settings.levels.includes(current.stage))return {error:"Current stage is absent from the configured framework; school review required"} as const;
+  const next=body.data.decision==="repeat"?current.stage:framework?configuredNextLevel(framework.settings.levels,current.stage):nextSchoolGrade(current.stage);
   if(!next)return {error:"The learner has completed the final school grade; use the school-leaving workflow"} as const;
   const [existing]=await tx.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,current.learnerId),eq(verifiedEnrollmentsTable.stage,next),eq(verifiedEnrollmentsTable.academicYear,body.data.targetYear))).limit(1);
   if(existing)return {error:"Next-year enrollment already exists"} as const;

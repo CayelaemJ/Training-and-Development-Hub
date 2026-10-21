@@ -4,7 +4,7 @@ type Setup={institutionType:string;province:string;district:string;circuit:strin
 const provinces=["Eastern Cape","Free State","Gauteng","KwaZulu-Natal","Limpopo","Mpumalanga","North West","Northern Cape","Western Cape"];
 const types=["preprimary","primary","highschool","combined","special","independent","tvet","university","training"];
 const curricular=["CAPS","IEB","Montessori","Cambridge","CUSTOM","UNIVERSITY","TVET"];
-const defaults:Setup={institutionType:"combined",province:"Gauteng",district:"",circuit:"",officialReference:"",curriculum:"CAPS",language:"English",academicYear:new Date().getFullYear(),status:"draft"};
+const defaults:Setup={institutionType:"combined",province:"",district:"",circuit:"",officialReference:"",curriculum:"CUSTOM",language:"English",academicYear:new Date().getFullYear(),status:"draft"};
 const field="mt-1 w-full rounded-md border bg-background p-3 text-sm";
 async function api<T>(p:string,method="GET",body?:unknown):Promise<T>{const r=await fetch("/api"+p,{method,credentials:"include",cache:"no-store",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});if(!r.ok){const j=await r.json().catch(()=>({}));throw Error(j.error??"Request failed")}return r.json()}
 export default function InstitutionSetupPage(){
@@ -17,10 +17,10 @@ export default function InstitutionSetupPage(){
  {error&&<p role="alert" className="rounded-lg border border-destructive p-3">{error}</p>}{notice&&<p role="status" className="rounded-lg border p-3">{notice}</p>}
  <div className="rounded-xl border p-5 space-y-4"><label className="block text-sm">Organisation<select className={field} value={org} onChange={e=>setOrg(e.target.value)}><option value="">Select institution</option>{orgs.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
  <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm">Institution type<select className={field} value={details.institutionType} onChange={e=>update("institutionType",e.target.value)}>{types.map(x=><option key={x} value={x}>{x}</option>)}</select></label>
- <label className="text-sm">Province<select className={field} value={details.province} onChange={e=>update("province",e.target.value)}>{provinces.map(x=><option key={x}>{x}</option>)}</select></label>
+ <label className="text-sm">Region / province<input className={field} maxLength={60} value={details.province} onChange={e=>update("province",e.target.value)} placeholder="e.g. South-East, Botswana"/></label>
  <label className="text-sm">District<input className={field} maxLength={120} value={details.district} onChange={e=>update("district",e.target.value)} placeholder="Education district"/></label>
  <label className="text-sm">Circuit<input className={field} maxLength={120} value={details.circuit} onChange={e=>update("circuit",e.target.value)} placeholder="Optional circuit"/></label>
- <label className="text-sm">Curriculum<select className={field} value={details.curriculum} onChange={e=>update("curriculum",e.target.value)}>{curricular.map(x=><option key={x}>{x}</option>)}</select></label>
+ <label className="text-sm">Curriculum<input className={field} maxLength={40} value={details.curriculum} onChange={e=>update("curriculum",e.target.value)} placeholder="e.g. PSLE, JCE, BGCSE, CAPS or custom"/></label>
  <label className="text-sm">Academic year<input className={field} type="number" min={2020} max={2200} value={details.academicYear} onChange={e=>update("academicYear",Number(e.target.value))}/></label>
  <label className="text-sm">Language<input className={field} maxLength={40} value={details.language} onChange={e=>update("language",e.target.value)}/></label>
  <label className="text-sm">Claimed official reference<input className={field} maxLength={100} value={details.officialReference} onChange={e=>update("officialReference",e.target.value)} placeholder="Optional EMIS/registration reference"/></label></div>

@@ -29,3 +29,17 @@ export function validGradingScale(
     )
   );
 }
+
+export function configuredNextLevel(
+  levels: readonly string[],
+  current: string,
+): string | null {
+  const i = levels.indexOf(current);
+  return i >= 0 && i < levels.length - 1 ? levels[i + 1] : null;
+}
+export function validFrameworkLevel(
+  levels: readonly string[],
+  current: string,
+) {
+  return current.length > 0 && current.length <= 28 && levels.includes(current);
+}
