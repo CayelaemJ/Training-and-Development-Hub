@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
+import { aiFailureAction } from "./aiRetryPolicy";
 
 type AiProvider = "groq" | "openai";
 type Provider = { name: AiProvider; client: OpenAI; models: string[] };
@@ -83,7 +84,7 @@ export async function completeAIJson<T>(args: {
 }): Promise<{ value: T; modelId: string }> {
   const providers = await configuredProviders();
   if (!providers.length) throw new AiUnavailableError();
-  for (const provider of providers) {
+  providers: for (const provider of providers) {
     for (const model of provider.models) {
       for (const jsonMode of [true, false]) {
         try {
@@ -105,10 +106,9 @@ export async function completeAIJson<T>(args: {
           const err = error as { status?: number; code?: string; name?: string };
           // Retrying without JSON mode is useful for models that do not implement response_format.
           logger.warn({ provider: provider.name, model, jsonMode, status: err.status ?? null, code: err.code ?? null, type: err.name ?? "Error" }, "CABO AI candidate did not return valid output");
-          // Invalid credentials, insufficient quota, or unavailable provider: don't repeatedly call its models.
-          if (err.status === 401 || err.status === 403 || err.status === 429) break;
-          if (err.status === 404) break;
-          if (!jsonMode) break;
+          const action = aiFailureAction(err, jsonMode);
+          if (action === "next-provider") continue providers;
+          if (action === "next-model") break;
         }
       }
     }
