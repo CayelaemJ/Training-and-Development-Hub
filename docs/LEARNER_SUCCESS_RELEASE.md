@@ -94,3 +94,13 @@ Real authentication/guardian browser tests, privacy/legal review, official curri
 ## Dependency scan follow-up
 
 The production scan found an inherited critical `proxy-addr` advisory and a moderate `uuid` advisory. Workspace overrides pin the published patched versions (2.0.8 and 11.1.1). A moderate `sprintf-js` advisory remains through mammoth → argparse; the advisory offers no patched release. Do not claim a clean security scan. Review that transitive path and document reachability before real learner rollout.
+
+## Live Render verification (21 October 2026)
+
+The pilot is live at https://cabo-learning-hub-pilot.onrender.com on an isolated Neon copy (`render-learner-success-pilot-20261021`). The primary-branch migration was rejected by automatic approval review, so the migration was applied only to this isolated branch. A read-only primary check confirmed the new support table is absent there. The Railway application and primary schema remain unchanged. A no-compute pre-release backup branch was also retained.
+
+Live checks passed for the landing page, JS/CSS assets, database readiness, short-lived database-backed synthetic sessions, Botswana framework permissions, school enrolment, idempotent learner ticket creation, cross-school rejection, educator assignment/reply/practice, evidence-gated resolution, the illustrative 42→72 outcome, educator-reviewed DNA, learner acknowledgement/closure, passport export data, accountability aggregation and automatic report propagation. Evidence: [JSON result](validation/learner-success-live-2026-10-21.json). These tests do not represent real educational performance or causal attribution.
+
+The pilot feature flag is enabled **only on the isolated Render copy**. The source Railway credentials remain unchanged. Actual password sign-in cannot be verified until the source `CABO_TEST_LOGIN_USERNAME`, `CABO_TEST_PASSWORD_HASH` and optional `CABO_TEST_USERS_JSON` are copied securely into Render Environment. AI provider continuity needs `GROQ_API_KEY` and the matching model configuration (or the existing OpenAI settings). Until then, tutoring returns the labelled non-AI template. No secret values appear in this repository or evidence file. Browser/mobile validation and the remaining security review are still pending; PR #38 stays draft.
+
+This is a working pilot and database copy, **not a final production cutover**. Changes made subsequently in Railway's database are not replicated into the pilot. Do not retire Railway or introduce real learner data until login/AI continuity, final synchronisation, authorisation and release gates are complete.
