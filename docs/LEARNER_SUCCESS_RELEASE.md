@@ -119,3 +119,11 @@ The user supplied a new provider key and explicitly requested new isolated test 
 Groq configuration is present and support AI is enabled for the synthetic pilot. The initial live connection check failed; configuration alone is not a successful AI integration. The administrative check now distinguishes rejected credentials, denied access, quota and missing models without exposing the provider key. Provider success remains a verification gate.
 
 Rewrote learner, school, landing-page and development-plan copy in plain language. Removed promotional labels and implementation notes from routine workflows while retaining short AI-source labels, provisional marks and privacy guidance. Planning and tutoring prompts now request practical, conversational explanations.
+
+## Final live provider verification
+
+Render deployment `dep-dbcd41favr4c739bg3c0` is live on application commit `66cfc7189d62c4b3eb6402c9c3e444a6a1e977f8`. Groq model `openai/gpt-oss-120b` passed the authenticated connection check in 870 ms. A synthetic fractions development plan returned validated provider output. A signed-in role-demo learner created support request #3 and received an `ai_draft` explanation and practice activity from the same model. No child profile or support conversation was sent by the guidance endpoint. This supersedes the initial provider failure notes.
+
+All 14 password logins passed, the administrator resolves to superadmin, and role-demo accounts retain their scoped permissions. The plain-language UI and prompt changes are live. Browser/mobile fixture checks, six selected accessibility rules, all 74 policy tests, database workflow tests, workspace TypeScript checks and production builds pass. New credential material is configured only on the isolated Render test service.
+
+Automatic approval review rejected the shared-primary migration again after a fresh no-compute backup (`pre-success-loop-schema-20261021-1455`, `br-royal-waterfall-b98rbbz0`) was created. Primary remains unchanged and Render remains on the isolated pilot branch. Final primary cutover is not complete. No workaround was attempted.

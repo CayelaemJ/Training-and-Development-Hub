@@ -5,6 +5,22 @@
   "demoAccounts": 13,
   "sessions": "logged out after checks",
   "groqConfigured": true,
-  "initialGroqConnectionCheck": "failed; diagnostic follow-up pending",
-  "secretsIncluded": false
+  "initialGroqConnectionCheck": "superseded by successful final check",
+  "secretsIncluded": false,
+  "applicationCommit": "66cfc7189d62c4b3eb6402c9c3e444a6a1e977f8",
+  "renderDeployment": "dep-dbcd41favr4c739bg3c0",
+  "deploymentStatus": "live",
+  "liveGroqConnectionCheck": {
+    "result": "PASS",
+    "model": "openai/gpt-oss-120b",
+    "latencyMs": 870
+  },
+  "liveDevelopmentPlan": "PASS \u2014 validated plan from provider",
+  "liveLearnerGuidance": {
+    "result": "PASS",
+    "source": "ai_draft",
+    "model": "openai/gpt-oss-120b",
+    "syntheticTicketId": 3
+  },
+  "primaryMigration": "blocked by automatic approval review; primary unchanged"
 }
