@@ -1,0 +1,10 @@
+{
+  "environment": "isolated Render pilot",
+  "authentication": "14 real password logins passed",
+  "superadmin": "cabo_test role verified",
+  "demoAccounts": 13,
+  "sessions": "logged out after checks",
+  "groqConfigured": true,
+  "initialGroqConnectionCheck": "failed; diagnostic follow-up pending",
+  "secretsIncluded": false
+}

@@ -3,7 +3,7 @@ import {Link} from "wouter";
 type Org={id:number;name:string;role:string};
 type RecordRow={id:number;title:string;description:string;status:string;startAt:string|null;endAt:string|null;subjectId:string|null;createdAt:string};
 const modules=[
- {id:"academic_intervention",title:"Academic intelligence",description:"Create reviewable intervention and progress support records",read:"Scoped learning intervention records"},
+ {id:"academic_intervention",title:"Learning support",description:"Create reviewable intervention and progress support records",read:"Scoped learning intervention records"},
  {id:"timetable",title:"Attendance & timetables",description:"Publish school and university schedule entries",read:"Timetable entries and scheduled activities"},
  {id:"family_meeting",title:"Parent Connect",description:"Arrange confidential guardian engagement meetings",read:"Individual meeting records"},
  {id:"credential",title:"Qualifications wallet",description:"Verified credentials need issuer signing and identity verification",read:"Credential records (issuance locked)"},
@@ -38,7 +38,7 @@ export default function HubModulesPage(){
  const locked=kind==="credential"||kind==="assessment_blueprint";
  const sensitive=["academic_intervention","family_meeting","talent_skill"].includes(kind);
  return <section className="mx-auto max-w-6xl space-y-6 pb-16">
-  <header className="space-y-2 border-b pb-5"><p className="text-xs font-semibold uppercase tracking-[.2em] text-muted-foreground">CABO · Connected Education</p><h1 className="font-display text-3xl sm:text-4xl">Institution hub</h1><p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">One connected workspace across academic intelligence, school operations, tertiary learning and careers. Each section respects institutional membership and individual record privacy.</p></header>
+  <header className="space-y-2 border-b pb-5"><p className="text-xs font-semibold uppercase tracking-[.2em] text-muted-foreground">CABO · Connected Education</p><h1 className="font-display text-3xl sm:text-4xl">Institution hub</h1><p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Manage learning support, school tasks, further study and careers in one place. You only see the records your account is allowed to access.</p></header>
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" role="group" aria-label="CABO development modules">{modules.map(module=><button key={module.id} onClick={()=>setKind(module.id)} aria-pressed={kind===module.id} className={"min-h-20 rounded-lg border p-3 text-left text-sm font-medium transition-colors "+(kind===module.id?"border-primary bg-primary/10":"bg-card hover:bg-muted")}>{module.title}</button>)}</div>
   {error&&<p role="alert" className="rounded-lg border border-destructive p-3 text-sm">{error}</p>}{notice&&<p role="status" className="rounded-lg border p-3 text-sm">{notice}</p>}
   <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">

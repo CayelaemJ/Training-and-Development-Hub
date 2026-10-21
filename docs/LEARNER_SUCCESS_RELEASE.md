@@ -111,3 +111,11 @@ This is a working pilot and database copy, **not a final production cutover**. C
 - Added a single-job CircleCI configuration and extended GitHub verification with all policy tests, database integration and browser checks. CircleCI previously reported an error; this checkout had no `.circleci/config.yml`. The new YAML parses locally, but hosted execution is not yet verified. No CI failure is bypassed.
 - Railway OAuth still returns variable names only. The browser session timed out during account access. Existing values needing secure transfer: `CABO_TEST_LOGIN_USERNAME`, `CABO_TEST_PASSWORD_HASH`, `CABO_TEST_USERS_JSON`, `GROQ_API_KEY`, `GROQ_EXAM_MODEL`. No credentials were reset or recreated.
 - The shared primary migration is still blocked by automatic approval review pending explicit authorisation. No primary-table change or final traffic cutover is claimed.
+
+## Account and wording update
+
+The user supplied a new provider key and explicitly requested new isolated test credentials. Render now has salted scrypt verifiers for `cabo_test` and all 13 role-demo accounts. Real password HTTP sign-in passed for all 14 accounts, `cabo_test` resolves to superadmin, and demo roles remain scoped. Sessions were logged out after verification. These credentials are limited to the isolated testing deployment; no passwords, verifiers or provider keys are committed. This supersedes the earlier pending credential-transfer notes for this pilot. Railway credentials and the shared primary remain unchanged.
+
+Groq configuration is present and support AI is enabled for the synthetic pilot. The initial live connection check failed; configuration alone is not a successful AI integration. The administrative check now distinguishes rejected credentials, denied access, quota and missing models without exposing the provider key. Provider success remains a verification gate.
+
+Rewrote learner, school, landing-page and development-plan copy in plain language. Removed promotional labels and implementation notes from routine workflows while retaining short AI-source labels, provisional marks and privacy guidance. Planning and tutoring prompts now request practical, conversational explanations.

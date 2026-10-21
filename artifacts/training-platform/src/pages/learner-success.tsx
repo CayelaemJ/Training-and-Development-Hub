@@ -207,8 +207,8 @@ export default function LearnerSuccessPage() {
     onSuccess: (r) =>
       setText(
         (r.source === "ai_draft"
-          ? "AI draft — review before use"
-          : "Non-AI learning template") +
+          ? "AI suggestion — check before sharing"
+          : "Starter guidance — no AI used") +
           "\n" +
           r.explanation +
           "\n\nQuestions\n" +
@@ -268,11 +268,11 @@ export default function LearnerSuccessPage() {
       <header className="rounded-2xl border bg-card p-6 sm:p-8">
         <p className="eyebrow">CABO · Learning, support, progress</p>
         <h1 className="font-display text-3xl sm:text-4xl">
-          Your next breakthrough.
+          Let’s work through it.
         </h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Ask for help, practise with your educator and see what changes. Every
-          result has a source. Every support request has a next step.
+          Ask a question, get help from your teacher and keep track of what you
+          learn.
         </p>
       </header>
       <nav
@@ -492,9 +492,9 @@ export default function LearnerSuccessPage() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Published assessment evidence reviewed for comparability by
-                    an educator. Change does not prove the intervention caused
-                    it.
+                    Your educator checks that the two assessments cover similar
+                    work. A change in marks shows progress, but other things may
+                    have helped too.
                   </p>
                   <ol className="space-y-3 border-l pl-4">
                     {detail.data?.history.map((e) => (
@@ -522,9 +522,9 @@ export default function LearnerSuccessPage() {
                       : "Get guided learning help"}
                   </button>
                   <p className="text-xs text-muted-foreground">
-                    Uses the topic label only when school AI is enabled.
-                    Otherwise returns a labelled non-AI template. Review the
-                    draft before sending.
+                    When AI help is available, we send only the topic. Your
+                    question and conversation stay here. Check the suggestion
+                    before sharing it.
                   </p>
                   <label className="block text-sm">
                     Guidance, practice or review notes
@@ -755,15 +755,15 @@ export default function LearnerSuccessPage() {
         <section className="space-y-4">
           <h2 className="font-display text-2xl">Learning DNA</h2>
           <p className="text-sm text-muted-foreground">
-            A changing concept map, never an intelligence or personality score.
-            Unreviewed concepts remain unknown. These are support concept
-            labels; a versioned curriculum catalogue is still required.
+            See what you have shown you understand and what needs more practice.
+            Your teacher updates this as you learn. Topics without a review stay
+            unconfirmed.
           </p>
           {passport.isLoading ? (
-            <p>Loading your concept evidence…</p>
+            <p>Loading your topics…</p>
           ) : !dnaItems.length ? (
             <p className="rounded-xl border p-5">
-              No educator-reviewed concept evidence yet.
+              Your topics will appear after your teacher adds a review.
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -795,9 +795,9 @@ export default function LearnerSuccessPage() {
             Intervention Accountability Engine
           </h2>
           <p className="text-sm text-muted-foreground">
-            Open the Success Loop to review your authorised school queue.
-            Accountability follows the support process and evidence, without
-            ranking teachers.
+            Open the Success Loop to review your authorised school queue. See
+            who is waiting for help, which follow-ups are due and what happened
+            next.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             {[
@@ -851,9 +851,9 @@ export default function LearnerSuccessPage() {
         <section className="space-y-4">
           <h2 className="font-display text-2xl">Your Learner Passport</h2>
           <p className="text-muted-foreground">
-            Private, portable support and progress evidence across your schools.
-            This export contains your support progress; it does not certify a
-            qualification or expose staff conversations.
+            Keep a private copy of your learning support and progress. It
+            includes reviewed results, not staff conversations or qualification
+            certificates.
           </p>
           <button
             className={button}
@@ -983,10 +983,9 @@ function FrameworkEditor({ org }: { org: string }) {
     <section className="space-y-4">
       <h2 className="font-display text-2xl">School framework</h2>
       <p className="text-sm text-muted-foreground">
-        Country-neutral, versioned school settings. Botswana PSLE, JCE and BGCSE
-        or any custom curriculum can be configured. Configuration does not
-        establish examination-body approval or implement official promotion
-        rules.
+        Set your school’s country, curriculum, languages and year groups. You
+        can use Botswana PSLE, JCE or BGCSE labels, or your own framework. Your
+        school must still check its examination and progression rules.
       </p>
       {current.error && <p role="alert">{current.error.message}</p>}
       {current.data?.current && (

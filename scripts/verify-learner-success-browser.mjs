@@ -161,9 +161,7 @@ await page.route("**/api/**", async (route) => {
 });
 try {
   await page.goto(base + "/learner-success");
-  await page
-    .getByRole("heading", { name: "Your next breakthrough." })
-    .waitFor();
+  await page.getByRole("heading", { name: "Let’s work through it." }).waitFor();
   await page.getByRole("combobox", { name: /^Subject/ }).selectOption("1");
   await page.getByLabel("Concept", { exact: true }).fill("Fractions");
   await page.getByLabel("What is difficult?").fill(ticket.question);
@@ -174,7 +172,7 @@ try {
   await page.getByRole("button", { name: "Get guided learning help" }).click();
   await page.waitForFunction(() =>
     Array.from(document.querySelectorAll("textarea")).some((t) =>
-      t.value.includes("Non-AI learning template"),
+      t.value.includes("Starter guidance — no AI used"),
     ),
   );
   await page.getByRole("button", { name: "Learning DNA", exact: true }).click();

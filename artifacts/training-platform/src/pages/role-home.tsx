@@ -20,9 +20,9 @@ const roleCopy:Record<string,{title:string;description:string}>={
 };
 export default function RoleHomePage(){
  const [portal,setPortal]=useState<Portal|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(true);
- const refresh=async()=>{setBusy(true);setError("");try{const r=await fetch("/api/portal/me",{credentials:"include",cache:"no-store"});if(!r.ok)throw Error("Could not load your permitted workspace");setPortal(await r.json())}catch(e){setError(e instanceof Error?e.message:"Unexpected error")}finally{setBusy(false)}};
+ const refresh=async()=>{setBusy(true);setError("");try{const r=await fetch("/api/portal/me",{credentials:"include",cache:"no-store"});if(!r.ok)throw Error("We couldn’t open your workspace. Please try again.");setPortal(await r.json())}catch(e){setError(e instanceof Error?e.message:"Unexpected error")}finally{setBusy(false)}};
  useEffect(()=>{refresh()},[]);
- if(busy)return <section className="rounded-xl border p-6" aria-live="polite">Preparing your authorised workspace…</section>;
+ if(busy)return <section className="rounded-xl border p-6" aria-live="polite">Opening your workspace…</section>;
  if(error)return <section className="rounded-xl border p-6 space-y-3"><p role="alert">{error}</p><button className="rounded-md border px-4 py-2" onClick={refresh}>Try again</button></section>;
  if(!portal)return null;
  const copy=roleCopy[portal.role]??roleCopy.learner;

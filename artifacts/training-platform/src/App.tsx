@@ -73,7 +73,7 @@ const navItems = [
   { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
   { href: '/education-reports', label: 'Reports & statistics', icon: BookOpen },
   { href: '/report-issuance', label: 'Issue report cards', icon: FileText },
-  { href: '/school-intelligence', label: 'School intelligence', icon: BookOpen },
+  { href: '/school-intelligence', label: 'School progress', icon: BookOpen },
   { href: '/question-bank', label: 'Assessment question bank', icon: FileText },
   { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
@@ -83,7 +83,7 @@ const navItems = [
   { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
   { href: '/school-operations', label: 'School operations', icon: BookOpen },
   { href: '/sports-development', label: 'Sports & activities', icon: Target },
-  { href: '/development-plan', label: 'AI development plan', icon: Sparkles },
+  { href: '/development-plan', label: 'My development plan', icon: Sparkles },
   { href: '/career-passport', label: 'Careers & passport', icon: Target },
   { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
@@ -184,7 +184,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'AI development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
@@ -431,7 +431,7 @@ function MaterialConfigurePage() {
         <div className="choice-row option-choices">{([4, 6] as const).map((n) => <button key={n} className={`option-button ${options === n ? 'selected' : ''}`} onClick={() => setOptions(n)} data-testid={`button-options-${n}`}><span className="option-dots">{Array.from({ length: n }, (_, i) => <i key={i} />)}</span><strong>{n} options</strong>{options === n && <Check size={15} />}</button>)}</div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-primary generate-button" onClick={create} disabled={generateQuiz.isPending} data-testid="button-generate-quiz">{generateQuiz.isPending ? <><LoaderCircle className="spin" size={17} /> Building your test…</> : <>Create practice test <ArrowRight size={17} /></>}</button>
-         <p className="generate-foot"><Sparkles size={13} /> Generating a test sends extracted text to OpenAI; your original file stays in your private library.</p>
+         <p className="generate-foot"><Sparkles size={13} /> Creating a test sends the extracted text to our AI provider. Your original file stays in your private library.</p>
       </section>
     </div>
   </div>;

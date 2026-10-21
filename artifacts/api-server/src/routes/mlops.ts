@@ -39,7 +39,10 @@ router.post("/platform/mlops/smoke-test",async(req,res)=>{
   res.json({ok:true,provider:configuration.preferredProvider,model:configuration.developmentModel,latencyMs:Date.now()-start});
  }catch(e){
   await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"failure",start);
-  res.status(502).json({ok:false,error:"Model provider did not pass the synthetic smoke test. Check server logs and provider model availability."});
+  const status = typeof (e as {status?:unknown})?.status === "number" ? (e as {status:number}).status : null;
+  console.warn("AI connection check failed", {provider: configuration.preferredProvider, status});
+  const error = status === 401 ? "The AI provider rejected this API key. Check the key in Render settings." : status === 403 ? "The AI provider refused access. Check this project's permissions and provider restrictions." : status === 429 ? "The AI provider has reached its usage limit. Check the account quota and try again later." : status === 404 ? "This AI model is unavailable. Choose an available model in Render settings." : "The AI service could not complete the connection check. Please try again shortly.";
+  res.status(502).json({ok:false,error,providerStatus:status});
  }
 });
 export default router;

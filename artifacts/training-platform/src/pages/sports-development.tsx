@@ -27,6 +27,6 @@ export default function SportsDevelopmentPage(){
     <Icon size={23} className="text-primary" aria-hidden="true"/><h3 className="font-semibold">{name}</h3><p className="text-sm leading-relaxed text-muted-foreground">{detail}</p>
    </article>)}
   </div>
-  <div className="rounded-xl border p-5 space-y-2"><h2 className="font-semibold">How progress intelligence will work</h2><p className="text-sm leading-relaxed text-muted-foreground">Compare a learner with their own previous observations using the same rubric, age band and activity. Visualise participation and growth over time, highlight areas for supportive practice, and require coach review before verified results appear. The platform will not rank unrelated sports or use automated talent predictions to exclude children.</p></div>
+  <div className="rounded-xl border p-5 space-y-2"><h2 className="font-semibold">Following your progress</h2><p className="text-sm leading-relaxed text-muted-foreground">Compare a learner with their own previous observations using the same rubric, age band and activity. Visualise participation and growth over time, highlight areas for supportive practice, and require coach review before verified results appear. The platform will not rank unrelated sports or use automated talent predictions to exclude children.</p></div>
  </section>;
 }
