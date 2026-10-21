@@ -21,7 +21,7 @@ async function makeCourse(org:number,code:string,name:string,grade:string){
  return prior?.id??(await db.insert(academicCoursesTable).values({organizationId:org,name,code,level:grade}).returning())[0].id;
 }
 export async function seedPresentationDemo(){
- if(process.env.RAILWAY_ENVIRONMENT_NAME!=="testing"||process.env.ENABLE_CABO_DEMO_SEED!=="true")throw new Error("Isolated demo seeding is not enabled");
+ if((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=="testing"||process.env.ENABLE_CABO_DEMO_SEED!=="true")throw new Error("Isolated demo seeding is not enabled");
  await user(operator,"CABO","Tester");
  const principals=configuredPrincipals(process.env.CABO_TEST_USERS_JSON);
  // Use already-configured, independently authenticated test accounts; never create passwords in demo data.

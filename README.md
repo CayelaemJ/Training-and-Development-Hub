@@ -272,3 +272,7 @@ Institution owners/admins can now assign temporary teacher substitutes through `
 The development-plan service now returns an explicitly labelled, deterministic **non-AI template** when an upstream model is not configured or temporarily fails. The UI distinguishes it from AI-generated drafts. Human approval remains mandatory.
 
 An eight-workstream read-only authenticated smoke script is included under `scripts/verify-cabo-eight-workstreams.mjs`. See [Release Gates 1–8](docs/RELEASE_GATES_1_TO_8.md) for what is implemented, what has been verified, and what still requires external agreements or production safety validation.
+
+## Learner Success Loop (staged)
+
+The new `/learner-success` workspace connects educational help requests, educator guidance, published follow-up evidence, Learning DNA, Intervention Accountability and a private Learner Passport. Country-neutral versioned school framework settings include Botswana pilot configuration. See [release, testing and Render migration notes](docs/LEARNER_SUCCESS_RELEASE.md). Feature flags default off pending live deployment and browser verification.

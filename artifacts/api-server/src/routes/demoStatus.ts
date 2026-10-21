@@ -6,7 +6,7 @@ const router:IRouter=Router();
 const DEMO_NAMES=["CABO DEMO | Early Learning Centre","CABO DEMO | Tshwane Primary","CABO DEMO | Pretoria Secondary"];
 router.get("/platform/demo/status",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
- if(!isPlatformSuperadmin(req.user.id)||process.env.RAILWAY_ENVIRONMENT_NAME!=="testing"){res.sendStatus(403);return}
+ if(!isPlatformSuperadmin(req.user.id)||(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=="testing"){res.sendStatus(403);return}
  const schools=await db.select({id:organizationsTable.id,name:organizationsTable.name}).from(organizationsTable).where(inArray(organizationsTable.name,DEMO_NAMES));
  const rows=[] as {id:number;name:string;learners:number;publishedGrades:number;attendanceEntries:number}[];
  for(const school of schools){

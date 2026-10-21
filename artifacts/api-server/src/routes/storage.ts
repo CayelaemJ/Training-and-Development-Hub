@@ -73,7 +73,7 @@ router.post(
         return;
       }
 
-      const railwayFallback = process.env.RAILWAY_ENVIRONMENT_NAME === 'testing';
+      const railwayFallback = (process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === 'testing';
       const objectPath = railwayFallback ? `/railway-uploads/${randomUUID()}` : '';
       // Return an absolute same-origin URL: the API response schema requires a URL, not a relative path.
       // The request host keeps demo uploads on the same origin so session cookies accompany the PUT.
@@ -113,7 +113,7 @@ router.post(
  */
 router.put('/storage/uploads/railway/:id',express.raw({type:'*/*',limit:'20mb'}),async(req,res)=>{
  if(!hasAuthenticatedSession(req)){res.status(401).json({error:'Unauthorized'});return}
- if(process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return}
+ if((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'){res.sendStatus(404);return}
  const identifier=req.params.id;
  if(typeof identifier!=='string'||!/^[a-f0-9-]{36}$/.test(identifier)){res.sendStatus(400);return}
  const objectPath='/railway-uploads/'+identifier;

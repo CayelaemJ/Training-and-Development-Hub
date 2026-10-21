@@ -44,3 +44,9 @@ export * from './assessmentQuestionBank';
 export * from './timetableSubstitutions';
 
 export * from './assessmentPapers';
+
+export * from "./learnerSupport";
+
+
+
+export * from "./educationFrameworks";
