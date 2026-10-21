@@ -5,7 +5,7 @@ import {db,aiInferenceMetricsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {aiConfiguration,recordAiMetric} from "../lib/aiObservability";
 const router:IRouter=Router();
-let previousSmoke=0;
+
 router.get("/ai/capabilities",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const config=aiConfiguration();
@@ -26,10 +26,9 @@ router.get("/platform/mlops",async(req,res)=>{
 router.post("/platform/mlops/smoke-test",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  if(!isPlatformSuperadmin(req.user.id)){res.sendStatus(403);return}
- if(Date.now()-previousSmoke<60000){res.status(429).json({error:"One model smoke test per minute"});return}
  const configuration=aiConfiguration();
  if(!configuration.configured){res.status(503).json({error:"No model credentials configured"});return}
- previousSmoke=Date.now();const start=Date.now();
+ const start=Date.now();
  const groq=configuration.preferredProvider==="groq";
  try {
   const client=new OpenAI({apiKey:groq?process.env.GROQ_API_KEY:process.env.OPENAI_API_KEY,baseURL:groq?"https://api.groq.com/openai/v1":undefined,timeout:12000,maxRetries:0});

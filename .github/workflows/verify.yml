@@ -16,6 +16,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node --test artifacts/api-server/src/tests/*.test.mjs
       - run: node scripts/test-learner-support.mjs
+      - run: node scripts/test-uploads.mjs
       - run: pnpm run typecheck
       - run: pnpm run build
         env:

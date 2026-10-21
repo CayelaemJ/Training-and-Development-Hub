@@ -98,6 +98,7 @@ export async function completeAIJson<T>(args: {
               { role: "user", content: JSON.stringify(args.payload) },
             ],
             ...(jsonMode ? { response_format: { type: "json_object" as const } } : {}),
+            ...(provider.name === "groq" && model.startsWith("openai/gpt-oss-") ? { reasoning_effort: "low" as const } : {}),
             max_completion_tokens: args.maxCompletionTokens ?? 3500,
           },{timeout:Math.min(15000,remaining),signal:AbortSignal.timeout(remaining)});
           const body = response.choices[0]?.message?.content;

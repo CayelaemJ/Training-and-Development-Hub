@@ -330,22 +330,25 @@ function MaterialsPage() {
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [allowAiReading, setAllowAiReading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const busy = uploading || requestUrl.isPending || createMaterial.isPending;
   const onSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedFile(null); setAllowAiReading(false);
     if (file.size > 30 * 1024 * 1024) { setError('Files must be 30 MB or smaller.'); event.target.value = ''; return; }
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['txt', 'pdf', 'docx'].includes(ext || '')) { setError('Choose a TXT, PDF, or DOCX file.'); return; }
+    if (!['txt','md','csv','pdf','docx','pptx','xlsx','png','jpg','jpeg','webp'].includes(ext || '')) { setError('Choose a PDF, DOCX, PowerPoint, Excel, text, Markdown, CSV or a PNG, JPEG or WebP image.'); return; }
     setSelectedFile(file); setTitle(file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')); setError('');
   };
   const upload = async () => {
     if (!selectedFile || !title.trim()) { setError('Add a title and choose a file to continue.'); return; }
     try {
       setUploading(true); setError('');
-      const contentType = selectedFile.type || (selectedFile.name.endsWith('.txt') ? 'text/plain' : selectedFile.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      const signed = await requestUrl.mutateAsync({ data: { name: selectedFile.name, size: selectedFile.size, contentType } });
+      const mime: Record<string,string> = {txt:'text/plain',md:'text/markdown',csv:'text/csv',pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp'};
+      const contentType = mime[selectedFile.name.split('.').pop()?.toLowerCase()??''] || selectedFile.type;
+      const signed = await requestUrl.mutateAsync({ data: { name: selectedFile.name, size: selectedFile.size, contentType, allowAiReading } });
       const put = await fetch(signed.uploadURL, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedFile });
       if (!put.ok) throw new Error('The file could not be uploaded. Please try again.');
       await createMaterial.mutateAsync({ data: { title: title.trim(), objectPath: signed.objectPath } });
@@ -367,10 +370,11 @@ function MaterialsPage() {
       <div className="upload-form-grid">
         <label className="field-label">Give it a name<input className="text-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 4 · Cell biology" data-testid="input-material-title" /></label>
         <div className="field-label">Choose a file<label className={`file-drop ${selectedFile ? 'has-file' : ''}`} htmlFor="material-file">
-          <input id="material-file" ref={fileRef} type="file" accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onSelect} data-testid="input-material-file" />
-          <span className="file-drop-icon">{selectedFile ? <FileText size={21} /> : <FileUp size={21} />}</span><span><strong>{selectedFile?.name || 'Choose a document'}</strong><small>{selectedFile ? formatBytes(selectedFile.size) : 'PDF, DOCX, or TXT · up to 30 MB'}</small></span><span className="choose-file">{selectedFile ? 'Change' : 'Browse'}</span>
+          <input id="material-file" ref={fileRef} type="file" accept=".txt,.md,.csv,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.webp" onChange={onSelect} data-testid="input-material-file" />
+          <span className="file-drop-icon">{selectedFile ? <FileText size={21} /> : <FileUp size={21} />}</span><span><strong>{selectedFile?.name || 'Choose a document'}</strong><small>{selectedFile ? formatBytes(selectedFile.size) : 'Documents, slides, spreadsheets or photos · up to 30 MB'}</small></span><span className="choose-file">{selectedFile ? 'Change' : 'Browse'}</span>
         </label></div>
       </div>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={allowAiReading} onChange={e=>setAllowAiReading(e.target.checked)}/><span>Read scanned pages and images with AI. These pages are sent to our AI provider. Only share learning material you have permission to send; leave out personal records.</span></label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="upload-actions"><span className="privacy-hint"><Check size={14} /> Only you can access your materials</span><button className="button button-primary" disabled={busy || !selectedFile || !title.trim()} onClick={upload} data-testid="button-upload-save">{busy ? <><LoaderCircle className="spin" size={17} /> Uploading…</> : <>Upload material <ArrowRight size={16} /></>}</button></div>
     </section>}
@@ -431,7 +435,7 @@ function MaterialConfigurePage() {
         <div className="choice-row option-choices">{([4, 6] as const).map((n) => <button key={n} className={`option-button ${options === n ? 'selected' : ''}`} onClick={() => setOptions(n)} data-testid={`button-options-${n}`}><span className="option-dots">{Array.from({ length: n }, (_, i) => <i key={i} />)}</span><strong>{n} options</strong>{options === n && <Check size={15} />}</button>)}</div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-primary generate-button" onClick={create} disabled={generateQuiz.isPending} data-testid="button-generate-quiz">{generateQuiz.isPending ? <><LoaderCircle className="spin" size={17} /> Building your test…</> : <>Create practice test <ArrowRight size={17} /></>}</button>
-         <p className="generate-foot"><Sparkles size={13} /> Creating a test sends the extracted text to our AI provider. Your original file stays in your private library.</p>
+         <p className="generate-foot"><Sparkles size={13} /> Creating a test sends selected source text to our AI provider. Long documents are covered in sections. Your original file stays in your private library.</p>
       </section>
     </div>
   </div>;

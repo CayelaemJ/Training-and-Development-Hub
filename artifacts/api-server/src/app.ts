@@ -39,6 +39,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
 app.use("/api", router);
+app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
+  if(error instanceof SyntaxError && 'body' in error){res.status(400).json({error:'We couldn’t read this request. Please try again.'});return;}
+  next(error);
+});
 
 // Optional single-origin Railway deployment: deliver the built React SPA from the API server.
 // Keep /api separate so unknown API requests do not receive HTML.

@@ -382,7 +382,7 @@ router.get("/organizations/:orgId/support/:ticketId", async (req, res) => {
   res.json({ ...item, history, publishedResults, educators });
 });
 // Only a minimal topic label is sent to the AI; no learner record, question or conversation.
-const guidanceRate = new Map<string, number>();
+
 router.post(
   "/organizations/:orgId/support/:ticketId/guidance-draft",
   async (req, res) => {
@@ -406,18 +406,6 @@ router.post(
       res.json(template);
       return;
     }
-    const now = Date.now(),
-      key = req.user!.id;
-    // Instance-local limiter; use a shared gateway quota before horizontal AI rollout.
-    for (const [k, until] of guidanceRate)
-      if (until <= now) guidanceRate.delete(k);
-    if ((guidanceRate.get(key) ?? 0) > now) {
-      res.status(429).json({
-        error: "Wait one minute before requesting another guidance draft",
-      });
-      return;
-    }
-    guidanceRate.set(key, now + 60000);
     try {
       const output = z
         .object({

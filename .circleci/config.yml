@@ -17,6 +17,7 @@ jobs:
           command: |
             node --test artifacts/api-server/src/tests/*.test.mjs
             node scripts/test-learner-support.mjs
+            node scripts/test-uploads.mjs
       - run:
           name: Typecheck and build all workspaces
           command: pnpm run build

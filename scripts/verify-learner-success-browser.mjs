@@ -17,6 +17,7 @@ const base = process.env.CABO_UI_TEST_URL ?? "http://127.0.0.1:5180";
 let created = false;
 let teacher = false;
 let savedFramework;
+let uploadConsent;
 const ticket = {
   id: 1,
   organizationId: 1,
@@ -40,6 +41,33 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.route("**/api/**", async (route) => {
   const path = new URL(route.request().url()).pathname;
   let data;
+  if (path === "/api/storage/uploads/request-url") {
+    uploadConsent = route.request().postDataJSON().allowAiReading;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        uploadURL: base + "/api/mock-upload",
+        objectPath: "/railway-uploads/demo",
+      }),
+    });
+    return;
+  }
+  if (path === "/api/mock-upload") {
+    await route.fulfill({ status: 204 });
+    return;
+  }
+  if (path === "/api/materials" && route.request().method() === "POST") {
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: "Some pages could not be read. Try a clearer copy.",
+      }),
+    });
+    return;
+  }
+
   if (path === "/api/auth/user")
     data = {
       user: {
@@ -152,7 +180,8 @@ await page.route("**/api/**", async (route) => {
         },
       },
     };
-  } else data = {};
+  } else if (path === "/api/materials") data = [];
+  else data = {};
   await route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -255,9 +284,34 @@ try {
   assert.equal(savedFramework.countryCode, "ZA");
   assert.deepEqual(savedFramework.settings.levels, ["Grade 7", "Grade 8"]);
   assert.equal(savedFramework.settings.notes, "Keep school policy");
+
+  await page.goto(base + "/materials");
+  await page.getByTestId("button-add-material").click();
+  await page
+    .getByTestId("input-material-file")
+    .setInputFiles({
+      name: "notes.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(
+        "# Fractions\nEquivalent fractions have the same value.",
+      ),
+    });
+  await page.getByRole("checkbox").check();
+  await page.getByTestId("button-upload-save").click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Some pages could not be read. Try a clearer copy." })
+    .waitFor();
+  assert.equal(uploadConsent, true);
+  assert.ok(
+    (await page.getByTestId("input-material-title").inputValue()).includes(
+      "notes",
+    ),
+  );
+  assert.ok(!(await page.getByRole("alert").innerText()).includes("HTTP 400"));
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: learner help form, queue/detail, guidance fallback, Learning DNA, passport download, 390px mobile layout, paginated passport history, school-scoped accountability, preserved framework revisions, six axe accessibility rules, no browser runtime errors. API fixtures are synthetic.",
+    "PASS: learner help form, queue/detail, guidance fallback, Learning DNA, passport download, 390px mobile layout, paginated passport history, school-scoped accountability, preserved framework revisions, six axe accessibility rules, upload consent and friendly errors with retained input, no browser runtime errors. API fixtures are synthetic.",
   );
 } catch (error) {
   console.error((await page.locator("body").innerText()).slice(-6000));

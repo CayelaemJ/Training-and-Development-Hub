@@ -53,7 +53,7 @@ Rollback: disable both flags and redeploy the prior compatible application. Reta
 - Pool bounded by `DB_POOL_MAX` (default 10, maximum 50), 5-second connect and 15-second statement timeouts. Budget all replicas against the database connection limit; use the provider's pooled URL when available.
 - Graceful HTTP shutdown and pool drain; persistent sessions already live in PostgreSQL.
 - UI refreshes every 30 seconds and after writes. This is polling, not instant push delivery.
-- AI limiter/candidate health is not distributed. Shared quotas, durable notification outbox, queues, circuit breakers and worker retry/dead-letter processing remain required before horizontal AI rollout.
+- Provider candidate health is not distributed. App-level AI cooldowns are removed; provider quotas still apply. Shared quotas, durable notification outbox, queues, circuit breakers and worker retry/dead-letter processing remain required before horizontal AI rollout.
 - National capacity is not established by these checks. Load tests, production Postgres concurrency, query-plan verification, restore drills and external security review remain release gates.
 
 ## Verification
@@ -97,11 +97,11 @@ The production scan found an inherited critical `proxy-addr` advisory and a mode
 
 ## Live Render verification (21 October 2026)
 
-The pilot is live at https://cabo-learning-hub-pilot.onrender.com on an isolated Neon copy (`render-learner-success-pilot-20261021`). The primary-branch migration was rejected by automatic approval review, so the migration was applied only to this isolated branch. A read-only primary check confirmed the new support table is absent there. The Railway application and primary schema remain unchanged. A no-compute pre-release backup branch was also retained.
+The pilot is live at https://cabo-learning-hub-pilot.onrender.com on an isolated Neon copy (`render-learner-success-pilot-20261021`). The Learner Success migration was initially limited to this copy. After explicit user approval it was also applied to the shared primary on 21 October 2026; the additive migration is compatible with the existing Railway app. The separate optional material-reading migration remains limited to the pilot. A no-compute pre-release backup branch was also retained.
 
 Live checks passed for the landing page, JS/CSS assets, database readiness, short-lived database-backed synthetic sessions, Botswana framework permissions, school enrolment, idempotent learner ticket creation, cross-school rejection, educator assignment/reply/practice, evidence-gated resolution, the illustrative 42→72 outcome, educator-reviewed DNA, learner acknowledgement/closure, passport export data, accountability aggregation and automatic report propagation. Evidence: [JSON result](validation/learner-success-live-2026-10-21.json). These tests do not represent real educational performance or causal attribution.
 
-The pilot feature flag is enabled **only on the isolated Render copy**. The source Railway credentials remain unchanged. Actual password sign-in cannot be verified until the source `CABO_TEST_LOGIN_USERNAME`, `CABO_TEST_PASSWORD_HASH` and optional `CABO_TEST_USERS_JSON` are copied securely into Render Environment. AI provider continuity needs `GROQ_API_KEY` and the matching model configuration (or the existing OpenAI settings). Until then, tutoring returns the labelled non-AI template. No secret values appear in this repository or evidence file. Synthetic browser/mobile verification now passes as described above. Real password-login, live AI and the remaining security review are pending; PR #38 stays draft.
+The pilot feature flag and authorised test credentials are enabled only on the isolated Render copy. All 14 password sign-ins and live Groq tutoring/planning passed as recorded below. Source Railway settings remain unchanged. Secrets are held in deployment environment settings and are not committed.
 
 This is a working pilot and database copy, **not a final production cutover**. Changes made subsequently in Railway's database are not replicated into the pilot. Do not retire Railway or introduce real learner data until login/AI continuity, final synchronisation, authorisation and release gates are complete.
 
@@ -126,4 +126,16 @@ Render deployment `dep-dbcd41favr4c739bg3c0` is live on application commit `66cf
 
 All 14 password logins passed, the administrator resolves to superadmin, and role-demo accounts retain their scoped permissions. The plain-language UI and prompt changes are live. Browser/mobile fixture checks, six selected accessibility rules, all 74 policy tests, database workflow tests, workspace TypeScript checks and production builds pass. New credential material is configured only on the isolated Render test service.
 
-Automatic approval review rejected the shared-primary migration again after a fresh no-compute backup (`pre-success-loop-schema-20261021-1455`, `br-royal-waterfall-b98rbbz0`) was created. Primary remains unchanged and Render remains on the isolated pilot branch. Final primary cutover is not complete. No workaround was attempted.
+The user subsequently explicitly approved the Learner Success migration, which is now applied to the shared primary with checksum `7e9fc91fd072679f7103fce2abe55128e0e29919824d81f2b8648753799df764`. The pre-release backup remains retained. Render still uses its isolated pilot database; applying an additive schema change is not a data cutover.
+
+## Upload reliability release
+
+Supported inputs: TXT, Markdown, CSV, text PDF, DOCX, PPTX and XLSX; image reading additionally supports PNG, JPEG, WebP and scanned PDF with per-upload consent. The shared maximum is 30 MB. Corrupt, encrypted, empty, unsupported and oversized files produce actionable messages. Raw HTTP prefixes and upstream HTML are not shown to users. A failed test generation keeps the saved material.
+
+Question generation uses batches of at most five with two provider calls at a time and validates the entire assessment before saving it. It covers sections throughout the document rather than silently reading only its first 11,000 characters. Very long sections are sampled, not exhaustively analysed. App-level tutoring, planning and connection-check cooldowns are removed. Provider quotas, request deadlines, document expansion/image limits and bounded question counts remain.
+
+Optional extracted-text caching and scan-reading permission require `20261021_material_reading.sql`. It has been applied to the isolated pilot, including migration replay verification. Automatic approval review rejected applying this separate migration to the shared primary because the approval covered the Learner Success migration only. No bypass was attempted. `ENABLE_MATERIAL_READING` defaults off and all new-column access is guarded; an integration test removes the optional columns and verifies successful legacy generation. Enable it only after that database is migrated. `ENABLE_MATERIAL_OCR` also defaults off; enable on the synthetic pilot with an approved vision model. Real learner image processing requires school approval. Maximum 12 scanned pages per upload and 40 million input image pixels.
+
+Validation: 77 policy tests, HTTP/PGlite learner workflow tests and upload tests pass. Upload tests exercise seven formats through extraction, persistence, quiz/written generation, owner isolation, 25 MB upload intent acceptance, friendly failures, migration replay and legacy-schema compatibility. Provider responses in these integration tests are synthetic. Production-SPA Chromium checks also pass Markdown upload selection, explicit image-reading consent, readable failure messages and retained form input. Live upload/provider checks are recorded separately when completed.
+
+Dependency follow-up: patched file-reader/build-tool advisories (fflate, image-size, fast-uri, brace-expansion, source-map-js, selector parser, markdown-it and Vite). Replaced the mockup-only fast-glob traversal with Node filesystem traversal to remove its unpatched braces path. The final full-workspace scan reports 0 critical, 0 high, 0 low and 1 inherited moderate sprintf-js advisory.
