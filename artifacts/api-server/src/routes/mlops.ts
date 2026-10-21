@@ -33,7 +33,7 @@ router.post("/platform/mlops/smoke-test",async(req,res)=>{
  const groq=configuration.preferredProvider==="groq";
  try {
   const client=new OpenAI({apiKey:groq?process.env.GROQ_API_KEY:process.env.OPENAI_API_KEY,baseURL:groq?"https://api.groq.com/openai/v1":undefined,timeout:12000,maxRetries:0});
-  const answer=await client.chat.completions.create({model:configuration.developmentModel,max_tokens:32,messages:[{role:"system",content:"Return the exact word READY, and no other text."},{role:"user",content:"Synthetic CABO infrastructure availability test. Respond READY."}]});
+  const answer=await client.chat.completions.create({model:configuration.developmentModel,max_completion_tokens:512,...(groq && configuration.developmentModel.startsWith("openai/gpt-oss-") ? {reasoning_effort:"low" as const} : {}),messages:[{role:"system",content:"Return the exact word READY, and no other text."},{role:"user",content:"Synthetic CABO infrastructure availability test. Respond READY."}]});
   if(!answer.choices[0]?.message?.content?.includes("READY"))throw Error("Unexpected output");
   await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"success",start);
   res.json({ok:true,provider:configuration.preferredProvider,model:configuration.developmentModel,latencyMs:Date.now()-start});
