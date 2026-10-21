@@ -42,7 +42,7 @@ app.use("/api", router);
 
 // Optional single-origin Railway deployment: deliver the built React SPA from the API server.
 // Keep /api separate so unknown API requests do not receive HTML.
-const uiDist = process.env.FRONTEND_DIST_DIR || path.resolve(process.cwd(), "artifacts/training-platform/dist/public");
+const uiDist = path.resolve(process.cwd(), process.env.FRONTEND_DIST_DIR || "artifacts/training-platform/dist/public");
 if (fs.existsSync(path.join(uiDist, "index.html"))) {
   app.use(express.static(uiDist, { index: false }));
   app.get("/{*path}", (req, res, next) => {
