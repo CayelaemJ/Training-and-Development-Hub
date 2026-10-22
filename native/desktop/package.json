@@ -8,7 +8,8 @@
     "start": "electron .",
     "prepare:icons": "node ../../artifacts/training-platform/scripts/make-icons.mjs && node scripts/prepare-icons.cjs",
     "build:win": "npm run prepare:icons && electron-builder --win nsis --x64",
-    "build:linux": "npm run prepare:icons && electron-builder --linux AppImage"
+    "build:linux": "npm run prepare:icons && electron-builder --linux AppImage",
+    "test": "node --test tests/*.test.cjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -20,6 +21,7 @@
     "asar": true,
     "files": [
       "main.cjs",
+      "navigation.cjs",
       "package.json"
     ],
     "directories": {
