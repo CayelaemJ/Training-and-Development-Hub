@@ -16,7 +16,8 @@ internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
 internal data class StaffWorkspace(
-    val organizationId: Int, val courses: List<String>, val supportSummary: List<String>, val notice: String?
+    val organizationId: Int, val courses: List<String>, val supportSummary: List<String>,
+    val tickets: List<String>, val notice: String?
 )
 internal data class NativeLearning(
     val portal: NativePortal,
@@ -25,7 +26,8 @@ internal data class NativeLearning(
     val guardians: List<GuardianInvite> = emptyList(),
     val parentGuidance: String = "",
     val staff: List<StaffWorkspace> = emptyList(),
-    val journey: List<String> = emptyList()
+    val journey: List<String> = emptyList(),
+    val learnerHelp: List<String> = emptyList()
 )
 
 internal class NativeApi(private val context: Context) {
@@ -174,10 +176,24 @@ internal class NativeApi(private val context: Context) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    StaffWorkspace(orgId, courseNames, stats, null)
+                    val ticketNames = try {
+                        val response = request("/api/organizations/$orgId/support", auth = true)
+                        val tickets = response.optJSONArray("items") ?: JSONArray()
+                        (0 until minOf(tickets.length(), 20)).mapNotNull { index ->
+                            tickets.optJSONObject(index)?.let { row ->
+                                val topic = row.optString("concept").take(80)
+                                val state = row.optString("status").take(32)
+                                if (topic.isBlank()) null else "$topic · $state"
+                            }
+                        }
+                    } catch (error: Exception) {
+                        if (!hasSession()) throw error
+                        emptyList()
+                    }
+                    StaffWorkspace(orgId, courseNames, stats, ticketNames, null)
                 } catch (error: Exception) {
                     if (!hasSession()) throw error
-                    StaffWorkspace(orgId, emptyList(), emptyList(),
+                    StaffWorkspace(orgId, emptyList(), emptyList(), emptyList(),
                         "School support data is unavailable. This may not be enabled for your institution.")
                 }
             }
@@ -215,7 +231,23 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
-        NativeLearning(NativePortal(role, summary, cards), materials, quizzes, journey = journey)
+        val learnerHelp = orgIds.take(3).flatMap { orgId ->
+            try {
+                val response = request("/api/organizations/$orgId/support", auth = true)
+                val tickets = response.optJSONArray("items") ?: JSONArray()
+                (0 until minOf(tickets.length(), 15)).mapNotNull { i ->
+                    tickets.optJSONObject(i)?.let { row ->
+                        val concept = row.optString("concept").take(80)
+                        if (concept.isBlank()) null else "$concept · ${row.optString("status").take(32)}"
+                    }
+                }
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                emptyList()
+            }
+        }.take(20)
+        NativeLearning(NativePortal(role, summary, cards), materials, quizzes,
+            journey = journey, learnerHelp = learnerHelp)
     }
 
     suspend fun respondToGuardianInvite(invitationId: Int, accept: Boolean): Unit =
