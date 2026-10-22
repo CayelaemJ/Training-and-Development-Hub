@@ -31,7 +31,7 @@ function createWindow() {
       window.setTitle('CABO Learning Hub — connection unavailable');
     }
   });
-  window.loadURL(PORTAL_URL);
+  window.loadURL(PORTAL_URL).catch(() => { /* did-fail-load reports network failure */ });
   mainWindow = window;
 }
 app.whenReady().then(() => {
