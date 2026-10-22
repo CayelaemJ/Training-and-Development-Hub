@@ -24,4 +24,4 @@ function create(size){
   const header=Buffer.alloc(13);header.writeUInt32BE(size,0);header.writeUInt32BE(size,4);header[8]=8;header[9]=6;
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(bytes)),chunk('IEND',Buffer.alloc(0))]);
 }
-for(const size of [180,192,512]) writeFileSync(join(out.pathname,`cabo-${size}.png`),create(size));
+for(const size of [180,192,256,512,1024]) writeFileSync(join(out.pathname,`cabo-${size}.png`),create(size));
