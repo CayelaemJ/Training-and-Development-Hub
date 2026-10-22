@@ -16,6 +16,7 @@ jobs:
           name: Policy, isolation, migration and success-loop tests
           command: |
             node --test artifacts/api-server/src/tests/*.test.mjs
+            node scripts/test-passport.mjs
             node scripts/test-learner-support.mjs
             node scripts/test-uploads.mjs
       - run:
