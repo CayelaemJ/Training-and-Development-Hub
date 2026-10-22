@@ -38,7 +38,7 @@ Do not enable native authorization on a live school database without rollback, a
 
 **API / policies:** `node --test artifacts/api-server/src/tests/nativeAuthPolicy.test.mjs`, `pnpm run typecheck`, `pnpm run build`. Existing GitHub/CircleCI CI should also pass; unit policy tests **do not prove** the migration, endpoint integration, or mobile sign-in works.
 
-**Android:** Open `native-apps/android` in Android Studio with Android SDK 35, JDK 17, and compatible Gradle 8.11.1+, generate/add a Gradle wrapper, sync and run `:app` on an emulator. APK and AAB generation remain follow-on work. **No Android build was performed in this PR authoring environment.**
+**Android:** Open `native-apps/android` in Android Studio with Android SDK 35, JDK 17, and compatible Gradle 8.11.1+, generate/add a Gradle wrapper, sync and run `:app` on an emulator. APK and AAB generation remain follow-on work. **No Android build was performed in this PR authoring environment.** The new GitHub manual workflow is currently defined only on this feature branch; GitHub generally requires a workflow_dispatch definition on the default branch to appear as a manual action. Treat it as proposed build tooling until reviewed and registered on the default branch, not a presently downloadable APK.
 
 **iOS:** On a Mac with Xcode 15+ and XcodeGen, run `cd native-apps/ios && xcodegen generate`, open `CABOLearningHub.xcodeproj`, select a development team, run on an iPhone/iPad. **No Xcode build or TestFlight upload has been performed.**
 
