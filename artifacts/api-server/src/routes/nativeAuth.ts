@@ -37,7 +37,7 @@ router.get("/native/authorize", async (req, res) => {
   const code = randomNativeCode();
   const codeHash = codeDigest(code);
   await db.insert(nativeAuthCodesTable).values({
-    codeHash, clientId: "cabo-android", userId: req.user.id, challenge,
+    codeHash, clientId: req.query.client_id as "cabo-android" | "cabo-ios", userId: req.user.id, challenge,
     expiresAt: new Date(Date.now() + NATIVE_CODE_SECONDS * 1000),
   });
   // Redirect URI comes solely from the allowlist; the query never contains
