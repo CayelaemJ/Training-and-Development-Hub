@@ -7,6 +7,19 @@ import UIKit
 
 // Native iOS sign-in uses the system-owned authentication browser session.
 // No WKWebView, password handling, or web-cookie copying.
+struct GuardianInvitation: Identifiable {
+    let id: Int
+    let status: String
+    let learnerName: String?
+    let verifiedForRead: Bool
+}
+struct StaffSchool: Identifiable {
+    let id: Int
+    let subjects: [String]
+    let support: [String]
+    let notice: String?
+}
+
 @MainActor
 final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
     @Published var status = "Sign in to load your CABO learning records."
@@ -16,6 +29,10 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var workspaces: [String] = []
     @Published var materials: [String] = []
     @Published var quizzes: [String] = []
+    @Published var guardians: [GuardianInvitation] = []
+    @Published var guardianGuidance = ""
+    @Published var staffSchools: [StaffSchool] = []
+    @Published var journey: [String] = []
 
     private let origin = URL(string: "https://cabo-learning-hub-pilot.onrender.com")!
     private let clientID = "cabo-ios"
@@ -150,18 +167,107 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         do {
             let portal = try await request("api/portal/me")
             let decoded = try JSONSerialization.jsonObject(with: portal) as? [String: Any] ?? [:]
-            role = decoded["role"] as? String ?? "learner"
-            summary = (decoded["summary"] as? [String: Int] ?? [:]).map { "\($0.key): \($0.value)" }.sorted()
-            workspaces = (decoded["cards"] as? [[String: Any]] ?? []).compactMap { $0["label"] as? String }
-            materials = (try? JSONDecoder().decode([NativeResource].self, from: await request("api/materials")))?.prefix(8).map(\.title) ?? []
-            quizzes = (try? JSONDecoder().decode([NativeResource].self, from: await request("api/quizzes")))?.prefix(8).map(\.title) ?? []
-            // A nested request may have invalidated the token; never display
-            // an authenticated screen after a 401 from materials or quizzes.
-            if keychainToken() == nil { throw NSError(domain: "CABO", code: 401) }
+            let verifiedRole = decoded["role"] as? String ?? "learner"
+            let nextSummary = (decoded["summary"] as? [String: Int] ?? [:])
+                .map { "\($0.key): \($0.value)" }.sorted()
+            let nextWorkspaces = (decoded["cards"] as? [[String: Any]] ?? [])
+                .compactMap { $0["label"] as? String }
+            var nextGuardians: [GuardianInvitation] = []
+            var nextStaff: [StaffSchool] = []
+            var nextJourney: [String] = []
+            var nextMaterials: [String] = []
+            var nextQuizzes: [String] = []
+            var nextGuidance = ""
+
+            if verifiedRole == "parent" {
+                let parentData = try await request("api/native/mobile/parent")
+                let parent = try JSONSerialization.jsonObject(with: parentData) as? [String: Any] ?? [:]
+                nextGuidance = parent["guidance"] as? String ?? ""
+                nextGuardians = (parent["relationships"] as? [[String: Any]] ?? []).compactMap { item in
+                    guard let id = item["invitationId"] as? Int,
+                          let status = item["status"] as? String else { return nil }
+                    return GuardianInvitation(
+                        id: id, status: status,
+                        learnerName: item["learnerName"] as? String,
+                        verifiedForRead: item["verifiedForRead"] as? Bool ?? false
+                    )
+                }
+            } else if ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head"]
+                        .contains(verifiedRole) {
+                let organizations = Array((decoded["organizationIds"] as? [Int] ?? []).prefix(12))
+                for org in organizations {
+                    do {
+                        let data = try await request("api/organizations/\(org)/support/options")
+                        let options = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                        let courses = (options["courses"] as? [[String: Any]] ?? [])
+                            .compactMap { $0["name"] as? String }
+                        var support: [String] = []
+                        if let stats = try? await request("api/organizations/\(org)/support/accountability"),
+                           let obj = try? JSONSerialization.jsonObject(with: stats) as? [String: Any],
+                           let summary = obj["summary"] as? [String: Int] {
+                            support = summary.map { "\($0.key): \($0.value)" }.sorted()
+                        }
+                        nextStaff.append(StaffSchool(id: org, subjects: courses, support: support, notice: nil))
+                    } catch {
+                        // Do not treat authorization failure as an empty classroom.
+                        if keychainToken() == nil { throw error }
+                        nextStaff.append(StaffSchool(
+                            id: org, subjects: [], support: [],
+                            notice: "This school's learning-support module may not be enabled."
+                        ))
+                    }
+                }
+            } else {
+                nextMaterials = (try? JSONDecoder().decode([NativeResource].self,
+                    from: await request("api/materials")))?.prefix(30).map(\.title) ?? []
+                nextQuizzes = (try? JSONDecoder().decode([NativeResource].self,
+                    from: await request("api/quizzes")))?.prefix(30).map(\.title) ?? []
+                if let data = try? await request("api/learner-journey/me"),
+                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let stages = (obj["journeys"] as? [Any])?.count ?? 0
+                    let milestones = (obj["milestones"] as? [Any])?.count ?? 0
+                    nextJourney = ["Learning stages: \(stages)", "Milestones: \(milestones)"]
+                }
+            }
+            // One of the nested requests may have cleared credentials after a 401.
+            guard keychainToken() != nil else { throw NSError(domain: "CABO", code: 401) }
+            role = verifiedRole
+            summary = nextSummary
+            workspaces = nextWorkspaces
+            guardians = nextGuardians
+            guardianGuidance = nextGuidance
+            staffSchools = nextStaff
+            journey = nextJourney
+            materials = nextMaterials
+            quizzes = nextQuizzes
             status = "Connected securely to CABO"
         } catch {
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []
-            status = keychainToken() == nil ? "Session expired. Please sign in." : "Unable to load CABO. Check your connection and retry."
+            guardians = []; staffSchools = []; journey = []; guardianGuidance = ""
+            status = keychainToken() == nil
+                ? "Session expired. Sign in again."
+                : "Could not load CABO. Check your connection and retry."
+        }
+    }
+
+    func decideGuardian(invitationId: Int, accept: Bool) async {
+        guard !busy, invitationId > 0 else { return }
+        busy = true
+        do {
+            let body = try JSONSerialization.data(withJSONObject: [
+                "decision": accept ? "accepted" : "declined"
+            ])
+            _ = try await request(
+                "api/guardian-relationships/\(invitationId)/decision",
+                method: "POST", body: body
+            )
+            busy = false
+            await refresh()
+            status = accept ? "Invitation accepted. School verification is still required."
+                            : "Invitation declined."
+        } catch {
+            busy = false
+            status = "Unable to update invitation. Please retry."
         }
     }
 
@@ -179,6 +285,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []
+        guardians = []; staffSchools = []; journey = []; guardianGuidance = ""
         status = "Signed out on this device."
         busy = false
     }
