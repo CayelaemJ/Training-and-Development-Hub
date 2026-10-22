@@ -9,6 +9,8 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "15.0"
+    info:
+      path: Info.plist
     sources:
       - path: CABOLearningHubApp.swift
       - path: NativeHomeView.swift
@@ -16,7 +18,5 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
