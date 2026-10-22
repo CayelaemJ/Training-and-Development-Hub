@@ -1,0 +1,23 @@
+<Window x:Class="CABO.Native.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <ScrollViewer>
+  <StackPanel Padding="30" Spacing="14">
+   <TextBlock Text="CABO Learning Hub" FontSize="34" FontWeight="Bold"/>
+   <TextBlock Text="Your learning journey" FontSize="22"/>
+   <TextBlock x:Name="ServiceStatus" Text="Checking CABO service…"/>
+   <Button Content="Sign in securely in your browser" Click="OpenSignIn"/>
+   <TextBlock Text="Authenticated native features are being implemented. No private learner data is stored here." TextWrapping="Wrap"/>
+   <TextBlock Text="My learning" FontSize="20" FontWeight="SemiBold"/>
+   <TextBlock Text="Lessons and personal progress"/>
+   <TextBlock Text="Practice tests" FontSize="20" FontWeight="SemiBold"/>
+   <TextBlock Text="Questions, results and feedback"/>
+   <TextBlock Text="Academic journey" FontSize="20" FontWeight="SemiBold"/>
+   <TextBlock Text="Subjects, milestones and school reporting"/>
+   <TextBlock Text="Sports and activities" FontSize="20" FontWeight="SemiBold"/>
+   <TextBlock Text="Development and achievements"/>
+   <TextBlock Text="Teacher support" FontSize="20" FontWeight="SemiBold"/>
+   <TextBlock Text="Learning interventions and educator feedback"/>
+  </StackPanel>
+ </ScrollViewer>
+</Window>
