@@ -1,0 +1,47 @@
+{
+  "name": "cabo-learning-hub-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CABO Learning Hub desktop distribution (online, shared account and API)",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "prepare:icons": "node ../../artifacts/training-platform/scripts/make-icons.mjs && node scripts/prepare-icons.cjs",
+    "build:win": "npm run prepare:icons && electron-builder --win nsis --x64",
+    "build:linux": "npm run prepare:icons && electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "za.co.cabosolutions.learninghub",
+    "productName": "CABO Learning Hub",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/cabo.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "CABO-Learning-Hub-Setup-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "category": "Education",
+      "target": "AppImage",
+      "icon": "build/icons",
+      "artifactName": "CABO-Learning-Hub-${version}-${arch}.${ext}"
+    },
+    "publish": null
+  }
+}
