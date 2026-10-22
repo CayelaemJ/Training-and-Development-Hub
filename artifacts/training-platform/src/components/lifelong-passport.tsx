@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PassportTrustLayers from "./passport-trust-layers";
 
 type Preferences={learningContext:string;preferredLanguage:string;learningGoal:string};
 type EvidenceLink={id:number;provider:string;url:string;description:string;evidenceType:string;verificationStatus:string};
@@ -90,7 +91,7 @@ export default function LifelongPassport(){
    <button className={primary} disabled={busy||provider.trim().length<2||!url.startsWith("https://")} onClick={()=>act(async()=>{await send("/learning-passport/links","POST",{provider,url,description:linkNote,evidenceType:linkType});PV("");U("");LN("")},"Private evidence link added")}>Add evidence link</button>
   </div>
   <div className="space-y-3">
-   <h3 className="font-semibold">Practical skills I can demonstrate</h3>
+   <p className="text-xs uppercase tracking-widest text-muted-foreground">Layer 1 · Practical evidence</p><h3 className="font-semibold">Practical skills I can demonstrate</h3>
    <p className="text-sm text-muted-foreground">Describe work you really completed. Mastery levels describe the evidence for one skill only; they do not compare anyone's intelligence or potential. This is your self-assessment until a human review is available.</p>
    {skills.length===0?<p className="text-sm text-muted-foreground">No skills recorded yet.</p>:skills.map(item=><article key={item.id} className="rounded-md border p-3">
     <div className="flex justify-between gap-2"><div>
@@ -110,5 +111,6 @@ export default function LifelongPassport(){
    <label className="block text-sm">What did you make, solve, do or explain?<textarea className={field+" mt-1"} maxLength={3000} rows={3} value={detail} onChange={e=>D(e.target.value)}/></label>
    <button className={primary} disabled={busy||skill.trim().length<2||detail.trim().length<10} onClick={()=>act(async()=>{await send("/learning-passport/competencies","POST",{skill,category,masteryLevel:level,demonstration:method,description:detail,evidenceLinkId:support?Number(support):null});SK("");D("");SU("")},"Practical competency recorded privately")}>Record skill evidence</button>
   </div>
+  <PassportTrustLayers competencies={skills} />
  </section>;
 }
