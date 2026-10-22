@@ -1,0 +1,29 @@
+name: Build CABO Windows installer (manual pilot)
+on:
+  workflow_dispatch:
+jobs:
+  unsigned-windows-preview:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install isolated desktop packaging dependencies
+        working-directory: native/desktop
+        run: npm install --no-audit --no-fund
+      - name: Verify desktop URL navigation policy
+        working-directory: native/desktop
+        run: npm test
+      - name: Build CABO Windows pilot installer
+        working-directory: native/desktop
+        run: npm run build:win
+      - name: Upload preview (not signed or production approved)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CABO-Windows-UNSIGNED-PILOT
+          path: native/desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 3
