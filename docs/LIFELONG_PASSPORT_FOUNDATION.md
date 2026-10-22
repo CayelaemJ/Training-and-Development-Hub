@@ -18,4 +18,4 @@ Writes require a trusted browser origin through existing app middleware. Link st
 
 Local checks: node --test artifacts/api-server/src/tests/*.test.mjs; pnpm run typecheck; pnpm run build. Full database isolation and browser acceptance checks must pass before merge. Migration must be applied before the new API can serve requests.
 
-NOT included: document/CV/CSV history importer, AI extraction or human approval, credentials/certifications, OAuth syncing, unrestricted platform crawling, employer matchmaking, native parity or human-verified competency levels. Existing material uploads do not imply credential extraction. No claims of production deployment or tested runtime until CI/staging confirms.
+AI interpretation and institution-specific human-review layers are implemented separately; see PASSPORT_TRUST_BOUNDARIES.md. Still not included: document/CV/CSV importer, verified qualification accreditation, employer sharing, external professional assessor validation, OAuth sync, full RPL, or native parity. Existing material uploads do not imply credential extraction. No claims of production deployment or tested runtime until CI/staging confirms.
