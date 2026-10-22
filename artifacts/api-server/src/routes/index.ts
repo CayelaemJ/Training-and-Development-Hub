@@ -1,4 +1,5 @@
 import nativeAuthRouter from "./nativeAuth";
+import nativeParentRouter from "./nativeParent";
 import educationFrameworksRouter from "./educationFrameworks";
 import learnerSupportRouter from "./learnerSupport";
 
@@ -45,6 +46,7 @@ router.use(learnerSupportRouter);
 
 router.use(authRouter);
 router.use(nativeAuthRouter);
+router.use(nativeParentRouter);
 router.use(storageRouter);
 router.use(trainingRouter);
 router.use(writtenExamsRouter);
