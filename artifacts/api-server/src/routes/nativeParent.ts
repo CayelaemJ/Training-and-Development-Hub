@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, guardianRelationshipsTable, verifiedEnrollmentsTable, usersTable } from "@workspace/db";
-import { canReadChildReport } from "../lib/guardianPolicy";
+import { parentMobileView } from "../lib/parentMobilePolicy";
 import { nativeAuthEnabled } from "../lib/nativeAuthPolicy";
 import { getSession, getSessionId } from "../lib/auth";
 
@@ -49,19 +49,9 @@ router.get("/native/mobile/parent", async (req, res) => {
     : [];
   const byId = new Map(names.map(u => [u.id, u.firstName]));
   res.json({
-    relationships: relationships.map(r => {
-      const canView = canReadChildReport(
-        r.status as "pending" | "accepted" | "declined" | "verified" | "revoked",
-        r.status === "verified", activeIds.has(r.learnerId)
-      );
-      return {
-        invitationId: r.id,
-        status: r.status,
-        // No learnerId or name in ANY response until verified plus enrolled.
-        learnerName: canView ? (byId.get(r.learnerId) || "Verified learner") : null,
-        verifiedForRead: canView,
-      };
-    }),
+    relationships: relationships.map(r => parentMobileView(
+      r, activeIds, byId
+    )),
     guidance: "Accepting an invitation is not proof of guardianship. School verification is required before viewing a child's progress.",
   });
 });
