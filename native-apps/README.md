@@ -1,6 +1,6 @@
 # CABO native application programme — implementation progress
 
-**Status:** genuine Android Compose and iOS SwiftUI clients with secure native sign-in source and read-only learner data screens. Native Windows WinUI 3 remains an initial signed-out preview. **Not production-ready, compiled, device-tested or published.**
+**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, and learner study/testing listings. Windows WinUI 3 remains an initial signed-out preview. **Not production-ready, native-compiled, physically device-tested or published.**
 
 These are standalone native interfaces, **not browser wrappers, PWAs or React WebViews**. The existing PR #40 web application stays available as a separate channel.
 
@@ -8,10 +8,19 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 
 | Platform | Implemented in this branch | Still required |
 | --- | --- | --- |
-| Android — Kotlin / Jetpack Compose | CABO-branded native UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore encrypted verifier, state and short-lived session; authenticated role dashboard, material and quiz titles; native logout | Real Android Studio/Gradle compile, emulator/device test, full native quiz-taking, upload picker, offline strategy, signed APK/AAB |
-| iOS — Swift / SwiftUI | Native learning sections; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role dashboard, material and quiz titles; native sign-out; XcodeGen definition | Real Xcode compile, iPhone/iPad tests, upload picker, interactive assessments, app signing and TestFlight/App Store review |
+| Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token encryption; learner materials/quizzes/journey/help requests; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout | Real Android Studio/Gradle compile, emulator/device test, full native quiz-taking, upload picker, offline strategy, signed APK/AAB |
+| iOS — Swift / SwiftUI | Adaptive iPhone/iPad SwiftUI parent/learner/educator screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role data, assigned teaching subjects, restricted parent invite decisions, authorized support queues; native sign-out; callback Info.plist and XcodeGen definition | Real Xcode compile, iPhone/iPad tests, upload picker, interactive assessments, app signing and TestFlight/App Store review |
 | Windows — C# / WinUI 3 | Initial XAML UI and backend reachability | Native OAuth redirect, Windows DPAPI/credential vault storage, dashboard, documents, packaging, Windows builds and QA |
 | Web — React + TypeScript | Previously merged PR #40 | Existing web release gates remain unchanged |
+
+## Inclusive device and role delivery
+
+- Android target lowered from API 26 to **API 23 (Android 6.0)**; iOS deployment target lowered from 17.0 to **15.0**. These are proposed floors pending native toolchain/hardware testing; they cannot guarantee compatibility with every Android phone or iPhone ever manufactured.
+- Android tablet 600dp+ uses two panes. iPad regular size class uses two panes. Phones get a single-column interface with the same permitted functions.
+- Teachers get assigned subjects and available learner-support queues; learners get their own study materials, practice test listings, journey counts and support statuses; parents get pending invitations, accept/decline operations, and minimal verified connection details.
+- Guardian names must not be disclosed until institutional verification AND an active learner enrolment. A pending/accepted invitation alone does not give access to reports. Role and access are decided by the backend, not by device model or display width.
+- No expensive GPU, fingerprint reader, high-end camera or Play Services feature is a product prerequisite. Old Android/iOS below the minimum native OS must use a separately tested web fallback where secure browser technology permits it.
+- **Compatibility and device validation plan:** [DEVICE_INCLUSION_MATRIX.md](DEVICE_INCLUSION_MATRIX.md). Static test guards exist in `nativeDeviceInclusion.test.mjs`; they are not equivalent to simulator/device builds.
 
 ## Auth architecture and release safety
 
@@ -38,15 +47,15 @@ Do not enable native authorization on a live school database without rollback, a
 
 **API / policies:** `node --test artifacts/api-server/src/tests/nativeAuthPolicy.test.mjs`, `pnpm run typecheck`, `pnpm run build`. Existing GitHub/CircleCI CI should also pass; unit policy tests **do not prove** the migration, endpoint integration, or mobile sign-in works.
 
-**Android:** Open `native-apps/android` in Android Studio with Android SDK 35, JDK 17, and compatible Gradle 8.11.1+, generate/add a Gradle wrapper, sync and run `:app` on an emulator. APK and AAB generation remain follow-on work. **No Android build was performed in this PR authoring environment.** The new GitHub manual workflow is currently defined only on this feature branch; GitHub generally requires a workflow_dispatch definition on the default branch to appear as a manual action. Treat it as proposed build tooling until reviewed and registered on the default branch, not a presently downloadable APK.
+**Android:** Open `native-apps/android` in Android Studio with Android SDK 35, JDK 17, and compatible Gradle 8.11.1+; emulate API 23 and low-memory Android phones, generate/add a Gradle wrapper, sync and run `:app` on an emulator. APK and AAB generation remain follow-on work. **No Android build was performed in this PR authoring environment.** The new GitHub manual workflow is currently defined only on this feature branch; GitHub generally requires a workflow_dispatch definition on the default branch to appear as a manual action. Treat it as proposed build tooling until reviewed and registered on the default branch, not a presently downloadable APK.
 
-**iOS:** On a Mac with Xcode 15+ and XcodeGen, run `cd native-apps/ios && xcodegen generate`, open `CABOLearningHub.xcodeproj`, select a development team, run on an iPhone/iPad. **No Xcode build or TestFlight upload has been performed.**
+**iOS:** On a Mac with Xcode and XcodeGen with a toolchain able to compile iOS 15 deployment targets, run `cd native-apps/ios && xcodegen generate`, open `CABOLearningHub.xcodeproj`, select a development team, run on an iPhone/iPad. **No Xcode build or TestFlight upload has been performed.**
 
 **Windows:** Open `native-apps/windows/CABO.Native/CABO.Native.csproj` in Visual Studio with Windows App SDK/WinUI 3 workload. No signed Windows installer is available.
 
 ## Next feature milestone
 
-After real physical-device native sign-in works: implement a **complete learner practice-test interaction** on Android and iOS (load quiz details, choose an answer, submit once, display score and source feedback) using the existing CABO API. Follow with document upload selection and write-safe offline drafts, then Windows parity. Educator, parent, guardian and government portals require separate authorized native experiences; never show routes based solely on the client-supplied role.
+After real physical-device native sign-in works: implement **complete learner practice-test interaction, educator response/marking actions, and guardian-authorised child reports** on Android and iOS (load quiz details, choose an answer, submit once, display score and source feedback) using the existing CABO API. Follow with document upload selection and write-safe offline drafts, then Windows parity. Educator, parent, guardian and government portals require separate authorized native experiences; never show routes based solely on the client-supplied role.
 
 Security notes: no AI provider key is embedded in any client, no second learner database is created, and the native UI must never assume that a network failure means a submission failed or can be retried blindly.
 
