@@ -153,6 +153,12 @@ struct NativeHomeView: View {
                     Text("Learning support").font(.headline).padding(.top, 8)
                     ForEach(school.support, id: \.self) { item in Text(item) }
                 }
+                if !school.tickets.isEmpty {
+                    Text("Learner help requests").font(.headline).padding(.top, 8)
+                    ForEach(school.tickets, id: \.self) { ticket in
+                        Label(ticket, systemImage: "person.crop.circle.badge.questionmark")
+                    }
+                }
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,6 +187,13 @@ struct NativeHomeView: View {
         }
         ForEach(session.quizzes, id: \.self) { title in
             infoTile(title, "My practice test", system: "checkmark.circle")
+        }
+        title("My learning support")
+        if session.learnerHelp.isEmpty {
+            infoTile("No requests yet", "You can ask your educator for additional help.", system: "person.2")
+        }
+        ForEach(session.learnerHelp, id: \.self) { ticket in
+            infoTile(ticket, "My support request", system: "person.2")
         }
     }
 
