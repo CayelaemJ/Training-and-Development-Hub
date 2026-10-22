@@ -710,6 +710,80 @@ export function useListQuizzes<TData = Awaited<ReturnType<typeof listQuizzes>>, 
 
 
 
+export const getDeleteQuizUrl = (id: number,) => {
+
+
+
+
+  return `/api/quizzes/${id}`
+}
+
+/**
+ * @summary Delete your own practice test and its attempts; keep the source material
+ */
+export const deleteQuiz = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteQuizUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteQuizMutationKey = () => ['deleteQuiz'] as const;
+
+export const getDeleteQuizMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQuiz>>, TError,DeleteQuizMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteQuiz>>, TError,DeleteQuizMutationVariables, TContext> => {
+
+const mutationKey = getDeleteQuizMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQuiz>>, DeleteQuizMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteQuiz(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteQuizMutationResult = NonNullable<Awaited<ReturnType<typeof deleteQuiz>>>
+
+    export type DeleteQuizMutationError = ErrorType<void>
+    export type DeleteQuizMutationVariables = {id: number}
+
+    /**
+ * @summary Delete your own practice test and its attempts; keep the source material
+ */
+export const useDeleteQuiz = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQuiz>>, TError,DeleteQuizMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteQuiz>>,
+        TError,
+        DeleteQuizMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteQuizMutationOptions(options));
+    }
+
 export const getGetQuizUrl = (id: number,) => {
 
 

@@ -34,7 +34,7 @@ import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } f
 import { useAuth } from '@workspace/replit-auth-web';
 import {
   useRequestUploadUrl, useListMaterials, useCreateMaterial, useDeleteMaterial,
-  useGenerateQuiz, useListQuizzes, useGetQuiz, useSubmitQuizAttempt, useGetDashboard,
+  useGenerateQuiz, useDeleteQuiz, useListQuizzes, useGetQuiz, useSubmitQuizAttempt, useGetDashboard,
   getListMaterialsQueryKey, getListQuizzesQueryKey, getGetQuizQueryKey, getGetDashboardQueryKey,
 } from '@workspace/api-client-react';
 import type { QuizDetail, QuizAttemptResult, StudyMaterial, QuizSummary } from '@workspace/api-client-react';
@@ -311,12 +311,24 @@ function DashboardPage() {
 
 function QuizRow({ quiz, index = 0 }: { quiz: QuizSummary; index?: number }) {
   const score = quiz.latestScore;
-  return <Link href={`/quiz/${quiz.id}`} className="activity-row" data-testid={`row-quiz-${quiz.id}`}>
+  const queryClient = useQueryClient();
+  const deletion = useDeleteQuiz();
+  const remove = () => {
+    if (!window.confirm(`Delete “${quiz.title}” and its practice attempts? Your source material will stay saved.`)) return;
+    deletion.mutate({id: quiz.id}, {onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({queryKey: getListQuizzesQueryKey()}),
+        queryClient.invalidateQueries({queryKey: getGetDashboardQueryKey()}),
+      ]);
+      queryClient.removeQueries({queryKey: getGetQuizQueryKey(quiz.id)});
+    }});
+  };
+  return <div><div className="flex items-center gap-2"><Link href={`/quiz/${quiz.id}`} className="activity-row flex-1 min-w-0" data-testid={`row-quiz-${quiz.id}`}>
     <span className={`row-icon row-icon-${index % 3}`}><BrainCircuit size={18} /></span>
     <span className="row-main"><strong>{quiz.title}</strong><small>{quiz.materialTitle} <span className="mini-separator">·</span> {quiz.questionCount} questions <span className="mini-separator">·</span> {quiz.difficulty}</small></span>
     <span className={`score-chip ${score == null ? 'score-empty' : score >= 70 ? 'score-good' : 'score-low'}`}>{score == null ? 'Not attempted' : `${Math.round(score)}%`}</span>
     <span className="row-date">{formatDistanceToNow(new Date(quiz.createdAt), { addSuffix: true })}</span><ChevronRight size={16} className="row-arrow" />
-  </Link>;
+  </Link><button className="button button-outline button-small" aria-label={`Delete test: ${quiz.title}`} onClick={remove} disabled={deletion.isPending} data-testid={`button-delete-quiz-${quiz.id}`}><Trash2 size={16} />{deletion.isPending ? 'Deleting…' : 'Delete'}</button></div>{deletion.isError && <p role="alert">{deletion.error.message}</p>}</div>;
 }
 
 function MaterialsPage() {
@@ -426,9 +438,9 @@ function MaterialConfigurePage() {
       </div>
       <section className="configure-panel">
         <div className="configure-step"><span className="step-number">01</span><div><h2 className="font-display">Question count</h2><p>How much time do you have?</p></div></div>
-        <div className="count-control"><button className="count-button" aria-label="Decrease question count" disabled={count <= 1} onClick={() => setCount((n) => Math.max(1, n - 1))} data-testid="button-count-decrease">−</button><div className="count-display"><strong>{count}</strong><span>questions</span></div><button className="count-button" aria-label="Increase question count" disabled={count >= 30} onClick={() => setCount((n) => Math.min(30, n + 1))} data-testid="button-count-increase">+</button></div>
-        <input className="range-slider" type="range" min="1" max="30" value={count} onChange={(e) => setCount(Number(e.target.value))} aria-label="Question count" data-testid="input-question-count" />
-        <div className="range-labels"><span>1 question</span><span>30 questions</span></div>
+        <div className="count-control"><button className="count-button" aria-label="Decrease question count" disabled={count <= 1} onClick={() => setCount((n) => Math.max(1, n - 1))} data-testid="button-count-decrease">−</button><div className="count-display"><strong>{count}</strong><span>questions</span></div><button className="count-button" aria-label="Increase question count" onClick={() => setCount((n) => n + 1)} data-testid="button-count-increase">+</button></div>
+        <input className="text-input" type="number" min="1" step="1" value={count} onChange={(e) => setCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))} aria-label="Question count" data-testid="input-question-count" />
+        <p className="generate-foot">Choose your question count. Larger tests take longer; we prepare them in batches and wait when the provider is busy.</p>
         <div className="configure-step step-spaced"><span className="step-number">02</span><div><h2 className="font-display">Difficulty</h2><p>Choose the kind of challenge</p></div></div>
         <div className="choice-row difficulty-choices">{(['beginner', 'intermediate', 'advanced'] as const).map((item) => <button key={item} className={`choice-button ${difficulty === item ? 'selected' : ''}`} onClick={() => setDifficulty(item)} data-testid={`button-difficulty-${item}`}><span className={`choice-level ${item}`} /><strong>{item[0].toUpperCase() + item.slice(1)}</strong>{difficulty === item && <Check size={15} />}</button>)}</div>
         <div className="configure-step step-spaced"><span className="step-number">03</span><div><h2 className="font-display">Answer options</h2><p>How many choices per question?</p></div></div>

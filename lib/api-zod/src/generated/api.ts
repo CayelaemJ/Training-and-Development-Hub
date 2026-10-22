@@ -107,7 +107,7 @@ export const GenerateQuizParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
-export const generateQuizBodyQuestionCountMax = 30;
+export const generateQuizBodyQuestionCountMax = 2147483647;
 
 
 
@@ -146,6 +146,19 @@ export const ListQuizzesResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListQuizzesResponse = zod.array(ListQuizzesResponseItem)
+
+
+/**
+ * @summary Delete your own practice test and its attempts; keep the source material
+ */
+
+
+
+export const DeleteQuizParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const DeleteQuizResponse = zod.void()
 
 
 /**

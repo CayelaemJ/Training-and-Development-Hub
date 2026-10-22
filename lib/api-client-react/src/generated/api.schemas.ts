@@ -82,7 +82,7 @@ export const QuizGenerationInputOptionCount = {
 export interface QuizGenerationInput {
   /**
      * @minimum 1
-     * @maximum 30
+     * @maximum 2147483647
      */
   questionCount: number;
   difficulty: QuizGenerationInputDifficulty;
