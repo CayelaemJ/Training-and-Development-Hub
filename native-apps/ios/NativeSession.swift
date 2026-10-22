@@ -3,6 +3,7 @@ import SwiftUI
 import AuthenticationServices
 import CryptoKit
 import Security
+import UIKit
 
 // Native iOS sign-in uses the system-owned authentication browser session.
 // No WKWebView, password handling, or web-cookie copying.
@@ -162,16 +163,21 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func signOut() async {
-        let hadToken = keychainToken() != nil
-        clearToken()
-        if hadToken {
-            // Remote revocation is best effort: no local credential remains.
-            // Native sessions expire server-side after one hour even if offline.
-            // Revocation with the previous token is handled before removing it
-            // in a later hardened session-management release.
+        guard !busy else { return }
+        busy = true
+        // Revoke server-side token while still available, then always clear it
+        // from Keychain even when the network is unavailable.
+        if let token = keychainToken() {
+            var request = URLRequest(url: origin.appendingPathComponent("api/native/logout"))
+            request.httpMethod = "POST"
+            request.timeoutInterval = 6
+            request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")
+            _ = try? await URLSession.shared.data(for: request)
         }
+        clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []
         status = "Signed out on this device."
+        busy = false
     }
 
     private struct NativeResource: Decodable { let title: String }
