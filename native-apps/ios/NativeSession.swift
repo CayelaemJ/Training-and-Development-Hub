@@ -17,6 +17,7 @@ struct StaffSchool: Identifiable {
     let id: Int
     let subjects: [String]
     let support: [String]
+    let tickets: [String]
     let notice: String?
 }
 
@@ -33,6 +34,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var guardianGuidance = ""
     @Published var staffSchools: [StaffSchool] = []
     @Published var journey: [String] = []
+    @Published var learnerHelp: [String] = []
 
     private let origin = URL(string: "https://cabo-learning-hub-pilot.onrender.com")!
     private let clientID = "cabo-ios"
@@ -175,6 +177,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextGuardians: [GuardianInvitation] = []
             var nextStaff: [StaffSchool] = []
             var nextJourney: [String] = []
+            var nextLearnerHelp: [String] = []
             var nextMaterials: [String] = []
             var nextQuizzes: [String] = []
             var nextGuidance = ""
@@ -207,12 +210,23 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                            let summary = obj["summary"] as? [String: Int] {
                             support = summary.map { "\($0.key): \($0.value)" }.sorted()
                         }
-                        nextStaff.append(StaffSchool(id: org, subjects: courses, support: support, notice: nil))
+                        var ticketNames: [String] = []
+                        if let data = try? await request("api/organizations/\(org)/support"),
+                           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            ticketNames = Array((obj["items"] as? [[String: Any]] ?? []).prefix(20))
+                                .compactMap { ticket in
+                                    guard let concept = ticket["concept"] as? String else { return nil }
+                                    return "\(String(concept.prefix(80))) · \(ticket["status"] as? String ?? "open")"
+                                }
+                        }
+                        nextStaff.append(StaffSchool(
+                            id: org, subjects: courses, support: support, tickets: ticketNames, notice: nil
+                        ))
                     } catch {
                         // Do not treat authorization failure as an empty classroom.
                         if keychainToken() == nil { throw error }
                         nextStaff.append(StaffSchool(
-                            id: org, subjects: [], support: [],
+                            id: org, subjects: [], support: [], tickets: [],
                             notice: "This school's learning-support module may not be enabled."
                         ))
                     }
@@ -222,6 +236,16 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     from: await request("api/materials")))?.prefix(30).map(\.title) ?? []
                 nextQuizzes = (try? JSONDecoder().decode([NativeResource].self,
                     from: await request("api/quizzes")))?.prefix(30).map(\.title) ?? []
+                for org in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(3)) {
+                    if let data = try? await request("api/organizations/\(org)/support"),
+                       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let items = Array((obj["items"] as? [[String: Any]] ?? []).prefix(15))
+                        nextLearnerHelp += items.compactMap { row in
+                            guard let topic = row["concept"] as? String else { return nil }
+                            return "\(String(topic.prefix(80))) · \(row["status"] as? String ?? "open")"
+                        }
+                    }
+                }
                 if let data = try? await request("api/learner-journey/me"),
                    let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     let stages = (obj["journeys"] as? [Any])?.count ?? 0
@@ -238,12 +262,13 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             guardianGuidance = nextGuidance
             staffSchools = nextStaff
             journey = nextJourney
+            learnerHelp = Array(nextLearnerHelp.prefix(20))
             materials = nextMaterials
             quizzes = nextQuizzes
             status = "Connected securely to CABO"
         } catch {
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []
-            guardians = []; staffSchools = []; journey = []; guardianGuidance = ""
+            guardians = []; staffSchools = []; journey = []; learnerHelp = []; guardianGuidance = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
