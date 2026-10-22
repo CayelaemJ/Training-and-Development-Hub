@@ -1,68 +1,68 @@
 import SwiftUI
 
-private struct LearningArea: Identifiable {
-    let title: String
-    let detail: String
-    var id: String { title }
-}
-
+// All visible views are native SwiftUI controls, not embedded HTML.
 struct NativeHomeView: View {
-    @State private var connection = "Checking CABO service…"
-    private let clay = Color(red: 196 / 255, green: 103 / 255, blue: 58 / 255)
-    private let areas = [
-        LearningArea(title: "My learning", detail: "Lessons and personal progress"),
-        LearningArea(title: "Practice tests", detail: "Questions, results and feedback"),
-        LearningArea(title: "Academic journey", detail: "Subjects and milestones"),
-        LearningArea(title: "Sports and activities", detail: "Development and achievements"),
-        LearningArea(title: "Teacher support", detail: "Get help when learning is difficult")
-    ]
+    @StateObject private var session = NativeSession()
+    private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Your learning journey")
-                            .font(.title2.bold())
-                        Text("A native iPhone and iPad CABO experience")
-                        Text(connection)
-                            .foregroundStyle(.secondary)
-                        Link("Sign in securely in Safari",
-                             destination: URL(string: "https://cabo-learning-hub-pilot.onrender.com/api/login")!)
-                            .buttonStyle(.borderedProminent)
-                        Text("Authenticated native screens are not yet enabled. No private learner data is downloaded.")
-                            .font(.caption)
-                    }
-                    .padding(.vertical, 8)
-                }
-                Section("Learning areas") {
-                    ForEach(areas) { area in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(area.title).font(.headline)
-                            Text(area.detail).font(.subheadline).foregroundStyle(.secondary)
-                            Text("Coming to native CABO").font(.caption2).foregroundStyle(clay)
+                        Text("Your learning journey").font(.title2.bold())
+                        Text(session.status).foregroundStyle(.secondary)
+                        if session.busy { ProgressView("Connecting securely…") }
+                        if session.role == nil {
+                            Button("Sign in securely") { session.signIn() }
+                                .buttonStyle(.borderedProminent).disabled(session.busy)
+                        } else {
+                            HStack {
+                                Button("Refresh") { Task { await session.refresh() } }
+                                    .disabled(session.busy)
+                                Button("Sign out", role: .destructive) {
+                                    Task { await session.signOut() }
+                                }.disabled(session.busy)
+                            }.buttonStyle(.bordered)
                         }
-                        .padding(.vertical, 4)
+                        Text("Private records come from CABO's authenticated API. No learner data is cached offline.")
+                            .font(.caption)
+                    }.padding(.vertical, 8)
+                }
+                if let role = session.role {
+                    Section("My role") { Text(role.capitalized) }
+                    if !session.summary.isEmpty {
+                        Section("My progress") {
+                            ForEach(session.summary, id: \.self) { Text($0) }
+                        }
+                    }
+                    if !session.workspaces.isEmpty {
+                        Section("My workspaces") {
+                            ForEach(session.workspaces, id: \.self) { name in
+                                Label(name, systemImage: "square.grid.2x2")
+                            }
+                        }
+                    }
+                    Section("My study materials") {
+                        if session.materials.isEmpty { Text("No materials to show yet").foregroundStyle(.secondary) }
+                        ForEach(session.materials, id: \.self) { title in Label(title, systemImage: "book") }
+                    }
+                    Section("My practice tests") {
+                        if session.quizzes.isEmpty { Text("No practice tests to show yet").foregroundStyle(.secondary) }
+                        ForEach(session.quizzes, id: \.self) { title in Label(title, systemImage: "checkmark.circle") }
+                    }
+                } else {
+                    Section("Explore CABO") {
+                        Label("Study materials", systemImage: "book")
+                        Label("Practice tests", systemImage: "checkmark.circle")
+                        Label("Academic journey", systemImage: "graduationcap")
+                        Label("Sports and activities", systemImage: "figure.run")
+                        Label("Teacher support", systemImage: "person.2")
                     }
                 }
             }
             .navigationTitle("CABO Learning Hub")
-            .task { await checkService() }
-        }
-        .tint(clay)
-    }
-
-    @MainActor
-    private func checkService() async {
-        guard let url = URL(string: "https://cabo-learning-hub-pilot.onrender.com/api/auth/user") else { return }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 8
-        do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            connection = code == 200 ? "CABO service reachable · Sign in required" : "CABO service returned HTTP \(code)"
-        } catch {
-            connection = "Cannot reach CABO. Check your internet connection."
-        }
+            .task { await session.restore() }
+        }.tint(clay)
     }
 }
