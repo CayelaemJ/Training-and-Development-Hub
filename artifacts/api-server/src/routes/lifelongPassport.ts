@@ -56,7 +56,7 @@ router.post("/learning-passport/links",async(req,res)=>{
   }).returning();
   res.status(201).json(row);
  }catch(error){
-  if((error as {code?:string}).code==="23505"){res.status(409).json({error:"This link already belongs to your passport"});return}
+  if((error as {code?:string;cause?:{code?:string}}).code==="23505" || (error as {cause?:{code?:string}}).cause?.code==="23505"){res.status(409).json({error:"This link already belongs to your passport"});return}
   throw error;
  }
 });
