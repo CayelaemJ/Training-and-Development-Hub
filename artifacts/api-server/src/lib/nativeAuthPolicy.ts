@@ -4,6 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 // been tested. No arbitrary redirect URI is accepted from the caller.
 export const NATIVE_CLIENTS = {
   "cabo-android": "cabo-learninghub-android://auth",
+  "cabo-ios": "cabo-learninghub-ios://auth",
 } as const;
 export type NativeClientId = keyof typeof NATIVE_CLIENTS;
 export const NATIVE_CODE_SECONDS = 180;
