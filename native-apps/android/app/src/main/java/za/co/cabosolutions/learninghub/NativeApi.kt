@@ -124,12 +124,18 @@ internal class NativeApi(private val context: Context) {
             getArray("/api/materials").let { arr ->
                 (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("title") }.take(8)
             }
-        } catch (_: Exception) { emptyList() } // Dashboard still works if materials are unavailable.
+        } catch (error: Exception) {
+            if (!hasSession()) throw error // A 401 revoked the native session.
+            emptyList()
+        } // Other material-service outages do not hide the role dashboard.
         val quizzes = try {
             getArray("/api/quizzes").let { arr ->
                 (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("title") }.take(8)
             }
-        } catch (_: Exception) { emptyList() }
+        } catch (error: Exception) {
+            if (!hasSession()) throw error
+            emptyList()
+        }
         NativeLearning(NativePortal(json.optString("role", "learner"), summary, cards), materials, quizzes)
     }
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
