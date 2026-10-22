@@ -8,7 +8,7 @@ targets:
   CABOLearningHub:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "15.0"
     sources:
       - path: CABOLearningHubApp.swift
       - path: NativeHomeView.swift
