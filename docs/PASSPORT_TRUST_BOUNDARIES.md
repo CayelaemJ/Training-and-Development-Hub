@@ -43,3 +43,6 @@ The passport integration test uses fake AI and synthetic accounts to test trust 
 
 ## Outstanding governance
 Institutional identity and assessor accreditation validation; learner age/guardian permission checks; formal credential verification; clear human appeal process; export/deletion policies; retention; accessible native onboarding; source-document import, user-reviewed AI extraction and official recognition-of-prior-learning integrations. Do not market institution attestations as nationally accredited qualifications until the required external procedures exist.
+
+## Default-off institutional review release gate
+Organization membership alone is insufficient for accreditation claims or child-consent approval. All three private environment flags are required to open request/queue/decision routes: ENABLE_PASSPORT_HUMAN_REVIEW_PILOT=true, PASSPORT_INSTITUTION_VERIFICATION_READY=true, and PASSPORT_LEARNER_CONSENT_READY=true. These gates are off by default. Reading one's own history and withdrawing a review remain available even if the pilot is disabled. The capability endpoint reports availability to the learner UI. The integration suite explicitly tests the default-off case and then enables the three flags in its synthetic test environment.

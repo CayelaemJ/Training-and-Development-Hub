@@ -7,7 +7,7 @@ import {
  passportAiInterpretationsTable, passportAchievementReviewsTable, passportAchievementAuditTable
 } from "@workspace/db";
 import { completeAIJson, hasAiProvider } from "../lib/aiCompletion";
-import { PASSPORT_AI_DISCLOSURE, PASSPORT_AI_PROMPT_VERSION, canHumanVerify, decisionAllowed } from "../lib/passportTrustPolicy";
+import { PASSPORT_AI_DISCLOSURE, PASSPORT_AI_PROMPT_VERSION, canHumanVerify, decisionAllowed, humanReviewPilotEnabled } from "../lib/passportTrustPolicy";
 
 const router: IRouter = Router();
 const idSchema=z.coerce.number().int().positive();
@@ -35,6 +35,12 @@ function isUnique(error:unknown):boolean{
  const candidate=error as {code?:string;cause?:{code?:string}};
  return candidate?.code==="23505"||candidate?.cause?.code==="23505";
 }
+
+router.get("/learning-passport/trust-layers/capabilities",async(req,res)=>{
+ const userId=currentUser(req,res);if(!userId)return;
+ res.setHeader("Cache-Control","no-store");
+ res.json({aiConfigured:hasAiProvider(),humanReviewPilotEnabled:humanReviewPilotEnabled(process.env)});
+});
 
 router.get("/learning-passport/trust-layers/me",async(req,res)=>{
  const userId=currentUser(req,res);if(!userId)return;
@@ -104,6 +110,7 @@ router.patch("/learning-passport/interpretations/:id/review",async(req,res)=>{
 // Learner chooses the organization and a specific owned skill for consented review.
 router.post("/learning-passport/achievements/requests",async(req,res)=>{
  const userId=currentUser(req,res);if(!userId)return;
+ if(!humanReviewPilotEnabled(process.env)){res.status(503).json({error:"Institutional verification pilot is not enabled for this environment"});return}
  const input=requestReview.safeParse(req.body);if(!input.success){res.sendStatus(400);return}
  const [skill]=await db.select({id:passportCompetenciesTable.id}).from(passportCompetenciesTable)
   .where(and(eq(passportCompetenciesTable.id,input.data.competencyId),eq(passportCompetenciesTable.userId,userId))).limit(1);
@@ -128,6 +135,7 @@ router.post("/learning-passport/achievements/requests",async(req,res)=>{
 // Reviewers see only the evidence a learner explicitly submitted, never their complete Passport.
 router.get("/organizations/:orgId/passport/reviews",async(req,res)=>{
  const actor=currentUser(req,res);if(!actor)return;
+ if(!humanReviewPilotEnabled(process.env)){res.status(503).json({error:"Institutional verification pilot is not enabled for this environment"});return}
  const org=idSchema.safeParse(req.params.orgId);if(!org.success){res.sendStatus(400);return}
  const role=await memberRole(org.data,actor);
  if(!["owner","admin","assessor"].includes(role??"")){res.sendStatus(403);return}
@@ -146,6 +154,7 @@ router.get("/organizations/:orgId/passport/reviews",async(req,res)=>{
 
 router.post("/organizations/:orgId/passport/reviews/:id/decision",async(req,res)=>{
  const actor=currentUser(req,res);if(!actor)return;
+ if(!humanReviewPilotEnabled(process.env)){res.status(503).json({error:"Institutional verification pilot is not enabled for this environment"});return}
  const org=idSchema.safeParse(req.params.orgId),id=idSchema.safeParse(req.params.id),input=decisionBody.safeParse(req.body);
  if(!org.success||!id.success||!input.success){res.sendStatus(400);return}
  const role=await memberRole(org.data,actor);

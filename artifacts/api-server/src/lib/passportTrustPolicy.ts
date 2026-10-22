@@ -7,3 +7,14 @@ export function decisionAllowed(current:string,decision:"verified"|"rejected"|"r
  return current==="pending"&&(decision==="verified"||decision==="rejected")||
         current==="verified"&&decision==="revoked";
 }
+
+/**
+ * Only deploy trusted institutional attestations after institution onboarding,
+ * learner-consent/age safeguards and pilot approval are complete.
+ * Staff role alone is NOT an accreditation credential.
+ */
+export function humanReviewPilotEnabled(env:Record<string,string|undefined>){
+ return env.ENABLE_PASSPORT_HUMAN_REVIEW_PILOT==="true" &&
+        env.PASSPORT_INSTITUTION_VERIFICATION_READY==="true" &&
+        env.PASSPORT_LEARNER_CONSENT_READY==="true";
+}

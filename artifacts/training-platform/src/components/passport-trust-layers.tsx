@@ -7,6 +7,7 @@ type Review={id:number;organizationId:number;competencyId:number;status:string;r
  reviewNote:string|null;reviewedAt:string|null;requestedAt:string;revokeReason:string|null};
 type Org={id:number;name:string;role:string};
 type Layers={aiInterpretations:Reflection[];achievementReviews:Review[]};
+type Capabilities={aiConfigured:boolean;humanReviewPilotEnabled:boolean};
 const btn="rounded-md border px-3 py-2 text-sm disabled:opacity-50";
 const primary="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50";
 const input="w-full rounded-md border bg-background p-2 text-sm";
@@ -21,15 +22,17 @@ export default function PassportTrustLayers({competencies}: {competencies:Skill[
  const [interpretations,I]=useState<Reflection[]>([]),[reviews,R]=useState<Review[]>([]),[orgs,O]=useState<Org[]>([]);
  const [organizationId,OI]=useState(""),[competencyId,CI]=useState("");
  const [busy,B]=useState(false),[notice,N]=useState(""),[error,E]=useState("");
+ const [pilot,SET_PILOT]=useState(false);
  const skillName=(id:number)=>competencies.find(x=>x.id===id)?.skill??"Evidence #"+id;
  const orgName=(id:number)=>orgs.find(x=>x.id===id)?.name??"Institution #"+id;
  const learnerOrgs=orgs.filter(o=>o.role==="learner");
  async function load(){
-  const [layers,organizations]=await Promise.all([
+  const [layers,organizations,capabilities]=await Promise.all([
    api<Layers>("/learning-passport/trust-layers/me"),
-   api<Org[]>("/organizations")
+   api<Org[]>("/organizations"),
+   api<Capabilities>("/learning-passport/trust-layers/capabilities")
   ]);
-  I(layers.aiInterpretations);R(layers.achievementReviews);O(organizations);
+  I(layers.aiInterpretations);R(layers.achievementReviews);O(organizations);SET_PILOT(capabilities.humanReviewPilotEnabled);
  }
  useEffect(()=>{load().catch(e=>E(e instanceof Error?e.message:"Could not load passport reviews"))},[]);
  async function act(task:()=>Promise<unknown>,message:string){
@@ -84,6 +87,7 @@ export default function PassportTrustLayers({competencies}: {competencies:Skill[
     {["pending","verified"].includes(item.status)&&<button className={btn} disabled={busy}
      onClick={()=>act(()=>api("/learning-passport/achievements/"+item.id+"/withdraw","POST"),"Institution review withdrawn and audit event recorded")}>Withdraw this review</button>}
    </article>)}
+   {!pilot&&<p className="rounded-md border p-3 text-sm text-muted-foreground">Institution verification is in controlled preview. A participating institution must complete its verification and consent safeguards before learners can submit new requests.</p>}
    {learnerOrgs.length===0?<p className="rounded-md border p-3 text-sm text-muted-foreground">Institution verification becomes available after an institution enrols your account as a learner. You can still record practical skills without it.</p>:
    <div className="space-y-2 rounded-md border p-3">
     <h4 className="font-medium">Request a human review</h4>
@@ -100,7 +104,7 @@ export default function PassportTrustLayers({competencies}: {competencies:Skill[
      </select>
     </label>
     <p className="text-xs text-muted-foreground">Submitting grants that institution's authorized reviewer access to this one evidence item only, not your entire learning history.</p>
-    <button className={primary} disabled={busy||!organizationId||!competencies.some(s=>String(s.id)===competencyId)}
+    <button className={primary} disabled={busy||!pilot||!organizationId||!competencies.some(s=>String(s.id)===competencyId)}
      onClick={()=>act(()=>api("/learning-passport/achievements/requests","POST",{organizationId:Number(organizationId),competencyId:Number(competencyId)}),"Human review requested; nothing has been verified yet")}>Request human review</button>
    </div>}
   </section>

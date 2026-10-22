@@ -123,6 +123,16 @@ try{
  assert.equal((await call("learner-b","/learning-passport/interpretations/"+ai[0].id+"/review","PATCH",{reviewState:"disputed"})).status,200);
  assert.equal((await call("learner-b","/learning-passport/trust-layers/me")).data.aiInterpretations[0].reviewState,"disputed");
 
+ const capabilities=await call("learner-b","/learning-passport/trust-layers/capabilities");
+ assert.equal(capabilities.status,200);
+ assert.equal(capabilities.data.humanReviewPilotEnabled,false);
+ assert.equal((await call("learner-b","/learning-passport/achievements/requests","POST",
+ {organizationId:2,competencyId:selfReported.data.id})).status,503);
+ process.env.ENABLE_PASSPORT_HUMAN_REVIEW_PILOT="true";
+ process.env.PASSPORT_INSTITUTION_VERIFICATION_READY="true";
+ process.env.PASSPORT_LEARNER_CONSENT_READY="true";
+ assert.equal((await call("learner-b","/learning-passport/trust-layers/capabilities")).data.humanReviewPilotEnabled,true);
+
  // Distinct layer 3: a learner submits only a named practical item to one institution.
  assert.equal((await call("","/learning-passport/achievements/requests","POST",{})).status,401);
  assert.equal((await call("learner-b","/learning-passport/achievements/requests","POST",
