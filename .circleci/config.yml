@@ -30,6 +30,7 @@ jobs:
             pnpm --filter @workspace/scripts exec playwright install --with-deps chromium
             mkdir -p test-results/browser
             CABO_UI_SCREENSHOT=test-results/browser/learner-dna-mobile.png node scripts/run-learner-success-browser.mjs
+            node scripts/run-learner-success-browser.mjs --pwa
       - store_artifacts:
           path: test-results
 workflows:
