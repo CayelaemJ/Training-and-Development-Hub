@@ -1,4 +1,4 @@
-import { and,eq } from "drizzle-orm";
+import { and,eq,inArray } from "drizzle-orm";
 import { db,organizationMembersTable,managementRoleGrantsTable,guardianRelationshipsTable } from "@workspace/db";
 import { leadershipRanks, type HierarchyRole } from "./hierarchyPolicy";
 import { isTestSuperadmin } from "./platformPolicy";
@@ -13,7 +13,7 @@ export async function resolvePortal(userId:string):Promise<{role:PortalRole;orga
  const [members,grants,guardian]=await Promise.all([
   db.select({organizationId:organizationMembersTable.organizationId,role:organizationMembersTable.role}).from(organizationMembersTable).where(eq(organizationMembersTable.userId,userId)),
   db.select({organizationId:managementRoleGrantsTable.organizationId,unitId:managementRoleGrantsTable.unitId,role:managementRoleGrantsTable.role}).from(managementRoleGrantsTable).where(eq(managementRoleGrantsTable.userId,userId)),
-  db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.guardianId,userId),eq(guardianRelationshipsTable.status,"accepted"))).limit(1)
+  db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.guardianId,userId),inArray(guardianRelationshipsTable.status,["pending","accepted","verified"]))).limit(1)
  ]);
  const ordered=[...grants].sort((a,b)=>(leadershipRanks[b.role as HierarchyRole]??0)-(leadershipRanks[a.role as HierarchyRole]??0));
  const top=ordered[0]?.role;
