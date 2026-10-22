@@ -258,6 +258,10 @@ private fun RoleContent(
                             Text("Learning support", style = MaterialTheme.typography.titleSmall)
                             org.supportSummary.forEach { Text(it) }
                         }
+                        if (org.tickets.isNotEmpty()) {
+                            Text("Learner help requests", style = MaterialTheme.typography.titleSmall)
+                            org.tickets.forEach { Text("• $it") }
+                        }
                     }
                 }
             }
@@ -271,6 +275,9 @@ private fun RoleContent(
             item { Text("Practice tests", style = MaterialTheme.typography.titleMedium) }
             if (data.quizzes.isEmpty()) item { Text("No tests available yet.") }
             else items(data.quizzes) { NativeCard(it, "My practice test") }
+            item { Text("My learning support", style = MaterialTheme.typography.titleMedium) }
+            if (data.learnerHelp.isEmpty()) item { Text("No personal help requests to display.") }
+            else items(data.learnerHelp) { NativeCard(it, "My support request") }
         }
         item { Text("Information is loaded securely from CABO when online, not kept as a private offline cache.",
             style = MaterialTheme.typography.bodySmall) }
