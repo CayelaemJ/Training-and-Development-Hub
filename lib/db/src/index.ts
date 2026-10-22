@@ -10,7 +10,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({
+ connectionString: process.env.DATABASE_URL,
+ max: Math.max(1, Math.min(50, Number(process.env.DB_POOL_MAX) || 10)),
+ connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000,
+ statement_timeout: 15000, query_timeout: 20000,
+});
+pool.on("error",()=>console.error("CABO database pool idle connection failure"));
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

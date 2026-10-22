@@ -73,11 +73,11 @@ export default function CaboAccessLanding() {
       <div className="cabo-access-layout">
         <section className="cabo-access-story" aria-labelledby="cabo-access-title">
           <div className="cabo-access-story-main">
-            <p className="cabo-access-eyebrow">THE CABO LEARNING ECOSYSTEM</p>
-            <h1 id="cabo-access-title">One platform.<br /><em>Every learning journey.</em></h1>
+            <p className="cabo-access-eyebrow">WELCOME TO CABO</p>
+            <h1 id="cabo-access-title">A place to learn.<br /><em>Room to grow.</em></h1>
             <p className="cabo-access-description">
               From school and university to workplace development, CABO brings
-              learning, assessment, progress and opportunity together.
+              lessons, practice, support and progress together.
             </p>
             <p className="cabo-access-mobile-audiences">For schools, universities, training organisations, learners and families.</p>
           </div>
@@ -104,7 +104,7 @@ export default function CaboAccessLanding() {
             </div>
             <h2 id="cabo-access-signin-title">Welcome to CABO.</h2>
             <p className="cabo-access-signin-description">
-              Sign in to continue to the workspace designed for your role.
+              Sign in to pick up where you left off.
             </p>
 
             {isolatedTest ? (

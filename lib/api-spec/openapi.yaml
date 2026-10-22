@@ -301,6 +301,10 @@ components:
         contentType:
           type: string
           minLength: 1
+        allowAiReading:
+          type: boolean
+          description: Explicit permission to send scanned learning pages or photos to the configured OCR provider.
+          default: false
       required: [name, size, contentType]
     UploadUrlResponse:
       type: object

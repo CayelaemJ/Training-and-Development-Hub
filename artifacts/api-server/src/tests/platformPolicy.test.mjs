@@ -13,3 +13,8 @@ test("never elevate in production or with missing flags",()=>{
  assert.equal(isTestSuperadmin("cabo-isolated-test-learner",{...allowed,CABO_SUPERADMIN_USER_ID:""}),false);
  assert.equal(isTestSuperadmin("cabo-isolated-test-learner",{}),false);
 });
+
+test("Render testing environment supports isolation without pretending to be Railway",()=>{
+ assert.equal(isTestSuperadmin("cabo-isolated-test-learner",{...allowed,RAILWAY_ENVIRONMENT_NAME:undefined,CABO_ENVIRONMENT:"testing"}),true);
+ assert.equal(isTestSuperadmin("cabo-isolated-test-learner",{...allowed,CABO_ENVIRONMENT:"production"}),false);
+});

@@ -1,6 +1,7 @@
 /** Browser origins accepted for credentialed requests must be explicitly trusted. */
 export function trustedOrigins(env:NodeJS.ProcessEnv):Set<string>{
  const origins=(env.CABO_ALLOWED_ORIGINS??"").split(",").map(x=>x.trim()).filter(Boolean);
+ if(env.RENDER_EXTERNAL_URL)origins.push(env.RENDER_EXTERNAL_URL);
  if(env.RAILWAY_PUBLIC_DOMAIN)origins.push("https://"+env.RAILWAY_PUBLIC_DOMAIN);
  if(env.NODE_ENV!=="production")origins.push("http://localhost:5173","http://127.0.0.1:5173");
  const valid=new Set<string>();

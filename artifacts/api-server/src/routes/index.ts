@@ -1,3 +1,6 @@
+import educationFrameworksRouter from "./educationFrameworks";
+import learnerSupportRouter from "./learnerSupport";
+
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
@@ -36,6 +39,9 @@ import admissionEvidenceRouter from "./admissionEvidence";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(educationFrameworksRouter);
+router.use(learnerSupportRouter);
+
 router.use(authRouter);
 router.use(storageRouter);
 router.use(trainingRouter);

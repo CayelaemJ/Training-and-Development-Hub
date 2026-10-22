@@ -1,7 +1,7 @@
 import {Router,type IRouter} from "express";
 import {and,eq,gte,lt} from "drizzle-orm";
 import {z} from "zod/v4";
-import {db,academicCoursesTable,academicAssessmentsTable,academicGradesTable,academicPeriodsTable,organizationMembersTable,verifiedEnrollmentsTable,usersTable,schoolAttendanceTable,guardianRelationshipsTable,guardianVerificationEventsTable} from "@workspace/db";
+import {db,learnerSupportTicketsTable,academicCoursesTable,academicAssessmentsTable,academicGradesTable,academicPeriodsTable,organizationMembersTable,verifiedEnrollmentsTable,usersTable,schoolAttendanceTable,guardianRelationshipsTable,guardianVerificationEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {canReadChildReport,type GuardianStatus} from "../lib/guardianPolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
@@ -23,7 +23,9 @@ export async function gather(org:number,learner:string,year:number){
  const subjects=[...aggregates.values()].map(x=>({name:x.subject,percentage:Math.round(x.total/x.weights*10)/10,assessmentCount:x.assessments})).sort((a,b)=>a.name.localeCompare(b.name));
  const days=await db.select({status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(and(eq(schoolAttendanceTable.organizationId,org),eq(schoolAttendanceTable.learnerId,learner),gte(schoolAttendanceTable.day,year+"-01-01"),lt(schoolAttendanceTable.day,(year+1)+"-01-01")));
  const present=days.filter(x=>x.status==="present"||x.status==="late").length;
- return {year,grade:enrolment[0].stage,enrolmentStatus:enrolment[0].status,subjects,average:subjects.length?Math.round(subjects.reduce((n,x)=>n+x.percentage,0)/subjects.length*10)/10:null,attendance:{recordedDays:days.length,presentDays:present,rate:days.length?Math.round(present/days.length*100):null},official:false};
+ const interventions=process.env.ENABLE_LEARNER_SUCCESS_LOOP==="true"?await db.select({concept:learnerSupportTicketsTable.concept,status:learnerSupportTicketsTable.status,outcome:learnerSupportTicketsTable.outcome,reviewAt:learnerSupportTicketsTable.reviewAt}).from(learnerSupportTicketsTable).where(and(eq(learnerSupportTicketsTable.organizationId,org),eq(learnerSupportTicketsTable.learnerId,learner),gte(learnerSupportTicketsTable.createdAt,new Date(year+"-01-01T00:00:00Z")),lt(learnerSupportTicketsTable.createdAt,new Date((year+1)+"-01-01T00:00:00Z")))).limit(200):[];
+ const support=interventions.map(({outcome,...item})=>({...item,progress:outcome?{baseline:outcome.baseline,followup:outcome.followup,improvementPp:outcome.improvementPp}:null}));
+ return {support,year,grade:enrolment[0].stage,enrolmentStatus:enrolment[0].status,subjects,average:subjects.length?Math.round(subjects.reduce((n,x)=>n+x.percentage,0)/subjects.length*10)/10:null,attendance:{recordedDays:days.length,presentDays:present,rate:days.length?Math.round(present/days.length*100):null},official:false};
 }
 router.get("/reports/me",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
@@ -67,6 +69,6 @@ router.get("/organizations/:orgId/analytics",async(req,res)=>{
  const byGrade:Record<string,number>={};for(const x of enrolled)byGrade[x.grade]=(byGrade[x.grade]??0)+1;
  const present=attendance.filter(x=>x.status==="present"||x.status==="late").length;
  res.setHeader("Cache-Control","private, no-store");
- res.json({year:year.data,learnerCount:enrolled.length,attendance:{events:attendance.length,rate:attendance.length?Math.round(present/attendance.length*100):null},byGrade,verifiedNationalStatistics:false,syntheticOnly:process.env.RAILWAY_ENVIRONMENT_NAME==="testing"});
+ res.json({year:year.data,learnerCount:enrolled.length,attendance:{events:attendance.length,rate:attendance.length?Math.round(present/attendance.length*100):null},byGrade,verifiedNationalStatistics:false,syntheticOnly:(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)==="testing"});
 });
 export default router;

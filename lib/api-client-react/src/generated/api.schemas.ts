@@ -36,6 +36,8 @@ export interface UploadUrlRequest {
   size: number;
   /** @minLength 1 */
   contentType: string;
+  /** Explicit permission to send scanned learning pages or photos to the configured OCR provider. */
+  allowAiReading?: boolean;
 }
 
 export interface UploadUrlResponse {

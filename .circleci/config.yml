@@ -1,0 +1,38 @@
+version: 2.1
+# One job, one install, no production secrets or automatic merges.
+jobs:
+  verify:
+    docker:
+      - image: node:24-bookworm
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Install pinned workspace tooling
+          command: |
+            npm install --global pnpm@10.28.2
+            pnpm install --frozen-lockfile
+      - run:
+          name: Policy, isolation, migration and success-loop tests
+          command: |
+            node --test artifacts/api-server/src/tests/*.test.mjs
+            node scripts/test-learner-support.mjs
+            node scripts/test-uploads.mjs
+      - run:
+          name: Typecheck and build all workspaces
+          command: pnpm run build
+          environment:
+            PORT: "5000"
+            BASE_PATH: "/"
+      - run:
+          name: Browser, mobile and accessibility release checks
+          command: |
+            pnpm --filter @workspace/scripts exec playwright install --with-deps chromium
+            mkdir -p test-results/browser
+            CABO_UI_SCREENSHOT=test-results/browser/learner-dna-mobile.png node scripts/run-learner-success-browser.mjs
+      - store_artifacts:
+          path: test-results
+workflows:
+  release_checks:
+    jobs:
+      - verify

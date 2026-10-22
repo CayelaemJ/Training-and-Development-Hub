@@ -28,7 +28,7 @@ const uid = (key: string) => `cabo-fixture-${key}`;
 const demoName = (name: string) => `[DEMO] ${name}`;
 
 export async function seedCaboDemo(): Promise<void> {
-  if (process.env.RAILWAY_ENVIRONMENT_NAME !== "testing" || process.env.ENABLE_CABO_DEMO_SEED !== "true") {
+  if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) !== "testing" || process.env.ENABLE_CABO_DEMO_SEED !== "true") {
     throw new Error("CABO demo seeding is restricted to explicitly enabled Railway testing");
   }
   for (const [key, firstName, lastName] of people) {

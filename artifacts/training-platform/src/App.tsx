@@ -1,3 +1,4 @@
+import LearnerSuccessPage from "@/pages/learner-success";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -49,29 +50,30 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
  provincial_director:['/','/education-command','/organizations','/governance'],
  district_director:['/','/education-command','/organizations','/governance'],
  group_executive:['/','/education-command','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
- deputy_headmaster:['/','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
- department_head:['/','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
- grade_head:['/','/school-stages','/hub-modules','/organizations','/academics','/governance'],
- administrator:['/','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
- teacher:['/','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
- assessor:['/','/organizations','/written-exams'],
+ headmaster:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
+ department_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
+ grade_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
+ administrator:['/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ teacher:['/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
+ assessor:['/','/learner-success','/organizations','/written-exams'],
  parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
- learner:['/','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ learner:['/','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
+  { href: '/learner-success', label: 'Learner Success Loop', icon: Target },
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
   { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
   { href: '/education-reports', label: 'Reports & statistics', icon: BookOpen },
   { href: '/report-issuance', label: 'Issue report cards', icon: FileText },
-  { href: '/school-intelligence', label: 'School intelligence', icon: BookOpen },
+  { href: '/school-intelligence', label: 'School progress', icon: BookOpen },
   { href: '/question-bank', label: 'Assessment question bank', icon: FileText },
   { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
@@ -81,7 +83,7 @@ const navItems = [
   { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
   { href: '/school-operations', label: 'School operations', icon: BookOpen },
   { href: '/sports-development', label: 'Sports & activities', icon: Target },
-  { href: '/development-plan', label: 'AI development plan', icon: Sparkles },
+  { href: '/development-plan', label: 'My development plan', icon: Sparkles },
   { href: '/career-passport', label: 'Careers & passport', icon: Target },
   { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
@@ -123,6 +125,7 @@ function AuthGate() {
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={RoleHomePage} />
+    <Route path="/learner-success" component={LearnerSuccessPage} />
     <Route path="/hub-modules" component={HubModulesPage} />
     <Route path="/cabo-apply" component={CaboApplyPage} />
     <Route path="/education-reports" component={EducationReportsPage} />
@@ -181,7 +184,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'AI development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
@@ -327,22 +330,25 @@ function MaterialsPage() {
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [allowAiReading, setAllowAiReading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const busy = uploading || requestUrl.isPending || createMaterial.isPending;
   const onSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedFile(null); setAllowAiReading(false);
     if (file.size > 30 * 1024 * 1024) { setError('Files must be 30 MB or smaller.'); event.target.value = ''; return; }
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['txt', 'pdf', 'docx'].includes(ext || '')) { setError('Choose a TXT, PDF, or DOCX file.'); return; }
+    if (!['txt','md','csv','pdf','docx','pptx','xlsx','png','jpg','jpeg','webp'].includes(ext || '')) { setError('Choose a PDF, DOCX, PowerPoint, Excel, text, Markdown, CSV or a PNG, JPEG or WebP image.'); return; }
     setSelectedFile(file); setTitle(file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')); setError('');
   };
   const upload = async () => {
     if (!selectedFile || !title.trim()) { setError('Add a title and choose a file to continue.'); return; }
     try {
       setUploading(true); setError('');
-      const contentType = selectedFile.type || (selectedFile.name.endsWith('.txt') ? 'text/plain' : selectedFile.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      const signed = await requestUrl.mutateAsync({ data: { name: selectedFile.name, size: selectedFile.size, contentType } });
+      const mime: Record<string,string> = {txt:'text/plain',md:'text/markdown',csv:'text/csv',pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp'};
+      const contentType = mime[selectedFile.name.split('.').pop()?.toLowerCase()??''] || selectedFile.type;
+      const signed = await requestUrl.mutateAsync({ data: { name: selectedFile.name, size: selectedFile.size, contentType, allowAiReading } });
       const put = await fetch(signed.uploadURL, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedFile });
       if (!put.ok) throw new Error('The file could not be uploaded. Please try again.');
       await createMaterial.mutateAsync({ data: { title: title.trim(), objectPath: signed.objectPath } });
@@ -364,10 +370,11 @@ function MaterialsPage() {
       <div className="upload-form-grid">
         <label className="field-label">Give it a name<input className="text-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 4 · Cell biology" data-testid="input-material-title" /></label>
         <div className="field-label">Choose a file<label className={`file-drop ${selectedFile ? 'has-file' : ''}`} htmlFor="material-file">
-          <input id="material-file" ref={fileRef} type="file" accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onSelect} data-testid="input-material-file" />
-          <span className="file-drop-icon">{selectedFile ? <FileText size={21} /> : <FileUp size={21} />}</span><span><strong>{selectedFile?.name || 'Choose a document'}</strong><small>{selectedFile ? formatBytes(selectedFile.size) : 'PDF, DOCX, or TXT · up to 30 MB'}</small></span><span className="choose-file">{selectedFile ? 'Change' : 'Browse'}</span>
+          <input id="material-file" ref={fileRef} type="file" accept=".txt,.md,.csv,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.webp" onChange={onSelect} data-testid="input-material-file" />
+          <span className="file-drop-icon">{selectedFile ? <FileText size={21} /> : <FileUp size={21} />}</span><span><strong>{selectedFile?.name || 'Choose a document'}</strong><small>{selectedFile ? formatBytes(selectedFile.size) : 'Documents, slides, spreadsheets or photos · up to 30 MB'}</small></span><span className="choose-file">{selectedFile ? 'Change' : 'Browse'}</span>
         </label></div>
       </div>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={allowAiReading} onChange={e=>setAllowAiReading(e.target.checked)}/><span>Read scanned pages and images with AI. These pages are sent to our AI provider. Only share learning material you have permission to send; leave out personal records.</span></label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="upload-actions"><span className="privacy-hint"><Check size={14} /> Only you can access your materials</span><button className="button button-primary" disabled={busy || !selectedFile || !title.trim()} onClick={upload} data-testid="button-upload-save">{busy ? <><LoaderCircle className="spin" size={17} /> Uploading…</> : <>Upload material <ArrowRight size={16} /></>}</button></div>
     </section>}
@@ -428,7 +435,7 @@ function MaterialConfigurePage() {
         <div className="choice-row option-choices">{([4, 6] as const).map((n) => <button key={n} className={`option-button ${options === n ? 'selected' : ''}`} onClick={() => setOptions(n)} data-testid={`button-options-${n}`}><span className="option-dots">{Array.from({ length: n }, (_, i) => <i key={i} />)}</span><strong>{n} options</strong>{options === n && <Check size={15} />}</button>)}</div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-primary generate-button" onClick={create} disabled={generateQuiz.isPending} data-testid="button-generate-quiz">{generateQuiz.isPending ? <><LoaderCircle className="spin" size={17} /> Building your test…</> : <>Create practice test <ArrowRight size={17} /></>}</button>
-         <p className="generate-foot"><Sparkles size={13} /> Generating a test sends extracted text to OpenAI; your original file stays in your private library.</p>
+         <p className="generate-foot"><Sparkles size={13} /> Creating a test sends selected source text to our AI provider. Long documents are covered in sections. Your original file stays in your private library.</p>
       </section>
     </div>
   </div>;

@@ -86,7 +86,7 @@ async function upsertUser(claims: Record<string, unknown>) {
 // Its verifier is supplied as a salted scrypt hash via Railway secrets, never source code.
 const failures = new Map<string,{count:number;until:number}>();
 router.post('/test-login', async (req:Request,res:Response) => {
- if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return;}
+ if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'){res.sendStatus(404);return;}
  const key=req.ip??'unknown';const rate=failures.get(key);
  if(rate&&rate.count>=6&&rate.until>Date.now()){res.status(429).json({error:'Too many attempts; try again later'});return;}
  const username=typeof req.body?.username==='string'?req.body.username:'';
@@ -107,7 +107,7 @@ router.post('/test-login', async (req:Request,res:Response) => {
  setSessionCookie(res,sid);res.json({ok:true});
 });
 router.post('/test-logout',async(req:Request,res:Response)=>{
- if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return;}
+ if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'){res.sendStatus(404);return;}
  await clearSession(res,getSessionId(req));res.json({ok:true});
 });
 router.get('/auth/user', (req: Request, res: Response) => {

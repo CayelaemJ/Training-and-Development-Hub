@@ -6,10 +6,10 @@ import {isPlatformSuperadmin} from "../lib/portalAccess";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 const profile=z.object({
  institutionType:z.enum(["preprimary","primary","highschool","combined","special","independent","tvet","university","training"]),
- province:z.enum(["Eastern Cape","Free State","Gauteng","KwaZulu-Natal","Limpopo","Mpumalanga","North West","Northern Cape","Western Cape"]),
+ province:z.string().trim().min(2).max(60),
  district:z.string().trim().min(2).max(120),circuit:z.string().trim().max(120).default(""),
  officialReference:z.string().trim().max(100).default(""),
- curriculum:z.enum(["CAPS","IEB","Montessori","Cambridge","CUSTOM","UNIVERSITY","TVET"]),
+ curriculum:z.string().trim().min(2).max(40),
  language:z.string().trim().min(2).max(40).default("English"),
  academicYear:z.number().int().min(2020).max(2200),
  status:z.enum(["draft","submitted"]).default("draft")

@@ -5,7 +5,7 @@ const demoSource = "Photosynthesis is the process by which green plants convert 
 
 /** One-shot synthetic exam-generation + AI-marking smoke test; testing only, no real learner data. */
 export async function groqSmokeTest(): Promise<void> {
-  if (process.env.RAILWAY_ENVIRONMENT_NAME !== "testing" || process.env.CABO_GROQ_SMOKE_TEST !== "true") return;
+  if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) !== "testing" || process.env.CABO_GROQ_SMOKE_TEST !== "true") return;
   if (!hasAiProvider()) {
     logger.error("CABO AI workflow smoke FAILED: no provider configured");
     return;

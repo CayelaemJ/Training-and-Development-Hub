@@ -37,12 +37,13 @@ export const GetCurrentAuthUserResponse = zod.object({
 
 
 
-
+export const requestUploadUrlBodyAllowAiReadingDefault = false;
 
 export const RequestUploadUrlBody = zod.object({
   "name": zod.string().min(1),
   "size": zod.number().int().min(1),
-  "contentType": zod.string().min(1)
+  "contentType": zod.string().min(1),
+  "allowAiReading": zod.boolean().default(requestUploadUrlBodyAllowAiReadingDefault).describe('Explicit permission to send scanned learning pages or photos to the configured OCR provider.')
 })
 
 export const RequestUploadUrlResponse = zod.object({

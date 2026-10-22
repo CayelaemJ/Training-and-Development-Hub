@@ -8,7 +8,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.11.1",
     "@types/node": "catalog:",
+    "playwright": "1.62.1",
     "tsx": "catalog:"
   }
 }

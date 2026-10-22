@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-21",
+  "environment": "local production SPA, synthetic API fixtures",
+  "browser": "Chromium 153 via pinned Playwright 1.62.1",
+  "result": "PASS",
+  "checks": [
+    "learner help form and detail",
+    "labelled guidance fallback",
+    "Learning DNA",
+    "passport pagination and JSON download",
+    "390px horizontal overflow",
+    "school-scoped accountability switching",
+    "framework revision preserves current settings",
+    "no browser runtime errors"
+  ],
+  "axeRules": [
+    "button-name",
+    "select-name",
+    "label",
+    "color-contrast",
+    "aria-valid-attr-value",
+    "image-alt"
+  ],
+  "limitations": [
+    "selected axe rules on DNA view only",
+    "not real password login",
+    "not live AI",
+    "not national load or production acceptance"
+  ]
+}
