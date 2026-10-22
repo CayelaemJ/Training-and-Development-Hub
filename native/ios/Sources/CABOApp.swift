@@ -10,7 +10,7 @@ private enum CABO {
     static func permits(_ url: URL) -> Bool {
         guard url.scheme == "https", let host = url.host?.lowercased() else { return false }
         return host == home.host || host == "replit.com" ||
-            host.hasSuffix(".replit.com") || host == "accounts.google.com"
+            host == "www.replit.com" || host == "accounts.google.com"
     }
 }
 
