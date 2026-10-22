@@ -12,7 +12,21 @@ import java.security.SecureRandom
 import android.util.Base64
 
 internal data class NativePortal(val role: String, val summary: List<String>, val areas: List<String>)
-internal data class NativeLearning(val portal: NativePortal, val materials: List<String>, val quizzes: List<String>)
+internal data class GuardianInvite(
+    val id: Int, val status: String, val learnerName: String?, val verified: Boolean
+)
+internal data class StaffWorkspace(
+    val organizationId: Int, val courses: List<String>, val supportSummary: List<String>, val notice: String?
+)
+internal data class NativeLearning(
+    val portal: NativePortal,
+    val materials: List<String>,
+    val quizzes: List<String>,
+    val guardians: List<GuardianInvite> = emptyList(),
+    val parentGuidance: String = "",
+    val staff: List<StaffWorkspace> = emptyList(),
+    val journey: List<String> = emptyList()
+)
 
 internal class NativeApi(private val context: Context) {
     private val secrets = NativeSecrets(context)
@@ -114,30 +128,103 @@ internal class NativeApi(private val context: Context) {
     }
     suspend fun dashboard(): NativeLearning = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val json = request("/api/portal/me", auth = true)
+        val role = json.optString("role", "learner")
         val summary = json.optJSONObject("summary")?.let { obj ->
             obj.keys().asSequence().map { key -> "$key: ${obj.optInt(key)}" }.toList()
         } ?: emptyList()
         val cards = json.optJSONArray("cards")?.let { arr ->
             (0 until arr.length()).mapNotNull { index -> arr.optJSONObject(index)?.optString("label") }
         } ?: emptyList()
+        val orgIds = json.optJSONArray("organizationIds")?.let { arr ->
+            (0 until arr.length()).mapNotNull { i -> arr.optInt(i).takeIf { it > 0 } }.distinct().take(12)
+        } ?: emptyList()
+
+        // Role is resolved by CABO on the server. Device size is presentation
+        // only, never a permission to access another person's information.
+        if (role == "parent") {
+            val response = request("/api/native/mobile/parent", auth = true)
+            val arr = response.optJSONArray("relationships") ?: JSONArray()
+            val relationships = (0 until arr.length()).mapNotNull { i ->
+                val item = arr.optJSONObject(i) ?: return@mapNotNull null
+                GuardianInvite(item.optInt("invitationId"), item.optString("status"),
+                    item.optString("learnerName").takeUnless { it.isBlank() || it == "null" },
+                    item.optBoolean("verifiedForRead"))
+            }
+            return@withContext NativeLearning(
+                NativePortal(role, summary, cards), emptyList(), emptyList(),
+                guardians = relationships,
+                parentGuidance = response.optString("guidance")
+            )
+        }
+
+        if (role in listOf("teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head")) {
+            val workspace = orgIds.map { orgId ->
+                try {
+                    val response = request("/api/organizations/$orgId/support/options", auth = true)
+                    val courses = response.optJSONArray("courses") ?: JSONArray()
+                    val courseNames = (0 until courses.length()).mapNotNull { i ->
+                        courses.optJSONObject(i)?.optString("name")?.takeIf { it.isNotBlank() }
+                    }
+                    val stats = try {
+                        val obj = request("/api/organizations/$orgId/support/accountability", auth = true)
+                            .optJSONObject("summary")
+                        obj?.keys()?.asSequence()?.map { key -> "$key: ${obj.optInt(key)}" }?.toList()
+                            ?: emptyList()
+                    } catch (error: Exception) {
+                        if (!hasSession()) throw error
+                        emptyList()
+                    }
+                    StaffWorkspace(orgId, courseNames, stats, null)
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    StaffWorkspace(orgId, emptyList(), emptyList(),
+                        "School support data is unavailable. This may not be enabled for your institution.")
+                }
+            }
+            return@withContext NativeLearning(
+                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace
+            )
+        }
+
         val materials = try {
             getArray("/api/materials").let { arr ->
-                (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("title") }.take(8)
-            }
-        } catch (error: Exception) {
-            if (!hasSession()) throw error // A 401 revoked the native session.
-            emptyList()
-        } // Other material-service outages do not hide the role dashboard.
-        val quizzes = try {
-            getArray("/api/quizzes").let { arr ->
-                (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("title") }.take(8)
+                (0 until arr.length()).mapNotNull { i ->
+                    arr.optJSONObject(i)?.optString("title")?.takeIf { it.isNotBlank() }
+                }.take(30)
             }
         } catch (error: Exception) {
             if (!hasSession()) throw error
             emptyList()
         }
-        NativeLearning(NativePortal(json.optString("role", "learner"), summary, cards), materials, quizzes)
+        val quizzes = try {
+            getArray("/api/quizzes").let { arr ->
+                (0 until arr.length()).mapNotNull { i ->
+                    arr.optJSONObject(i)?.optString("title")?.takeIf { it.isNotBlank() }
+                }.take(30)
+            }
+        } catch (error: Exception) {
+            if (!hasSession()) throw error
+            emptyList()
+        }
+        val journey = try {
+            val obj = request("/api/learner-journey/me", auth = true)
+            val stages = obj.optJSONArray("journeys") ?: JSONArray()
+            val milestones = obj.optJSONArray("milestones") ?: JSONArray()
+            listOf("Learning stages: ${stages.length()}", "Milestones: ${milestones.length()}")
+        } catch (error: Exception) {
+            if (!hasSession()) throw error
+            emptyList()
+        }
+        NativeLearning(NativePortal(role, summary, cards), materials, quizzes, journey = journey)
     }
+
+    suspend fun respondToGuardianInvite(invitationId: Int, accept: Boolean): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(invitationId > 0)
+            request("/api/guardian-relationships/$invitationId/decision",
+                JSONObject().put("decision", if (accept) "accepted" else "declined"), auth = true)
+        }
+
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
             val token = secrets.get("token")
