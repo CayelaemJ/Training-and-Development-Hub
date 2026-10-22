@@ -155,6 +155,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             workspaces = (decoded["cards"] as? [[String: Any]] ?? []).compactMap { $0["label"] as? String }
             materials = (try? JSONDecoder().decode([NativeResource].self, from: await request("api/materials")))?.prefix(8).map(\.title) ?? []
             quizzes = (try? JSONDecoder().decode([NativeResource].self, from: await request("api/quizzes")))?.prefix(8).map(\.title) ?? []
+            // A nested request may have invalidated the token; never display
+            // an authenticated screen after a 401 from materials or quizzes.
+            if keychainToken() == nil { throw NSError(domain: "CABO", code: 401) }
             status = "Connected securely to CABO"
         } catch {
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []
