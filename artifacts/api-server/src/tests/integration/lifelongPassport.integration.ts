@@ -27,7 +27,8 @@ async function call(user:string,route:string,method="GET",body?:unknown){
  const response=await fetch(base+route,{method,headers:{
   "x-test-user":user,"Content-Type":"application/json"
  },...(body!==undefined?{body:JSON.stringify(body)}:{})});
- return {status:response.status,data:await response.json().catch(()=>null),cacheControl:response.headers.get("cache-control")};
+ const data: any = await response.json().catch(()=>null);
+ return {status:response.status,data,cacheControl:response.headers.get("cache-control")};
 }
 try{
  assert.equal((await call("","/learning-passport/me")).status,401);
