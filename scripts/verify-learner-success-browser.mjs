@@ -15,6 +15,7 @@ const browser = await chromium.launch({
 });
 const base = process.env.CABO_UI_TEST_URL ?? "http://127.0.0.1:5180";
 let created = false;
+let testDeleted = false;
 let teacher = false;
 let savedFramework;
 let uploadConsent;
@@ -41,6 +42,15 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.route("**/api/**", async (route) => {
   const path = new URL(route.request().url()).pathname;
   let data;
+  if (path === '/api/quizzes/99' && route.request().method() === 'DELETE') {
+    testDeleted = true;
+    await route.fulfill({ status: 204 });
+    return;
+  }
+  if (path === '/api/quizzes') {
+    await route.fulfill({status: 200, contentType:'application/json', body: JSON.stringify(testDeleted ? [] : [{id:99,title:'Deletion fixture',materialId:1,materialTitle:'Fractions',questionCount:10,optionCount:4,difficulty:'beginner',latestScore:null,createdAt:'2026-10-21T12:00:00Z'}])});
+    return;
+  }
   if (path === "/api/storage/uploads/request-url") {
     uploadConsent = route.request().postDataJSON().allowAiReading;
     await route.fulfill({
@@ -309,9 +319,17 @@ try {
     ),
   );
   assert.ok(!(await page.getByRole("alert").innerText()).includes("HTTP 400"));
+  await page.goto(base + '/quizzes');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByTestId('button-delete-quiz-99').click();
+  assert.equal(testDeleted, false);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByTestId('button-delete-quiz-99').click();
+  await page.getByText('No practice tests yet', {exact:true}).waitFor();
+  assert.equal(testDeleted, true);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: learner help form, queue/detail, guidance fallback, Learning DNA, passport download, 390px mobile layout, paginated passport history, school-scoped accountability, preserved framework revisions, six axe accessibility rules, upload consent and friendly errors with retained input, no browser runtime errors. API fixtures are synthetic.",
+    "PASS: learner help form, queue/detail, guidance fallback, Learning DNA, passport download, 390px mobile layout, paginated passport history, school-scoped accountability, preserved framework revisions, six axe accessibility rules, upload consent and friendly errors with retained input, test deletion cancellation and confirmation, no browser runtime errors. API fixtures are synthetic.",
   );
 } catch (error) {
   console.error((await page.locator("body").innerText()).slice(-6000));

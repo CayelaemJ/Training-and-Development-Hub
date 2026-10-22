@@ -1,5 +1,8 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
+import { createProviderScheduler, ProviderQuotaError } from "./providerQuota";
+const providerSchedulers = { groq: createProviderScheduler(), openai: createProviderScheduler() };
+
 import { aiFailureAction } from "./aiRetryPolicy";
 
 type AiProvider = "groq" | "openai";
@@ -82,7 +85,8 @@ export async function completeAIJson<T>(args: {
   validate: (value: unknown) => T;
   maxCompletionTokens?: number;
 }): Promise<{ value: T; modelId: string }> {
-  const deadline=Date.now()+45000;
+  const deadline=Date.now()+180000;
+  let quotaError: ProviderQuotaError | undefined;
   const providers = await configuredProviders();
   if (!providers.length) throw new AiUnavailableError();
   providers: for (const provider of providers) {
@@ -91,7 +95,7 @@ export async function completeAIJson<T>(args: {
         const remaining=deadline-Date.now();
         if(remaining<=0)throw new AiUnavailableError();
         try {
-          const response = await provider.client.chat.completions.create({
+          const response = await providerSchedulers[provider.name](() => provider.client.chat.completions.create({
             model,
             messages: [
               { role: "system", content: args.system + " Return exactly one valid JSON object. No markdown and no extra text." },
@@ -100,13 +104,14 @@ export async function completeAIJson<T>(args: {
             ...(jsonMode ? { response_format: { type: "json_object" as const } } : {}),
             ...(provider.name === "groq" && model.startsWith("openai/gpt-oss-") ? { reasoning_effort: "low" as const } : {}),
             max_completion_tokens: args.maxCompletionTokens ?? 3500,
-          },{timeout:Math.min(15000,remaining),signal:AbortSignal.timeout(remaining)});
+          },{timeout:Math.min(25000,Math.max(1,deadline-Date.now())),signal:AbortSignal.timeout(Math.max(1,deadline-Date.now()))}), deadline);
           const body = response.choices[0]?.message?.content;
           if (!body) throw new Error("Empty completion");
           const parsed = args.validate(jsonFromAnswer(body));
           logger.info({ provider: provider.name, model }, "CABO AI completion validated");
           return { value: parsed, modelId: model };
         } catch (error) {
+          if (error instanceof ProviderQuotaError) { quotaError = error; continue providers; }
           const err = error as { status?: number; code?: string; name?: string };
           // Retrying without JSON mode is useful for models that do not implement response_format.
           logger.warn({ provider: provider.name, model, jsonMode, status: err.status ?? null, code: err.code ?? null, type: err.name ?? "Error" }, "CABO AI candidate did not return valid output");
@@ -117,5 +122,5 @@ export async function completeAIJson<T>(args: {
       }
     }
   }
-  throw new AiUnavailableError();
+  throw quotaError ?? new AiUnavailableError();
 }

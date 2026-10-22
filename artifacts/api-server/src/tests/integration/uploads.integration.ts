@@ -15,6 +15,7 @@ await engine.exec(`CREATE TABLE upload_intents(object_path text PRIMARY KEY,user
 CREATE TABLE study_materials(id serial PRIMARY KEY,user_id varchar,title varchar,file_name varchar,content_type varchar,size_bytes integer,object_path text UNIQUE,character_count integer,created_at timestamptz DEFAULT now());
 CREATE TABLE material_upload_blobs(object_path text PRIMARY KEY,user_id varchar,bytes bytea,created_at timestamptz DEFAULT now());
 CREATE TABLE training_quizzes(id serial PRIMARY KEY,user_id varchar,material_id integer,title varchar,difficulty varchar,question_count integer,option_count integer,model_id varchar,prompt_version varchar,questions jsonb,created_at timestamptz DEFAULT now());
+CREATE TABLE quiz_attempts(id serial PRIMARY KEY,quiz_id integer REFERENCES training_quizzes(id) ON DELETE CASCADE,user_id varchar);
 CREATE TABLE written_exams(id serial PRIMARY KEY,user_id varchar,material_id integer,title varchar,difficulty varchar,questions jsonb,model_id varchar,created_at timestamptz DEFAULT now());`);
 const migration = await readFile(
   "lib/db/migrations/20261021_material_reading.sql",
@@ -196,6 +197,13 @@ try {
   assert.equal(result.length, 30);
   assert.ok(batches.every((n) => n <= 5));
   // Reproduce the pre-cache Railway schema and prove the default-off path still works.
+  assert.equal((await call('', '/quizzes/1', undefined, 'DELETE')).status, 401);
+  assert.equal((await call('b', '/quizzes/1', undefined, 'DELETE')).status, 404);
+  await engine.exec("INSERT INTO quiz_attempts(quiz_id,user_id) VALUES(1,'a')");
+  assert.equal((await call('a', '/quizzes/1', undefined, 'DELETE')).status, 204);
+  assert.equal((await engine.query('SELECT * FROM quiz_attempts')).rows.length, 0);
+  assert.equal((await engine.query('SELECT id FROM study_materials WHERE id=1')).rows.length, 1);
+  assert.equal((await call('a', '/quizzes/1', undefined, 'DELETE')).status, 404);
   process.env.ENABLE_MATERIAL_READING='false';
   await engine.exec('ALTER TABLE study_materials DROP COLUMN extracted_text; ALTER TABLE study_materials DROP COLUMN allow_ai_reading; ALTER TABLE upload_intents DROP COLUMN allow_ai_reading;');
   const legacy=await call('a','/materials/1/quizzes',{questionCount:3,optionCount:4,difficulty:'beginner'});assert.equal(legacy.status,201,JSON.stringify(legacy.data));

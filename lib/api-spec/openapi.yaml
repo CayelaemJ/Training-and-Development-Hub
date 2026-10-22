@@ -180,6 +180,24 @@ paths:
                 items:
                   $ref: "#/components/schemas/QuizSummary"
   /quizzes/{id}:
+    delete:
+      operationId: deleteQuiz
+      tags: [training]
+      summary: Delete your own practice test and its attempts; keep the source material
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: Test deleted
+        "401":
+          description: Sign in required
+        "404":
+          description: Test not found or belongs to another account
     get:
       operationId: getQuiz
       tags: [training]
@@ -350,7 +368,7 @@ components:
         questionCount:
           type: integer
           minimum: 1
-          maximum: 30
+          maximum: 2147483647
         difficulty:
           type: string
           enum: [beginner, intermediate, advanced]
