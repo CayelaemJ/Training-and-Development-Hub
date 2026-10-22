@@ -16,7 +16,8 @@ test("native auth is disabled unless explicitly opted in", () => {
 });
 test("only fixed native Android redirect is registered", () => {
   assert.equal(nativeRedirect("cabo-android"), "cabo-learninghub-android://auth");
-  for(const id of ["web", "cabo-ios", "cabo-windows", "https://evil.test", "", null])
+  assert.equal(nativeRedirect("cabo-ios"), "cabo-learninghub-ios://auth");
+  for(const id of ["web", "cabo-windows", "https://evil.test", "", null])
     assert.equal(nativeRedirect(id), null);
 });
 test("PKCE RFC7636 S256 validates exact verifier and challenge", () => {
