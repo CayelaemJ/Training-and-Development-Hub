@@ -171,7 +171,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var request = URLRequest(url: origin.appendingPathComponent("api/native/logout"))
             request.httpMethod = "POST"
             request.timeoutInterval = 6
-            request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             _ = try? await URLSession.shared.data(for: request)
         }
         clearToken()
