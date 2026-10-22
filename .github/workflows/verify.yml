@@ -25,4 +25,6 @@ jobs:
       - name: Install browser runtime
         run: pnpm --filter @workspace/scripts exec playwright install --with-deps chromium
       - name: Browser and mobile release checks
-        run: node scripts/run-learner-success-browser.mjs
+        run: |
+          node scripts/run-learner-success-browser.mjs
+          node scripts/run-learner-success-browser.mjs --pwa

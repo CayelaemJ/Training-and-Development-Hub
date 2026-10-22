@@ -1,3 +1,4 @@
+import InstallPage from '@/pages/install';
 import LearnerSuccessPage from "@/pages/learner-success";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
@@ -116,6 +117,7 @@ function SignedOutConfirmation() {
 
 function AuthGate() {
   const auth = useAuth();
+  if (window.location.pathname === '/install') return <InstallPage />;
   if (auth.isLoading) return <BusyScreen />;
   if (auth.isAuthenticated) return <AppShell user={auth.user} />;
   if (window.location.pathname === '/signed-out') return <SignedOutConfirmation />;
@@ -191,6 +193,7 @@ function AppShell({ user }: { user: any }) {
       <Link href="/" className="brand"><Mark /><span>Training & Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
+        <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
         {navItems.filter(item=>portalRole!==null&&allowedNav[portalRole]?.includes(item.href)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">

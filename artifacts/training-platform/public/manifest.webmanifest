@@ -1,9 +1,9 @@
 {
   "id": "/",
-  "name": "CABO Training & Development Hub",
+  "name": "CABO Learning Hub",
   "short_name": "CABO Hub",
-  "description": "CABO school, university and workplace training portal",
-  "start_url": "/",
+  "description": "Your CABO learning and school workspace, on your phone or computer.",
+  "start_url": "/?source=installed",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0d1117",
@@ -27,6 +27,25 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "lang": "en",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Study materials",
+      "url": "/materials"
+    },
+    {
+      "name": "Practice tests",
+      "url": "/quizzes"
+    },
+    {
+      "name": "Learner Success Loop",
+      "url": "/learner-success"
     }
   ]
 }

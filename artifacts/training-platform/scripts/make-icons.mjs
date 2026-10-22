@@ -9,15 +9,14 @@ function crc32(bytes){let c=0xffffffff;for(const v of bytes)c=table[(c^v)&255]^(
 function chunk(type,data){const name=Buffer.from(type);const len=Buffer.alloc(4);len.writeUInt32BE(data.length);const crc=Buffer.alloc(4);crc.writeUInt32BE(crc32(Buffer.concat([name,data])));return Buffer.concat([len,name,data,crc]);}
 function create(size){
   const bytes=Buffer.alloc(size*(1+size*4));
-  const centre=size/2;
   for(let y=0;y<size;y++){
     const row=y*(1+size*4);
     for(let x=0;x<size;x++){
       const offset=row+1+x*4;
-      const radius=Math.hypot(x-centre,y-centre);
-      const theta=Math.atan2(y-centre,x-centre);
-      const c=radius>size*.19 && radius<size*.32 && Math.abs(theta)>0.47 && Math.abs(theta)<2*Math.PI-0.47;
-      const stripe=y>size*.77 && y<size*.80 && x>size*.23 && x<size*.77;
+      // Match the existing CABO favicon geometry, with safe maskable padding.
+      const px=x*64/size, py=y*64/size;
+      const c=(px>=17 && px<48 && py>=18 && py<26) || (px>=17 && px<26 && py>=26 && py<38) || (px>=17 && px<48 && py>=38 && py<46);
+      const stripe=px>=17 && px<48 && py>=48.5 && py<51.5;
       const rgb=c?[196,103,58]:stripe?[201,168,76]:[13,17,23];
       bytes[offset]=rgb[0];bytes[offset+1]=rgb[1];bytes[offset+2]=rgb[2];bytes[offset+3]=255;
     }
@@ -25,4 +24,4 @@ function create(size){
   const header=Buffer.alloc(13);header.writeUInt32BE(size,0);header.writeUInt32BE(size,4);header[8]=8;header[9]=6;
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(bytes)),chunk('IEND',Buffer.alloc(0))]);
 }
-for(const size of [192,512]) writeFileSync(join(out.pathname,`cabo-${size}.png`),create(size));
+for(const size of [180,192,512]) writeFileSync(join(out.pathname,`cabo-${size}.png`),create(size));
