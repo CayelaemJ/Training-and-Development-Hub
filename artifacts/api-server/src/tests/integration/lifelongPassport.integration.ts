@@ -4,13 +4,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import express from "express";
 import passportRouter from "../../routes/lifelongPassport";
+import trustRouter from "../../routes/passportTrustRoutes";
 import { engine } from "./supportTestDb";
 
 await engine.exec("CREATE TABLE users(id varchar PRIMARY KEY)");
+await engine.exec("CREATE TABLE organizations(id integer PRIMARY KEY,name varchar,owner_id varchar REFERENCES users(id)); CREATE TABLE organization_members(organization_id integer REFERENCES organizations(id),user_id varchar REFERENCES users(id),role varchar,PRIMARY KEY(organization_id,user_id));");
 const migration=await readFile("lib/db/migrations/20261022_lifelong_passport_foundation.sql","utf8");
 await engine.exec(migration);
 await engine.exec(migration); // schema replay must remain safe
-await engine.exec("INSERT INTO users(id) VALUES ('adult-a'),('learner-b')");
+const trustMigration=await readFile("lib/db/migrations/20261022_passport_trust_layers.sql","utf8");
+await engine.exec(trustMigration);
+await engine.exec(trustMigration);
+await engine.exec("INSERT INTO users(id) VALUES ('adult-a'),('learner-b'),('assessor-x'),('teacher-x'),('outside-x'),('assessor-y')");
+await engine.exec("INSERT INTO organizations(id,name,owner_id) VALUES(1,'Example Learning Institution','assessor-x'),(2,'Other Institution','assessor-y'); INSERT INTO organization_members(organization_id,user_id,role) VALUES (1,'adult-a','learner'),(1,'assessor-x','assessor'),(1,'teacher-x','teacher'),(2,'learner-b','learner'),(2,'assessor-y','assessor');");
 
 const app=express();
 app.use(express.json());
@@ -19,7 +25,7 @@ app.use((req,_res,next)=>{
  req.isAuthenticated=(()=>!!req.user) as any;
  next();
 });
-app.use("/api",passportRouter);
+app.use("/api",passportRouter,trustRouter);
 const server=app.listen(0,"127.0.0.1");
 await new Promise<void>(resolve=>server.once("listening",resolve));
 const base="http://127.0.0.1:"+(server.address() as {port:number}).port+"/api";
@@ -96,6 +102,76 @@ try{
  assert.equal((await call("adult-a","/learning-passport/competencies/"+createdSkill.data.id,"DELETE")).status,204);
  assert.equal((await call("adult-a","/learning-passport/me")).data.competencies.length,0);
  assert.equal((await call("learner-b","/learning-passport/me")).data.competencies.length,1);
+ 
+ // Distinct layer 2: the server, never a client-submitted verification, authors AI reflections.
+ const none=await call("adult-a","/learning-passport/trust-layers/me");
+ assert.equal(none.status,200);
+ assert.match(none.cacheControl??"",/no-store/);
+ assert.deepEqual(none.data.aiInterpretations,[]);
+ assert.deepEqual(none.data.achievementReviews,[]);
+ assert.equal((await call("learner-b","/learning-passport/competencies/"+selfReported.data.id+"/interpret","POST")).status,201);
+ assert.equal((await call("adult-a","/learning-passport/competencies/"+selfReported.data.id+"/interpret","POST")).status,404);
+ const ai=(await call("learner-b","/learning-passport/trust-layers/me")).data.aiInterpretations;
+ assert.equal(ai.length,1);
+ assert.equal(ai[0].layer,"ai_interpretation");
+ assert.equal(ai[0].reviewState,"unreviewed");
+ assert.equal(ai[0].modelId,"synthetic-test-model");
+ assert.match(ai[0].disclosure,/not evidence/i);
+ assert.equal((await call("learner-b","/learning-passport/competencies/"+selfReported.data.id+"/interpret","POST")).status,200);
+ assert.equal((await call("adult-a","/learning-passport/interpretations/"+ai[0].id+"/review","PATCH",{reviewState:"noted"})).status,404);
+ assert.equal((await call("learner-b","/learning-passport/interpretations/"+ai[0].id+"/review","PATCH",{reviewState:"verified"})).status,400);
+ assert.equal((await call("learner-b","/learning-passport/interpretations/"+ai[0].id+"/review","PATCH",{reviewState:"disputed"})).status,200);
+ assert.equal((await call("learner-b","/learning-passport/trust-layers/me")).data.aiInterpretations[0].reviewState,"disputed");
+
+ // Distinct layer 3: a learner submits only a named practical item to one institution.
+ assert.equal((await call("","/learning-passport/achievements/requests","POST",{})).status,401);
+ assert.equal((await call("learner-b","/learning-passport/achievements/requests","POST",
+ {organizationId:1,competencyId:selfReported.data.id})).status,403);
+ assert.equal((await call("adult-a","/learning-passport/achievements/requests","POST",
+ {organizationId:1,competencyId:selfReported.data.id})).status,404);
+ const request=await call("learner-b","/learning-passport/achievements/requests","POST",
+ {organizationId:2,competencyId:selfReported.data.id,status:"verified",reviewerId:"learner-b"});
+ assert.equal(request.status,201,JSON.stringify(request.data));
+ assert.equal(request.data.status,"pending");
+ assert.equal(request.data.reviewerId,null);
+ assert.equal((await call("learner-b","/learning-passport/achievements/requests","POST",
+ {organizationId:2,competencyId:selfReported.data.id})).status,409);
+
+ assert.equal((await call("learner-b","/organizations/2/passport/reviews")).status,403);
+ assert.equal((await call("outside-x","/organizations/2/passport/reviews")).status,403);
+ assert.equal((await call("assessor-x","/organizations/2/passport/reviews")).status,403);
+ assert.equal((await call("assessor-x","/organizations/2/passport/reviews/"+request.data.id+"/decision","POST",
+ {decision:"verified",reviewNote:"I separately evaluated the learner's practical example."})).status,403);
+ const queue=await call("assessor-y","/organizations/2/passport/reviews");
+ assert.equal(queue.status,200);
+ assert.equal(queue.data.length,1);
+ assert.equal(queue.data[0].userId,"learner-b");
+ assert.equal(queue.data[0].skill,"Practical circuit construction");
+ assert.equal(queue.data[0].learningGoal,undefined);
+ assert.equal((await call("assessor-y","/organizations/2/passport/reviews/"+request.data.id+"/decision","POST",
+ {decision:"verified",reviewNote:"Too short"})).status,400);
+ const approved=await call("assessor-y","/organizations/2/passport/reviews/"+request.data.id+"/decision","POST",
+ {decision:"verified",reviewNote:"I reviewed the evidence and observed the practical demonstration in person."});
+ assert.equal(approved.status,200,JSON.stringify(approved.data));
+ assert.equal(approved.data.status,"verified");
+ assert.equal(approved.data.reviewerId,"assessor-y");
+ assert.equal(approved.data.qualificationAccreditation,false);
+ assert.equal((await call("learner-b","/learning-passport/trust-layers/me")).data.achievementReviews[0].status,"verified");
+ assert.equal((await call("learner-b","/learning-passport/trust-layers/me")).data.aiInterpretations[0].reviewState,"disputed");
+ assert.equal((await call("assessor-y","/organizations/2/passport/reviews/"+request.data.id+"/decision","POST",
+ {decision:"verified",reviewNote:"Attempting duplicate verification is not allowed."})).status,409);
+ assert.equal((await call("adult-a","/learning-passport/achievements/"+request.data.id+"/withdraw","POST")).status,409);
+ const withdrawn=await call("learner-b","/learning-passport/achievements/"+request.data.id+"/withdraw","POST");
+ assert.equal(withdrawn.status,200);
+ assert.equal(withdrawn.data.status,"revoked");
+ assert.equal((await call("learner-b","/learning-passport/trust-layers/me")).data.achievementReviews[0].status,"revoked");
+ const audit=await engine.query("SELECT action,actor_id FROM passport_achievement_audit ORDER BY id");
+ assert.deepEqual(audit.rows.map((x:any)=>x.action),["requested","verified","revoked"]);
+ // Fail closed at the database level too: an AI/self-reported row cannot masquerade as human verified.
+ await assert.rejects(engine.exec("INSERT INTO passport_achievement_reviews(user_id,organization_id,competency_id,status) VALUES('learner-b',2,"+
+  selfReported.data.id+",'verified')"),/passport_human_verification_required|check constraint/i);
+ console.log("PASS: strict three-layer separation, opt-in AI and review, account isolation, institution authority, human audit and revocation.");
+
  console.log("PASS: schema replay, unauthenticated denial, adult preferences, private links, malformed URLs, owner isolation, cross-owner evidence denial, mastery boundaries and deletion.");
 }finally{
  server.close();

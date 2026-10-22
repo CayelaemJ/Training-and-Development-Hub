@@ -10,7 +10,9 @@ try{
   entryPoints:[path.join(root,"artifacts/api-server/src/tests/integration/lifelongPassport.integration.ts")],
   bundle:true,platform:"node",format:"esm",packages:"external",outfile,
   alias:{"@workspace/db":path.join(root,"artifacts/api-server/src/tests/integration/supportTestDb.ts")},
-  plugins:[{name:"database-schema-dependencies",setup(b){
+  plugins:[{name:"passport-ai-test-fixture",setup(b){
+   b.onResolve({filter:/aiCompletion$/},()=>({path:path.join(root,"artifacts/api-server/src/tests/integration/passportFakeAi.ts")}));
+  }},{name:"database-schema-dependencies",setup(b){
    b.onResolve({filter:/^drizzle-zod$/},()=>({
     path:path.join(root,"lib/db/node_modules/drizzle-zod/index.mjs"),external:true
    }));
