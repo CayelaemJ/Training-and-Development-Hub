@@ -394,6 +394,17 @@ internal class NativeApi(private val context: Context) {
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
     }
 
+    suspend fun sendEducatorReply(ticket: SupportTicket, text: String): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val body = text.trim()
+            require(ticket.organizationId > 0 && ticket.id > 0 && ticket.version > 0 &&
+                body.length in 2..4000)
+            request("/api/organizations/${ticket.organizationId}/support/${ticket.id}/actions",
+                JSONObject().put("version", ticket.version).put("action",
+                    JSONObject().put("kind", "reply").put("body", body)), auth = true)
+            Unit
+        }
+
     suspend fun fetchQuiz(id: Int): PracticeQuiz =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(id > 0)
