@@ -25,7 +25,9 @@ test("iOS exam obtains questions and stores only real backend feedback", () => {
   assert.match(ui, /submitted\.quizId == quiz\.id/);
   assert.match(ui, /attempt\.feedback/);
   assert.match(ui, /submissionStarted = true/);
-  assert.match(ui, /Do not submit again yet/);
+  assert.match(ui, /Check submission status/);
+  assert.match(ui, /session\.findSubmittedQuiz/);
+  assert.match(ui, /submissionUnconfirmed = true/);
   assert.doesNotMatch(ui, /WKWebView|webView/);
 });
 
