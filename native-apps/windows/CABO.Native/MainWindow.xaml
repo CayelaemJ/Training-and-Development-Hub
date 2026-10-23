@@ -22,6 +22,9 @@
    <TextBlock x:Name="RoleLabel" Text="Not signed in" FontSize="22" FontWeight="SemiBold"/>
    <TextBlock Text="Your current CABO account data" FontSize="18"/>
    <ListView x:Name="OverviewItems" MaxHeight="260"/>
+   <TextBlock Text="My academic report preview" FontSize="18" FontWeight="SemiBold"/>
+   <ListView x:Name="LearnerReportItems" MaxHeight="340"/>
+   <TextBlock Text="These are learner-only drafts based on published school data, not officially issued report cards." TextWrapping="Wrap"/>
    <TextBlock Text="Study materials" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="MaterialItems" MaxHeight="260" SelectionChanged="MaterialSelected"/>
    <StackPanel x:Name="MaterialPanel" Visibility="Collapsed" Spacing="12">
