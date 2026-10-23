@@ -30,6 +30,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var workspaces: [String] = []
     @Published var materials: [String] = []
     @Published var quizzes: [String] = []
+    @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var guardians: [GuardianInvitation] = []
     @Published var guardianGuidance = ""
     @Published var staffSchools: [StaffSchool] = []
@@ -180,6 +181,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextLearnerHelp: [String] = []
             var nextMaterials: [String] = []
             var nextQuizzes: [String] = []
+            var nextQuizSummaries: [NativeQuizSummary] = []
             var nextGuidance = ""
 
             if verifiedRole == "parent" {
@@ -234,8 +236,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             } else {
                 nextMaterials = (try? JSONDecoder().decode([NativeResource].self,
                     from: await request("api/materials")))?.prefix(30).map(\.title) ?? []
-                nextQuizzes = (try? JSONDecoder().decode([NativeResource].self,
-                    from: await request("api/quizzes")))?.prefix(30).map(\.title) ?? []
+                nextQuizSummaries = Array((try? JSONDecoder().decode([NativeQuizSummary].self,
+                    from: await request("api/quizzes")))?.prefix(30) ?? [])
+                nextQuizzes = nextQuizSummaries.map(\.title)
                 for org in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(3)) {
                     if let data = try? await request("api/organizations/\(org)/support"),
                        let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -265,14 +268,37 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             learnerHelp = Array(nextLearnerHelp.prefix(20))
             materials = nextMaterials
             quizzes = nextQuizzes
+            quizSummaries = nextQuizSummaries
             status = "Connected securely to CABO"
         } catch {
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; quizSummaries = []
             guardians = []; staffSchools = []; journey = []; learnerHelp = []; guardianGuidance = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
         }
+    }
+
+    // Source-of-truth practice assessment API. All results are returned by the server;
+    // no correct answers or fabricated grades are built into the app.
+    func loadQuiz(id: Int) async throws -> NativePracticeQuiz {
+        guard role != nil, id > 0 else { throw NSError(domain: "CABO", code: 401) }
+        let data = try await request("api/quizzes/\(id)")
+        return try JSONDecoder().decode(NativePracticeQuiz.self, from: data)
+    }
+
+    func submitQuiz(id: Int, answers: [Int]) async throws -> NativeQuizAttempt {
+        guard role != nil, id > 0, !answers.isEmpty, answers.allSatisfy({ $0 >= 0 }) else {
+            throw NSError(domain: "CABO", code: 400)
+        }
+        let payload = try JSONEncoder().encode(NativeQuizAnswers(answers: answers))
+        let data = try await request("api/quizzes/\(id)/attempts",
+                                     method: "POST", body: payload)
+        return try JSONDecoder().decode(NativeQuizAttempt.self, from: data)
+    }
+
+    private struct NativeQuizAnswers: Encodable {
+        let answers: [Int]
     }
 
     func decideGuardian(invitationId: Int, accept: Bool) async {
