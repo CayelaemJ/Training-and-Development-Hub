@@ -190,6 +190,49 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
+        title("School-verified progress")
+        if !session.guardianReportNotice.isEmpty {
+            Text(session.guardianReportNotice)
+                .font(.footnote).foregroundColor(.secondary)
+        }
+        if session.guardianReports.isEmpty {
+            infoTile("No verified reports", "School verification and active enrolment are required before marks or attendance can be viewed.", system: "lock.shield")
+        }
+        ForEach(session.guardianReports) { report in
+            VStack(alignment: .leading, spacing: 12) {
+                Text(report.learnerName).font(.title3.bold())
+                    .accessibilityAddTraits(.isHeader)
+                Text("\(report.grade) · \(report.year) · Draft progress")
+                    .font(.subheadline).foregroundColor(.secondary)
+                if let average = report.average {
+                    Label("Average \(average.formatted())%", systemImage: "chart.bar")
+                        .font(.headline)
+                }
+                if let rate = report.attendance.rate {
+                    Label("Attendance \(rate)% (\(report.attendance.presentDays) of \(report.attendance.recordedDays) recorded days)", systemImage: "calendar")
+                } else {
+                    Text("Attendance not recorded.").font(.subheadline)
+                }
+                Text("Subjects").font(.headline)
+                if report.subjects.isEmpty {
+                    Text("No published assessment marks yet.")
+                        .font(.subheadline).foregroundColor(.secondary)
+                }
+                ForEach(report.subjects) { subject in
+                    HStack {
+                        Text(subject.name)
+                        Spacer(minLength: 8)
+                        Text("\(subject.percentage.formatted())%").monospacedDigit()
+                    }
+                    .font(.subheadline)
+                }
+                Text("Not an officially issued report card.")
+                    .font(.footnote).foregroundColor(.secondary)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
     }
 
     @ViewBuilder
