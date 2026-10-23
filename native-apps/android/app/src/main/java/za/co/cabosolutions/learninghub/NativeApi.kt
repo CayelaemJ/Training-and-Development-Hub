@@ -56,7 +56,9 @@ internal data class NativeLearning(
     val learnerHelp: List<String> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
     val quizEntries: List<QuizSummary> = emptyList(),
-    val adminOrganizations: List<String> = emptyList()
+    val adminOrganizations: List<String> = emptyList(),
+    val learnerReports: List<LearnerAcademicReport> = emptyList(),
+    val learnerReportNotice: String = ""
 )
 
 internal class NativeApi(private val context: Context) {
