@@ -22,6 +22,9 @@ jobs:
       - name: Restore and compile WinUI 3 using Visual Studio MSBuild
         shell: pwsh
         run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -verbosity:minimal
+      - name: Compile isolated test-only Windows variant (no credentials)
+        shell: pwsh
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=true -verbosity:minimal
       - name: Validation boundary
         shell: pwsh
         run: Write-Output 'Build validation only; no signing, physical Windows lab run, MSIX, or native authentication verified.'
