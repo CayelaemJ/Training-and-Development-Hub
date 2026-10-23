@@ -271,7 +271,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             quizSummaries = nextQuizSummaries
             status = "Connected securely to CABO"
         } catch {
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; quizSummaries = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []
             guardians = []; staffSchools = []; journey = []; learnerHelp = []; guardianGuidance = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
