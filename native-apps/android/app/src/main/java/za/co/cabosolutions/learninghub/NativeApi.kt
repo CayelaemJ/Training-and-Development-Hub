@@ -330,6 +330,33 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
+        var learnerReportNotice = ""
+        val learnerReports = orgIds.take(5).mapNotNull { orgId ->
+            try {
+                val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                val response = request("/api/reports/me?organizationId=$orgId&year=$year", auth = true)
+                val attendance = response.optJSONObject("attendance") ?: JSONObject()
+                val subjects = response.optJSONArray("subjects") ?: JSONArray()
+                val rows = (0 until subjects.length()).mapNotNull { j ->
+                    val subj = subjects.optJSONObject(j) ?: return@mapNotNull null
+                    val name = subj.optString("name")
+                    if (name.isBlank()) null else GuardianSubject(
+                        name, subj.optDouble("percentage"), subj.optInt("assessmentCount")
+                    )
+                }
+                LearnerAcademicReport(
+                    orgId, response.optInt("year", year), response.optString("grade"),
+                    if (response.isNull("average")) null else response.optDouble("average"),
+                    rows,
+                    if (attendance.isNull("rate")) null else attendance.optInt("rate"),
+                    attendance.optInt("presentDays"), attendance.optInt("recordedDays")
+                )
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                learnerReportNotice = "Some academic reports could not be loaded."
+                null
+            }
+        }
         val journey = try {
             val obj = request("/api/learner-journey/me", auth = true)
             val stages = obj.optJSONArray("journeys") ?: JSONArray()
