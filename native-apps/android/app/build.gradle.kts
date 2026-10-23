@@ -12,7 +12,16 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "API_ORIGIN", "\"https://cabo-learning-hub-pilot.onrender.com\"")
+        // Test URL and login are compile-time settings, never downloaded from a web page.
+        val publicOrigin = "https://cabo-learning-hub-pilot.onrender.com"
+        val origin = providers.gradleProperty("caboApiOrigin").orNull ?: publicOrigin
+        require(Regex("^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?$").matches(origin)) {
+            "CABO Android API origin must be a trusted HTTPS host"
+        }
+        val pilot = providers.gradleProperty("caboEnableTestLogin").orNull == "true" &&
+            origin != publicOrigin
+        buildConfigField("String", "API_ORIGIN", "\"$origin\"")
+        buildConfigField("boolean", "ENABLE_TEST_LOGIN", pilot.toString())
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
