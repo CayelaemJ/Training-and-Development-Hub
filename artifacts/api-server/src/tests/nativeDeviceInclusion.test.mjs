@@ -42,3 +42,18 @@ test("private child names are guarded in native parent API projection", () => {
   assert.match(source, /activeLearnerIds\.has/);
   assert.match(source, /learnerName:\s*readAllowed/);
 });
+
+test("Windows uses native WinUI, loopback PKCE and DPAPI rather than a browser wrapper", () => {
+  const project = file("native-apps/windows/CABO.Native/CABO.Native.csproj");
+  const client = file("native-apps/windows/CABO.Native/NativeLearningService.cs");
+  const window = file("native-apps/windows/CABO.Native/MainWindow.xaml.cs");
+  assert.match(project, /<UseWinUI>true<\/UseWinUI>/);
+  assert.match(client, /IPAddress\.Loopback/);
+  assert.match(client, /code_challenge_method=S256/);
+  assert.match(client, /ProtectedData\.Protect/);
+  assert.match(client, /ProtectedData\.Unprotect/);
+  assert.match(client, /api\/portal\/me/);
+  assert.match(client, /api\/native\/logout/);
+  assert.match(window, /NativeLearningService/);
+  assert.doesNotMatch(client, /WebView2|WebView\s*\(/);
+});
