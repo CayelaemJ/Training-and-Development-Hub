@@ -34,6 +34,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var guardians: [GuardianInvitation] = []
     @Published var guardianGuidance = ""
+    @Published var guardianReports: [NativeGuardianReport] = []
+    @Published var guardianReportNotice = ""
     @Published var staffSchools: [StaffSchool] = []
     @Published var adminOrganizations: [String] = []
     @Published var journey: [String] = []
@@ -239,6 +241,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextQuizzes: [String] = []
             var nextQuizSummaries: [NativeQuizSummary] = []
             var nextGuidance = ""
+            var nextGuardianReports: [NativeGuardianReport] = []
+            var nextGuardianReportNotice = ""
 
             if verifiedRole == "superadmin" {
                 // Read-only registry via audited, server-authorized endpoint.
@@ -258,6 +262,15 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                         learnerName: item["learnerName"] as? String,
                         verifiedForRead: item["verifiedForRead"] as? Bool ?? false
                     )
+                }
+                do {
+                    let data = try await request("api/native/mobile/parent/reports")
+                    let envelope = try JSONDecoder().decode(NativeGuardianReportEnvelope.self, from: data)
+                    nextGuardianReports = Array(envelope.reports.prefix(20))
+                    nextGuardianReportNotice = envelope.guidance
+                } catch {
+                    if keychainToken() == nil { throw error }
+                    nextGuardianReportNotice = "Verified academic reports are unavailable. Check your connection or ask the school."
                 }
             } else if ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head"]
                         .contains(verifiedRole) {
@@ -326,6 +339,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             workspaces = nextWorkspaces
             guardians = nextGuardians
             guardianGuidance = nextGuidance
+            guardianReports = nextGuardianReports
+            guardianReportNotice = nextGuardianReportNotice
             staffSchools = nextStaff
             adminOrganizations = nextAdminOrganizations
             journey = nextJourney
@@ -337,7 +352,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Connected securely to CABO"
         } catch {
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-            guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""
+            guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
@@ -421,7 +436,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""
+        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""
         status = "Signed out on this device."
         busy = false
     }

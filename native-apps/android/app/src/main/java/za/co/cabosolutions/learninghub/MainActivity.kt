@@ -450,6 +450,41 @@ private fun RoleContent(
                     }
                 }
             }
+            item {
+                Text("School-verified progress", style = MaterialTheme.typography.titleMedium)
+                if (data.parentReportNotice.isNotBlank())
+                    Text(data.parentReportNotice, style = MaterialTheme.typography.bodySmall)
+            }
+            if (data.parentReports.isEmpty()) item {
+                NativeCard("No verified reports",
+                    "Only a school-verified guardian of an actively enrolled learner can view their academic progress.")
+            }
+            items(data.parentReports, key = { it.id }) { report ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(report.learnerName, style = MaterialTheme.typography.titleLarge)
+                        Text("${report.grade} · ${report.year} · Draft progress",
+                            style = MaterialTheme.typography.bodyMedium)
+                        report.average?.let { Text("Average: $it%",
+                            style = MaterialTheme.typography.titleMedium) }
+                        report.attendanceRate?.let { rate ->
+                            Text("Attendance: $rate% (${report.presentDays} of ${report.recordedDays} recorded days)")
+                        } ?: Text("Attendance not recorded.")
+                        Text("Subjects", style = MaterialTheme.typography.titleMedium)
+                        if (report.subjects.isEmpty()) Text("No published marks available.")
+                        report.subjects.forEach { subject ->
+                            Row(Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(subject.name, modifier = Modifier.weight(1f))
+                                Text("${subject.percentage}%")
+                            }
+                        }
+                        Text("Not an officially issued report card.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
         } else if (role in listOf("teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head")) {
             item { Text("My assigned teaching work", style = MaterialTheme.typography.titleMedium) }
             if (data.staff.isEmpty()) item {
