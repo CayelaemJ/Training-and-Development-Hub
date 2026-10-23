@@ -260,10 +260,27 @@ struct NativeHomeView: View {
                     Text("Learning support").font(.headline).padding(.top, 8)
                     ForEach(school.support, id: \.self) { item in Text(item) }
                 }
-                if !school.tickets.isEmpty {
+                if !school.ticketItems.isEmpty {
                     Text("Learner help requests").font(.headline).padding(.top, 8)
-                    ForEach(school.tickets, id: \.self) { ticket in
-                        Label(ticket, systemImage: "person.crop.circle.badge.questionmark")
+                    ForEach(school.ticketItems) { ticket in
+                        Button {
+                            selectedSupportTicket = ticket
+                        } label: {
+                            HStack {
+                                Image(systemName: "person.crop.circle.badge.questionmark")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(ticket.concept).font(.headline)
+                                    Text("Status: \(ticket.status)")
+                                        .font(.subheadline).foregroundColor(.secondary)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(session.busy)
+                        .accessibilityHint("Opens a versioned educator support reply")
                     }
                 }
             }
@@ -271,7 +288,7 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
-        Text("Teacher marking and support actions are being developed after device authentication tests.")
+        Text("Educators can send their own replies. Assessment marking and real-device acceptance testing remain pending.")
             .font(.footnote).foregroundColor(.secondary)
     }
 
