@@ -24,7 +24,7 @@
    <ListView x:Name="OverviewItems" MaxHeight="260"/>
    <TextBlock Text="My academic report preview" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="LearnerReportItems" MaxHeight="340"/>
-   <TextBlock Text="These are learner-only drafts based on published school data, not officially issued report cards." TextWrapping="Wrap"/>
+   <TextBlock Text="These are learner-only drafts based on published school data, not an officially issued report card." TextWrapping="Wrap"/>
    <TextBlock Text="Study materials" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="MaterialItems" MaxHeight="260" SelectionChanged="MaterialSelected"/>
    <StackPanel x:Name="MaterialPanel" Visibility="Collapsed" Spacing="12">
