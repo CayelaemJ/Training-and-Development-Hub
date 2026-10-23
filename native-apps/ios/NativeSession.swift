@@ -39,7 +39,20 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var journey: [String] = []
     @Published var learnerHelp: [String] = []
 
-    private let origin = URL(string: "https://cabo-learning-hub-pilot.onrender.com")!
+    // Test-login is a build-time opt-in, never enabled by a server response.
+    var testLoginAvailable: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "CABO_ENABLE_TEST_LOGIN") as? Bool == true
+    }
+    private let origin: URL = {
+        let source = Bundle.main.object(forInfoDictionaryKey: "CABO_API_ORIGIN") as? String ?? ""
+        guard let url = URL(string: source),
+              url.scheme == "https", url.host != nil,
+              url.user == nil, url.password == nil,
+              url.query == nil, url.fragment == nil else {
+            return URL(string: "https://cabo-learning-hub-pilot.onrender.com")!
+        }
+        return url
+    }()
     private let clientID = "cabo-ios"
     private let redirectScheme = "cabo-learninghub-ios"
     private var browserSession: ASWebAuthenticationSession?
@@ -116,7 +129,14 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     private func request(_ path: String, method: String = "GET", body: Data? = nil, authorized: Bool = true, idempotencyKey: String? = nil) async throws -> Data {
-        var request = URLRequest(url: origin.appendingPathComponent(path))
+        // URLComponents keeps the reading-offset query outside of URL path
+        // encoding (appendingPathComponent would escape the '?' separator).
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        var components = URLComponents(url: origin, resolvingAgainstBaseURL: false)!
+        components.path = "/" + String(parts[0]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if parts.count > 1 { components.percentEncodedQuery = String(parts[1]) }
+        guard let url = components.url else { throw NSError(domain: "CABO", code: 400) }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 12
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -162,6 +182,34 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         } catch {
             busy = false
             status = "Could not complete native CABO login. Please try again."
+        }
+    }
+
+    // Disposable pilot only. No plaintext credential is persisted, logged,
+    // embedded in the app bundle, or sent to a different HTTP origin.
+    func signInTest(username: String, password: String) async {
+        guard testLoginAvailable, !busy else { return }
+        busy = true
+        status = "Signing in to isolated CABO test account…"
+        do {
+            let body = try JSONSerialization.data(withJSONObject: [
+                "username": username, "password": password
+            ])
+            let data = try await request("api/native/test-login",
+                method: "POST", body: body, authorized: false)
+            guard let response = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let token = response["access_token"] as? String, token.count >= 32,
+                  response["token_type"] as? String == "Bearer",
+                  let seconds = response["expires_in"] as? Int,
+                  (1...3600).contains(seconds) else {
+                throw NSError(domain: "CABO", code: 400)
+            }
+            try storeToken(token)
+            busy = false
+            await refresh()
+        } catch {
+            busy = false
+            status = "Test sign-in failed. Check the isolated server and credentials."
         }
     }
 
