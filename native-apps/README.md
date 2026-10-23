@@ -1,6 +1,6 @@
 # CABO native application programme — implementation progress
 
-**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, learner study listings, and native iOS practice quiz submission/results source. Windows WinUI 3 remains an initial signed-out preview. **Not production-ready, native-compiled, physically device-tested or published.**
+**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, plus native iOS and Android quiz-taking, material readers and restricted admin registry screens. Windows WinUI 3 remains an initial signed-out preview. **iOS simulator build and a prior Android debug build passed in CI; physical devices, authentication integration and production release remain unverified.**
 
 These are standalone native interfaces, **not browser wrappers, PWAs or React WebViews**. The existing PR #40 web application stays available as a separate channel.
 
@@ -8,8 +8,8 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 
 | Platform | Implemented in this branch | Still required |
 | --- | --- | --- |
-| Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token encryption; learner materials/quizzes/journey/help requests; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout | Real Android Studio/Gradle compile, emulator/device test, full native quiz-taking, upload picker, offline strategy, signed APK/AAB |
-| iOS — Swift / SwiftUI | Adaptive iPhone/iPad SwiftUI parent/learner/educator screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role data, assigned teaching subjects, restricted parent invite decisions, authorized support queues; native quiz fetching, answer selection, submission and genuine grading feedback (UNCOMPILED); native sign-out; callback Info.plist and XcodeGen definition | Real Xcode compile, iPhone/iPad tests, API sign-in/submission integration, upload picker, server-side quiz idempotency, app signing and TestFlight/App Store review |
+| Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token encryption; learner materials/quizzes/journey/help requests; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout | API 23 emulator/device test, uploaded document picker, offline drafts, native sign-in integration, signed release AAB |
+| iOS — Swift / SwiftUI | Adaptive iPhone/iPad SwiftUI parent/learner/educator screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role data, assigned teaching subjects, restricted parent invite decisions, authorized support queues; native quiz fetching, answer selection, submission and genuine grading feedback (UNCOMPILED); native sign-out; callback Info.plist and XcodeGen definition | iPhone/iPad physical tests, native sign-in and submission integration, upload picker, signed build and TestFlight/App Store review |
 | Windows — C# / WinUI 3 | Initial XAML UI and backend reachability | Native OAuth redirect, Windows DPAPI/credential vault storage, dashboard, documents, packaging, Windows builds and QA |
 | Web — React + TypeScript | Previously merged PR #40 | Existing web release gates remain unchanged |
 
@@ -47,9 +47,9 @@ Do not enable native authorization on a live school database without rollback, a
 
 **API / policies:** `node --test artifacts/api-server/src/tests/nativeAuthPolicy.test.mjs`, `pnpm run typecheck`, `pnpm run build`. Existing GitHub/CircleCI CI should also pass; unit policy tests **do not prove** the migration, endpoint integration, or mobile sign-in works.
 
-**Android:** Open `native-apps/android` in Android Studio with Android SDK 35, JDK 17, and compatible Gradle 8.11.1+; emulate API 23 and low-memory Android phones, generate/add a Gradle wrapper, sync and run `:app` on an emulator. APK and AAB generation remain follow-on work. **No Android build was performed in this PR authoring environment.** The new GitHub manual workflow is currently defined only on this feature branch; GitHub generally requires a workflow_dispatch definition on the default branch to appear as a manual action. Treat it as proposed build tooling until reviewed and registered on the default branch, not a presently downloadable APK.
+**Android:** Open `native-apps/android` in Android Studio with Android SDK 35, JDK 17, and compatible Gradle 8.11.1+; emulate API 23 and low-memory Android phones, generate/add a Gradle wrapper, sync and run `:app` on an emulator. The GitHub Actions Android job now compiles a DEBUG (not release-signed) APK for PRs. A prior Android compilation passed. Download any passing debug artifact from the matching Actions run, never distribute it as an institution release. API23 emulator and low-end physical devices remain untested.
 
-**iOS:** On a Mac with Xcode and XcodeGen with a toolchain able to compile iOS 15 deployment targets, run `cd native-apps/ios && xcodegen generate`, open `CABOLearningHub.xcodeproj`, select a development team, run on an iPhone/iPad. **No Xcode build or TestFlight upload has been performed.**
+**iOS:** On a Mac with Xcode and XcodeGen with a toolchain able to compile iOS 15 deployment targets, run `cd native-apps/ios && xcodegen generate`, open `CABOLearningHub.xcodeproj`, select a development team, run on an iPhone/iPad. GitHub's macOS runner has successfully compiled the unsigned iOS Simulator target. No TestFlight upload, signed physical iPhone build or real-device login has been performed.
 
 **Windows:** Open `native-apps/windows/CABO.Native/CABO.Native.csproj` in Visual Studio with Windows App SDK/WinUI 3 workload. No signed Windows installer is available.
 
@@ -64,3 +64,21 @@ Relevant native OAuth best practice: https://www.rfc-editor.org/rfc/rfc8252.html
 ## iOS practice assessment implementation (unverified on device)
 
 `NativeQuizView.swift` now requests each learner-owned quiz using `GET /api/quizzes/:id`, renders its real server-provided questions and answer options, then sends answers to `POST /api/quizzes/:id/attempts`. The server returns the persisted score and question explanations. The screen prevents duplicate taps and treats a failed/uncertain submission as potentially committed, so it does **not** offer blind retries. **Server-level durable idempotency is still pending**, as is recovery of an attempt after an interrupted network response. This is practice feedback, not teacher-approved certification. Add native build and signed-in API integration tests before declaring the feature delivered.
+
+## Native quiz reliability (review-gated database migration)
+
+The iOS and Android clients now open learner-owned materials, fetch actual practice questions, submit answers and display persisted marks/feedback. Both send a per-attempt `Idempotency-Key` and offer a read-only status lookup after an interrupted response. No native client blindly re-submits on an unknown outcome.
+
+To activate **durable** de-duplication, review and apply `lib/db/migrations/20261023_quiz_idempotency.sql` on an **isolated** Neon test database before setting `CABO_QUIZ_IDEMPOTENCY_ENABLED=true` in its corresponding Render API service. The backend uses a unique `(user_id, request_key)` index and returns the same result for a matching duplicate. If the flag stays off, prior web behavior continues and native status lookup cannot confirm submission, so **do not describe the submission as fully reliable across network interruptions**. No production migrations were applied in this iteration.
+
+## Superadmin test account
+
+The requested `cabo_test` account is supported by the existing isolated test-login gate, with a server-side scrypt hash generated using `scripts/configure-cabo-test-login.mjs`. The plaintext password is not committed to any file or app. See `native-apps/TEST_ADMIN_SETUP.md`. **The account has not been activated in Render because the currently public pilot's database isolation and permissions have not been verified.** Never elevate this test principal on a school/production database. Native OIDC login is a separate integration gate, and no native sign-in claim is made based on browser test credentials.
+
+## What's still outstanding
+
+- Backend: apply/test native authorization and quiz idempotency migrations on disposable environments; confirm tenant isolation, replay, session expiry, lost-response recovery and role permissions with real authenticated requests.
+- iOS: signed physical-device install, consented file uploads, secure offline drafts, iOS15 low-end and iPad accessibility QA, TestFlight.
+- Android: compile/debug artifact review on latest commit, API23 emulator and physical-device acceptance, uploads, offline drafts, battery/data performance, signed release AAB.
+- Windows: implement native sign-in/session storage and verified user workflows, MSIX packaging, Windows-runner compilation and lab-computer QA.
+- All: school pilots, POPIA review, DPIA as appropriate for children's records, educator review and guardian boundaries; launch remains blocked until these checks pass.
