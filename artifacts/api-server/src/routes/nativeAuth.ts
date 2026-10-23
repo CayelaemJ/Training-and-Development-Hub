@@ -129,7 +129,9 @@ router.post("/native/token", async (req, res) => {
 });
 
 router.post("/native/logout", async (req, res) => {
-  if (!nativeAuthEnabled(process.env)) { res.sendStatus(404); return; }
+  if (!nativeAuthEnabled(process.env) && !nativeTestLoginEnabled(process.env)) {
+    res.sendStatus(404); return;
+  }
   const authorization = req.get("authorization");
   if (!authorization?.startsWith("Bearer ") || !req.isAuthenticated()) {
     res.status(401).json({ error: "unauthorized" }); return;
