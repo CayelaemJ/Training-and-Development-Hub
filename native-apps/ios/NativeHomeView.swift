@@ -99,12 +99,32 @@ struct NativeHomeView: View {
             infoTile("Teachers", "Teaching assignments and intervention progress on tablets.", system: "rectangle.3.group")
             infoTile("Learners", "Materials, practice tests and progress on tablets or phones.", system: "book")
             infoTile("Parents", "Simple family invitations and verified links on phones.", system: "person.2")
+        } else if session.role == "superadmin" {
+            adminContent
         } else if session.role == "parent" {
             parentContent
         } else if isEducator {
             educatorContent
         } else {
             learnerContent
+        }
+    }
+
+    @ViewBuilder
+    private var adminContent: some View {
+        title("Platform governance")
+        Text("Read-only CABO institution registry. Private learner records remain access-controlled.")
+            .font(.subheadline).foregroundColor(.secondary)
+        ForEach(session.summary, id: \.self) { metric in
+            infoTile(metric, "Current platform registry total", system: "chart.bar")
+        }
+        title("Organisations")
+        if session.adminOrganizations.isEmpty {
+            infoTile("No organisations", "There are no registered organisations to display.",
+                     system: "building.2")
+        }
+        ForEach(session.adminOrganizations, id: \.self) { organisation in
+            infoTile(organisation, "Institution registry", system: "building.2")
         }
     }
 
