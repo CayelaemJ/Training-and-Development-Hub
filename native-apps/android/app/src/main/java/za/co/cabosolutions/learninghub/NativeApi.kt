@@ -280,21 +280,23 @@ internal class NativeApi(private val context: Context) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    val ticketNames = try {
+                    val ticketItems = try {
                         val response = request("/api/organizations/$orgId/support", auth = true)
                         val tickets = response.optJSONArray("items") ?: JSONArray()
                         (0 until minOf(tickets.length(), 20)).mapNotNull { index ->
-                            tickets.optJSONObject(index)?.let { row ->
-                                val topic = row.optString("concept").take(80)
-                                val state = row.optString("status").take(32)
-                                if (topic.isBlank()) null else "$topic · $state"
-                            }
+                            val row = tickets.optJSONObject(index) ?: return@mapNotNull null
+                            val id = row.optInt("id")
+                            val version = row.optInt("version")
+                            val concept = row.optString("concept").take(160)
+                            if (id <= 0 || version <= 0 || concept.isBlank()) null else
+                                SupportTicket(id, orgId, concept, row.optString("status"), version)
                         }
                     } catch (error: Exception) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    StaffWorkspace(orgId, courseNames, stats, ticketNames, null)
+                    StaffWorkspace(orgId, courseNames, stats,
+                        ticketItems.map { "${it.concept} · ${it.status}" }, null, ticketItems)
                 } catch (error: Exception) {
                     if (!hasSession()) throw error
                     StaffWorkspace(orgId, emptyList(), emptyList(), emptyList(),
