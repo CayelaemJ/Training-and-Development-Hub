@@ -28,7 +28,33 @@ public record NativeDashboard(
 // Never embed passwords, AI provider secrets or school records in this app.
 public sealed class NativeLearningService
 {
-    private static readonly Uri Origin = new("https://cabo-learning-hub-pilot.onrender.com/");
+    // The normal Windows app always uses the approved browser sign-in.
+    // An isolated password pilot requires a separate, explicit test compilation.
+    private static readonly Uri Origin = ResolveOrigin();
+    private static Uri ResolveOrigin()
+    {
+        var publicOrigin = new Uri("https://cabo-learning-hub-pilot.onrender.com/");
+#if CABO_ISOLATED_TEST
+        var candidate = Environment.GetEnvironmentVariable("CABO_ISOLATED_TEST_ORIGIN");
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out var url) &&
+            url.Scheme == Uri.UriSchemeHttps &&
+            url.Host != publicOrigin.Host && url.UserInfo.Length == 0 &&
+            url.AbsolutePath == "/" && url.Query.Length == 0 &&
+            url.Fragment.Length == 0) return url;
+#endif
+        return publicOrigin;
+    }
+    public bool TestLoginEnabled
+    {
+        get
+        {
+#if CABO_ISOLATED_TEST
+            return Origin.Host != "cabo-learning-hub-pilot.onrender.com";
+#else
+            return false;
+#endif
+        }
+    }
     private static readonly Uri Callback = new("http://127.0.0.1:47787/auth");
     private static readonly HttpClient Http = new() { BaseAddress = Origin, Timeout = TimeSpan.FromSeconds(15) };
     private readonly string tokenFile = Path.Combine(
@@ -140,6 +166,30 @@ public sealed class NativeLearningService
         var nextToken = root.GetProperty("access_token").GetString();
         if (string.IsNullOrWhiteSpace(nextToken) || nextToken.Length < 32)
             throw new InvalidOperationException("Invalid native token.");
+        SaveToken(nextToken);
+    }
+
+    public async Task SignInTestAsync(string username, string password,
+        CancellationToken cancellation)
+    {
+        if (!TestLoginEnabled || username != "cabo_test" || password.Length < 12)
+            throw new UnauthorizedAccessException("Test mode is not available.");
+        // The password is sent once to the isolated HTTPS server and never
+        // written to DPAPI storage. Only the expiring bearer token is saved.
+        using var response = await Http.PostAsJsonAsync("api/native/test-login",
+            new { username, password }, cancellation);
+        if (!response.IsSuccessStatusCode)
+            throw new UnauthorizedAccessException("CABO test login was not accepted.");
+        using var json = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(cancellation),
+            cancellationToken: cancellation);
+        var root = json.RootElement;
+        if (root.GetProperty("token_type").GetString() != "Bearer" ||
+            root.GetProperty("expires_in").GetInt32() is < 1 or > 3600)
+            throw new UnauthorizedAccessException("Unexpected test session.");
+        var nextToken = root.GetProperty("access_token").GetString();
+        if (nextToken is null || nextToken.Length < 32)
+            throw new UnauthorizedAccessException("Invalid token.");
         SaveToken(nextToken);
     }
 
