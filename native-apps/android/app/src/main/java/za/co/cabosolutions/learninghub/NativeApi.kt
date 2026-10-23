@@ -58,6 +58,29 @@ internal class NativeApi(private val context: Context) {
         val bytes = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
+    fun testLoginAvailable(): Boolean = BuildConfig.ENABLE_TEST_LOGIN
+
+    // Explicitly enabled in private, disposable test builds only. The
+    // password stays in memory for this single HTTPS request, not on disk.
+    suspend fun testLogin(username: String, password: String): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (!BuildConfig.ENABLE_TEST_LOGIN) return@withContext "Not a test build."
+            if (username != "cabo_test" || password.isEmpty())
+                return@withContext "Enter the CABO test username and password."
+            try {
+                val json = request("/api/native/test-login", JSONObject()
+                    .put("username", username).put("password", password))
+                val token = json.getString("access_token")
+                val seconds = json.getInt("expires_in")
+                require(json.optString("token_type") == "Bearer" &&
+                    token.length >= 32 && seconds in 1..3600)
+                secrets.put("token", token)
+                "CABO test account signed in."
+            } catch (_: Exception) {
+                "Test sign-in failed. Verify the isolated test server and credentials."
+            }
+        }
+
     fun hasSession(): Boolean = secrets.get("token") != null
     fun authorize(): Intent {
         val verifier = random()
