@@ -47,6 +47,14 @@ struct NativeHomeView: View {
         .navigationViewStyle(StackNavigationViewStyle())
         .tint(clay)
         .task { await session.restore() }
+        .onChange(of: session.role) { current in
+            // Revoke visible private study screens as soon as auth is lost.
+            if current == nil {
+                selectedQuiz = nil
+                selectedMaterial = nil
+                testPassword = ""
+            }
+        }
         .sheet(item: $selectedQuiz) { quiz in
             NativeQuizView(session: session, item: quiz)
         }
