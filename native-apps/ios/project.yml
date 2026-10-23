@@ -1,0 +1,24 @@
+name: CABOLearningHub
+options:
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+targets:
+  CABOLearningHub:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    info:
+      path: Info.plist
+    sources:
+      - path: CABOLearningHubApp.swift
+      - path: NativeHomeView.swift
+      - path: NativeSession.swift
+      - path: NativeQuizView.swift
+      - path: NativeMaterialView.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"

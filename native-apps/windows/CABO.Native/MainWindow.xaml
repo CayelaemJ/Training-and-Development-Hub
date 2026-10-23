@@ -1,0 +1,45 @@
+<Window x:Class="CABO.Native.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <ScrollViewer>
+  <StackPanel Padding="30" Spacing="14" MaxWidth="920">
+   <TextBlock Text="CABO" FontSize="36" FontWeight="Bold"/>
+   <TextBlock Text="Learning Hub • Windows" FontSize="22"/>
+   <TextBlock x:Name="ServiceStatus" Text="Sign in to load real CABO records." TextWrapping="Wrap"/>
+   <StackPanel Orientation="Horizontal" Spacing="12">
+    <Button x:Name="SignInButton" Content="Sign in securely" Click="OpenSignIn"/>
+    <Button x:Name="RefreshButton" Content="Refresh" Click="RefreshDashboard" IsEnabled="False"/>
+    <Button x:Name="SignOutButton" Content="Sign out" Click="SignOut" IsEnabled="False"/>
+   </StackPanel>
+   <StackPanel x:Name="TestLoginPanel" Visibility="Collapsed" Spacing="10">
+    <TextBlock Text="Isolated demo account only" FontSize="17" FontWeight="SemiBold"/>
+    <TextBox x:Name="TestUsername" Header="Test username" Text="cabo_test" MaxLength="80"/>
+    <PasswordBox x:Name="TestPassword" Header="Test password" MaxLength="200"/>
+    <Button x:Name="TestSignInButton" Content="Sign in to test environment" Click="SignInTest"/>
+    <TextBlock Text="For fictional learner data only. Test sign-in is disabled in release builds." TextWrapping="Wrap"/>
+   </StackPanel>
+   <ProgressRing x:Name="BusyIndicator" IsActive="False" Width="26" Height="26" HorizontalAlignment="Left"/>
+   <TextBlock x:Name="RoleLabel" Text="Not signed in" FontSize="22" FontWeight="SemiBold"/>
+   <TextBlock Text="Your current CABO account data" FontSize="18"/>
+   <ListView x:Name="OverviewItems" MaxHeight="260"/>
+   <TextBlock Text="Study materials" FontSize="18" FontWeight="SemiBold"/>
+   <ListView x:Name="MaterialItems" MaxHeight="260"/>
+   <TextBlock Text="Practice tests" FontSize="18" FontWeight="SemiBold"/>
+   <ListView x:Name="QuizItems" MaxHeight="260" SelectionChanged="QuizSelected"/>
+   <StackPanel x:Name="QuizPanel" Visibility="Collapsed" Spacing="10">
+    <TextBlock x:Name="QuizTitle" TextWrapping="Wrap" FontSize="20" FontWeight="SemiBold"/>
+    <TextBlock Text="Select one option for every question. Answers are graded by the secure CABO server." TextWrapping="Wrap"/>
+    <StackPanel x:Name="QuizQuestions" Spacing="12"/>
+    <StackPanel Orientation="Horizontal" Spacing="10">
+     <Button x:Name="QuizSubmitButton" Content="Submit assessment" Click="SubmitQuiz" IsEnabled="False"/>
+     <Button x:Name="QuizCheckButton" Content="Check saved submission" Click="CheckQuiz" Visibility="Collapsed"/>
+     <Button x:Name="QuizCloseButton" Content="Close test" Click="CloseQuiz"/>
+    </StackPanel>
+    <TextBlock x:Name="QuizResults" TextWrapping="Wrap" />
+   </StackPanel>
+   <TextBlock Text="Institution registry (authorised platform accounts only)" TextWrapping="Wrap" FontSize="18" FontWeight="SemiBold"/>
+   <ListView x:Name="OrganizationItems" MaxHeight="260"/>
+   <TextBlock Text="This Windows client uses the secure CABO backend. Practice assessments are graded by the CABO backend; no marks are invented or cached locally. Materials remain online-only on Windows." TextWrapping="Wrap"/>
+  </StackPanel>
+ </ScrollViewer>
+</Window>

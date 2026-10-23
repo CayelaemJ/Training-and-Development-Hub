@@ -1,0 +1,30 @@
+name: CABO native Windows build verification
+on:
+  pull_request:
+    paths:
+      - 'native-apps/windows/**'
+      - '.github/workflows/native-windows-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      # WinUI 3 desktop resource packaging targets require Visual Studio's
+      # MSBuild, not the standalone dotnet SDK's incomplete AppxPackage tasks.
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore and compile WinUI 3 using Visual Studio MSBuild
+        shell: pwsh
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -verbosity:minimal
+      - name: Compile isolated test-only Windows variant (no credentials)
+        shell: pwsh
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=true -verbosity:minimal
+      - name: Validation boundary
+        shell: pwsh
+        run: Write-Output 'Build validation only; no signing, physical Windows lab run, MSIX, or native authentication verified.'
