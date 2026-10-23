@@ -5,6 +5,7 @@ import SwiftUI
 struct NativeHomeView: View {
     @StateObject private var session = NativeSession()
     @State private var selectedQuiz: NativeQuizSummary?
+    @State private var selectedMaterial: NativeMaterialSummary?
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
 
@@ -46,6 +47,9 @@ struct NativeHomeView: View {
         .task { await session.restore() }
         .sheet(item: $selectedQuiz) { quiz in
             NativeQuizView(session: session, item: quiz)
+        }
+        .sheet(item: $selectedMaterial) { material in
+            NativeMaterialView(session: session, item: material)
         }
     }
 
@@ -182,8 +186,23 @@ struct NativeHomeView: View {
         if session.materials.isEmpty {
             infoTile("No materials available", "Ask your educator or upload through the web edition.", system: "book")
         }
-        ForEach(session.materials, id: \.self) { title in
-            infoTile(title, "My learning material", system: "doc.text")
+        ForEach(session.materialSummaries) { material in
+            Button {
+                selectedMaterial = material
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.text").foregroundColor(clay)
+                    Text(material.title).font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundColor(.secondary)
+                }
+                .padding(16)
+                .background(Color(UIColor.secondarySystemBackground),
+                            in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(session.busy)
+            .accessibilityHint("Opens the online reading view for this learning material")
         }
         title("Practice tests")
         if session.quizzes.isEmpty {
