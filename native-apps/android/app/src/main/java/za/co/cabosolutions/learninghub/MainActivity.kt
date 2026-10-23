@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.launch
 
 // Jetpack Compose native screen; no WebView or embedded web application.
@@ -22,6 +23,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val api by lazy { NativeApi(this) }
     private var status by mutableStateOf("CABO native Android preview")
+    private var testUsername by mutableStateOf("cabo_test")
+    private var testPassword by mutableStateOf("")
     private var busy by mutableStateOf(false)
     private var screen by mutableStateOf<NativeLearning?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
@@ -62,6 +65,11 @@ class MainActivity : ComponentActivity() {
                     else -> NativeHome(
                         status = status, busy = busy, data = screen,
                         signIn = { startSignIn() }, refresh = { loadDashboard() },
+                        testLoginAvailable = api.testLoginAvailable(),
+                        testUsername = testUsername, testPassword = testPassword,
+                        onTestUsername = { testUsername = it },
+                        onTestPassword = { testPassword = it },
+                        signInTest = { startTestSignIn() },
                         signOut = { signOut() },
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
                         openQuiz = { openQuiz(it) },
@@ -85,6 +93,20 @@ class MainActivity : ComponentActivity() {
     private fun startSignIn() {
         try { startActivity(api.authorize()) }
         catch (_: Exception) { status = "No browser could be opened for secure sign-in." }
+    }
+
+    private fun startTestSignIn() {
+        if (busy || !api.testLoginAvailable() || testPassword.isEmpty()) return
+        val account = testUsername
+        val secret = testPassword
+        testPassword = ""
+        busy = true
+        lifecycleScope.launch {
+            try {
+                status = api.testLogin(account, secret)
+            } finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
     }
 
     private fun handleCallback(callback: Intent) {
@@ -252,6 +274,12 @@ private fun NativeHome(
     data: NativeLearning?,
     signIn: () -> Unit,
     refresh: () -> Unit,
+    testLoginAvailable: Boolean,
+    testUsername: String,
+    testPassword: String,
+    onTestUsername: (String) -> Unit,
+    onTestPassword: (String) -> Unit,
+    signInTest: () -> Unit,
     signOut: () -> Unit,
     respondToInvite: (Int, Boolean) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -279,6 +307,10 @@ private fun NativeHome(
                         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                         Spacer(Modifier.height(16.dp))
                         SessionButtons(data, busy, signIn, refresh, signOut)
+                        if (data == null && testLoginAvailable) {
+                            TestLoginControls(testUsername, testPassword, busy,
+                                onTestUsername, onTestPassword, signInTest)
+                        }
                         Spacer(Modifier.height(16.dp))
                         Text("Tablet layout • touch, keyboard and accessibility supported",
                             style = MaterialTheme.typography.bodySmall)
@@ -293,11 +325,40 @@ private fun NativeHome(
                         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                         Spacer(Modifier.height(8.dp))
                         SessionButtons(data, busy, signIn, refresh, signOut)
+                        if (data == null && testLoginAvailable) {
+                            TestLoginControls(testUsername, testPassword, busy,
+                                onTestUsername, onTestPassword, signInTest)
+                        }
                     }
                     RoleContent(Modifier.weight(1f), data, busy, respondToInvite, openQuiz, openMaterial)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TestLoginControls(
+    username: String, password: String, busy: Boolean,
+    onUsername: (String) -> Unit, onPassword: (String) -> Unit,
+    submit: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Isolated test account", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(value = username, onValueChange = onUsername,
+            label = { Text("Test username") }, singleLine = true,
+            modifier = Modifier.fillMaxWidth(), enabled = !busy)
+        OutlinedTextField(value = password, onValueChange = onPassword,
+            label = { Text("Test password") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(), enabled = !busy)
+        Button(onClick = submit, enabled = !busy && username.isNotBlank() &&
+            password.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) {
+            Text("Sign in to test environment")
+        }
+        Text("For a disposable dummy-data pilot only. School accounts use browser sign-in.",
+            style = MaterialTheme.typography.bodySmall)
     }
 }
 
