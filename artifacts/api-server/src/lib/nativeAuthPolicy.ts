@@ -1,10 +1,12 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-// Native flow is limited to Android until the iOS and Windows URL handlers have
-// been tested. No arbitrary redirect URI is accepted from the caller.
+// Native callback targets are strictly pinned. The Windows pilot uses a fixed
+// loopback port bound before the browser opens; validate on Windows before release.
 export const NATIVE_CLIENTS = {
   "cabo-android": "cabo-learninghub-android://auth",
   "cabo-ios": "cabo-learninghub-ios://auth",
+  // Fixed loopback callback for unpackaged Windows WinUI 3 pilot.
+  "cabo-windows": "http://127.0.0.1:47787/auth",
 } as const;
 export type NativeClientId = keyof typeof NATIVE_CLIENTS;
 export const NATIVE_CODE_SECONDS = 180;
