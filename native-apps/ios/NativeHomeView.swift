@@ -276,6 +276,46 @@ struct NativeHomeView: View {
         ForEach(session.summary + session.journey, id: \.self) { item in
             infoTile(item, "Current CABO learning progress", system: "chart.bar")
         }
+        title("My academic report")
+        if !session.learnerReportNotice.isEmpty {
+            Text(session.learnerReportNotice)
+                .font(.footnote).foregroundColor(.secondary)
+        }
+        if session.learnerReports.isEmpty {
+            infoTile("No report preview yet", "A verified school enrolment and published assessments are needed.", system: "chart.bar.doc.horizontal")
+        }
+        ForEach(session.learnerReports) { report in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("\(report.grade) · \(report.year)")
+                    .font(.title3.bold()).accessibilityAddTraits(.isHeader)
+                if let average = report.average {
+                    Text("Published assessment average: \(average.formatted())%")
+                        .font(.headline)
+                }
+                if let rate = report.attendance.rate {
+                    Text("Attendance: \(rate)% (\(report.attendance.presentDays) of \(report.attendance.recordedDays) recorded days)")
+                } else {
+                    Text("Attendance has not been recorded.")
+                }
+                if report.subjects.isEmpty {
+                    Text("No published subject marks yet.").foregroundColor(.secondary)
+                }
+                ForEach(report.subjects) { subject in
+                    HStack {
+                        Text(subject.name)
+                        Spacer(minLength: 8)
+                        Text("\(subject.percentage.formatted())%")
+                            .monospacedDigit()
+                    }
+                    .font(.subheadline)
+                }
+                Text("Draft learner preview. This is not an officially issued report card.")
+                    .font(.footnote).foregroundColor(.secondary)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
         title("Study materials")
         if session.materials.isEmpty {
             infoTile("No materials available", "Ask your educator or upload through the web edition.", system: "book")
