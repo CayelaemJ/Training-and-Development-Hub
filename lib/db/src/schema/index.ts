@@ -50,3 +50,5 @@ export * from "./learnerSupport";
 
 
 export * from "./educationFrameworks";
+export * from "./lifelongPassport";
+export * from "./passportTrustLayers";
