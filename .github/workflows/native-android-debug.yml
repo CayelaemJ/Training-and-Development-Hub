@@ -1,5 +1,9 @@
 name: CABO native Android debug APK (manual)
 on:
+  pull_request:
+    paths:
+      - 'native-apps/android/**'
+      - '.github/workflows/native-android-debug.yml'
   workflow_dispatch:
 jobs:
   android-debug:
