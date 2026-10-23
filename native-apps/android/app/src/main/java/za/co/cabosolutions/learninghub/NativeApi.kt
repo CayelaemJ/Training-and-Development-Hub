@@ -96,7 +96,7 @@ internal class NativeApi(private val context: Context) {
             }
         } catch (_: Exception) { "Native sign-in could not complete. Please try again." }
     }
-    private fun request(route: String, body: JSONObject? = null, auth: Boolean = false): JSONObject {
+    private fun request(route: String, body: JSONObject? = null, auth: Boolean = false, requestKey: String? = null): JSONObject {
         val url = URL(origin + route)
         val connection = url.openConnection() as HttpURLConnection
         connection.connectTimeout = 9000
@@ -104,6 +104,7 @@ internal class NativeApi(private val context: Context) {
         connection.instanceFollowRedirects = false
         connection.useCaches = false
         connection.setRequestProperty("Accept", "application/json")
+        if (requestKey != null) connection.setRequestProperty("Idempotency-Key", requestKey)
         if (auth) {
             val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
             connection.setRequestProperty("Authorization", "Bearer $token")
@@ -288,11 +289,11 @@ internal class NativeApi(private val context: Context) {
             PracticeQuiz(id, obj.getString("title"), result)
         }
 
-    suspend fun submitQuiz(id: Int, answers: List<Int>): QuizAttempt =
+    suspend fun submitQuiz(id: Int, answers: List<Int>, requestKey: String): QuizAttempt =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(id > 0 && answers.isNotEmpty() && answers.all { it >= 0 })
             val json = request("/api/quizzes/$id/attempts",
-                JSONObject().put("answers", JSONArray(answers)), auth = true)
+                JSONObject().put("answers", JSONArray(answers)), auth = true, requestKey = requestKey)
             val rows = json.getJSONArray("feedback")
             val feedback = (0 until rows.length()).map { i ->
                 val row = rows.getJSONObject(i)
@@ -300,6 +301,21 @@ internal class NativeApi(private val context: Context) {
                     row.getBoolean("isCorrect"), row.getString("explanation"))
             }
             require(json.getInt("quizId") == id) { "Mismatched assessment result" }
+            QuizAttempt(json.getInt("id"), id, json.getInt("correctCount"),
+                json.getInt("totalQuestions"), json.getDouble("percentage"), feedback)
+        }
+
+    suspend fun lookupQuiz(id: Int, requestKey: String): QuizAttempt =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0 && requestKey.matches(Regex("[A-Za-z0-9_-]{16,64}")))
+            val json = request("/api/quizzes/$id/attempts/by-key/$requestKey", auth = true)
+            val rows = json.getJSONArray("feedback")
+            val feedback = (0 until rows.length()).map { i ->
+                val row = rows.getJSONObject(i)
+                QuizFeedback(row.getInt("questionIndex"),
+                    row.getBoolean("isCorrect"), row.getString("explanation"))
+            }
+            require(json.getInt("quizId") == id) { "Mismatched result" }
             QuizAttempt(json.getInt("id"), id, json.getInt("correctCount"),
                 json.getInt("totalQuestions"), json.getDouble("percentage"), feedback)
         }
