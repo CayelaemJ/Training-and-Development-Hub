@@ -1,6 +1,6 @@
 # CABO native application programme — implementation progress
 
-**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, plus native iOS and Android quiz-taking, material readers and restricted admin registry screens. Windows WinUI 3 remains an initial signed-out preview. **iOS simulator build and a prior Android debug build passed in CI; physical devices, authentication integration and production release remain unverified.**
+**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, plus native iOS and Android quiz-taking, material readers and restricted admin registry screens. Windows WinUI 3 now includes a native loopback PKCE browser sign-in client, DPAPI token storage, logout and read-only role-scoped records, pending Windows build and runtime verification. **iOS simulator build and a prior Android debug build passed in CI; physical devices, authentication integration and production release remain unverified.**
 
 These are standalone native interfaces, **not browser wrappers, PWAs or React WebViews**. The existing PR #40 web application stays available as a separate channel.
 
@@ -10,7 +10,7 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 | --- | --- | --- |
 | Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token encryption; learner materials/quizzes/journey/help requests; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout | API 23 emulator/device test, uploaded document picker, offline drafts, native sign-in integration, signed release AAB |
 | iOS — Swift / SwiftUI | Adaptive iPhone/iPad SwiftUI parent/learner/educator screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role data, assigned teaching subjects, restricted parent invite decisions, authorized support queues; native quiz fetching, answer selection, submission and genuine grading feedback (UNCOMPILED); native sign-out; callback Info.plist and XcodeGen definition | iPhone/iPad physical tests, native sign-in and submission integration, upload picker, signed build and TestFlight/App Store review |
-| Windows — C# / WinUI 3 | Initial XAML UI and backend reachability | Native OAuth redirect, Windows DPAPI/credential vault storage, dashboard, documents, packaging, Windows builds and QA |
+| Windows — C# / WinUI 3 | WinUI 3 desktop UI; Windows loopback PKCE callback to the shared API; DPAPI CurrentUser secure token storage, logout and account-scoped read-only learner/admin dashboards | Windows CI compile and live login test, interactive quizzes and material previews, native teacher/guardian views, MSIX packaging and Windows lab QA |
 | Web — React + TypeScript | Previously merged PR #40 | Existing web release gates remain unchanged |
 
 ## Inclusive device and role delivery
@@ -24,7 +24,7 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 
 ## Auth architecture and release safety
 
-CABO's web login uses cookie sessions and Replit OIDC. **A native browser window opening `/api/login` alone does NOT authenticate an app.** This branch introduces a separate native PKCE authorization-code bridge that uses the existing OIDC login in the system browser and a **fixed, registered redirect per native client**. Codes are 256-bit random, hashed at rest, bound to a SHA-256 PKCE verifier, expire after 180 seconds and are atomically consumed. Only Android and iOS redirects are currently enabled in the allowlist. Successful exchange creates a separate one-hour bearer session in the existing sessions table, without copying OIDC refresh tokens to the device. Android uses Android Keystore and iOS uses Keychain; native API requests use the bearer only over HTTPS.
+CABO's web login uses cookie sessions and Replit OIDC. **A native browser window opening `/api/login` alone does NOT authenticate an app.** This branch introduces a separate native PKCE authorization-code bridge that uses the existing OIDC login in the system browser and a **fixed, registered redirect per native client**. Codes are 256-bit random, hashed at rest, bound to a SHA-256 PKCE verifier, expire after 180 seconds and are atomically consumed. Android, iOS and a fixed Windows loopback redirect are explicitly pinned in the native callback allowlist. The Windows listener must be bound to 127.0.0.1 before browser sign-in. Successful exchange creates a separate one-hour bearer session in the existing sessions table, without copying OIDC refresh tokens to the device. Android uses Android Keystore and iOS uses Keychain; native API requests use the bearer only over HTTPS.
 
 Endpoints:
 - `GET /api/native/authorize?client_id=cabo-android|cabo-ios&code_challenge=...&code_challenge_method=S256&state=...` — browser phase, logs users in through existing CABO OIDC when needed.
@@ -51,7 +51,7 @@ Do not enable native authorization on a live school database without rollback, a
 
 **iOS:** On a Mac with Xcode and XcodeGen with a toolchain able to compile iOS 15 deployment targets, run `cd native-apps/ios && xcodegen generate`, open `CABOLearningHub.xcodeproj`, select a development team, run on an iPhone/iPad. GitHub's macOS runner has successfully compiled the unsigned iOS Simulator target. No TestFlight upload, signed physical iPhone build or real-device login has been performed.
 
-**Windows:** Open `native-apps/windows/CABO.Native/CABO.Native.csproj` in Visual Studio with Windows App SDK/WinUI 3 workload. No signed Windows installer is available.
+**Windows:** Native WinUI 3 source is under `native-apps/windows/CABO.Native`. The new Windows GitHub Actions job uses Visual Studio MSBuild for WinUI resource tasks, not standalone dotnet CLI. The fixed localhost callback `http://127.0.0.1:47787/auth` must be tested on actual Windows 10/11 devices with the isolated CABO native-auth test server. Windows displays real role data after login, but assessment-taking, upload, packaging and installer validation are not yet complete. No signed Windows installer is available.
 
 ## Next feature milestone
 
@@ -82,3 +82,9 @@ The requested `cabo_test` account is supported by the existing isolated test-log
 - Android: compile/debug artifact review on latest commit, API23 emulator and physical-device acceptance, uploads, offline drafts, battery/data performance, signed release AAB.
 - Windows: implement native sign-in/session storage and verified user workflows, MSIX packaging, Windows-runner compilation and lab-computer QA.
 - All: school pilots, POPIA review, DPIA as appropriate for children's records, educator review and guardian boundaries; launch remains blocked until these checks pass.
+
+## Windows native authentication boundary
+
+The Windows pilot opens the system browser and starts a short-lived loopback listener bound specifically to 127.0.0.1:47787. It uses PKCE S256, a 256-bit random state, verifies the returned code before exchange, and stores only the CABO session token with DPAPI CurrentUser on Windows. Successful API reads use Bearer over HTTPS; sign-out revokes the session where online and clears local encrypted credentials regardless of network availability. Unlike the prior preview, merely opening a web login is no longer presented as authenticating the native app.
+
+This new code has **not** been validated on a physical Windows machine. It uses a fixed callback port to limit server redirect targets; if that port is occupied, sign-in should fail closed. Before broader rollout, move to dynamic RFC8252 loopback ports and test endpoint and binding security, device timeouts, DPAPI recovery, proxy behavior, school lab profiles and WinUI desktop accessibility. Review the OIDC registration/legacy test account distinction. No production credentials or child records should be used in these tests.
