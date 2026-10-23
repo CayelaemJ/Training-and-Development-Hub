@@ -18,6 +18,10 @@ public sealed partial class MainWindow : Window
     private string? submissionKey;
     private bool submitted;
     private bool uncertain;
+    private List<NativeMaterialSummary> materialEntries = new();
+    private NativeMaterialSummary? activeMaterial;
+    private int? materialNextOffset;
+    private string materialContent = "";
 
     public MainWindow()
     {
@@ -42,6 +46,8 @@ public sealed partial class MainWindow : Window
             answerOptions.All(c => c.SelectedIndex >= 0);
         QuizCheckButton.IsEnabled = !busy && uncertain && activeQuiz is not null;
         QuizCloseButton.IsEnabled = !busy;
+        MaterialNextButton.IsEnabled = !busy && activeMaterial is not null && materialNextOffset.HasValue;
+        MaterialCloseButton.IsEnabled = !busy;
     }
 
     private async void OpenSignIn(object sender, RoutedEventArgs args)
@@ -100,7 +106,8 @@ public sealed partial class MainWindow : Window
             var data = await service.DashboardAsync(cts.Token);
             RoleLabel.Text = "My CABO role: " + data.Role;
             OverviewItems.ItemsSource = data.Summary;
-            MaterialItems.ItemsSource = data.Materials;
+            materialEntries = data.MaterialEntries.ToList();
+            MaterialItems.ItemsSource = materialEntries.Select(x => x.Title).ToList();
             quizEntries = data.QuizEntries.ToList();
             QuizItems.ItemsSource = quizEntries.Select(q => q.Title +
                 " (" + q.QuestionCount + " questions)").ToList();
@@ -123,6 +130,8 @@ public sealed partial class MainWindow : Window
         RoleLabel.Text = "Not signed in";
         OverviewItems.ItemsSource = null;
         MaterialItems.ItemsSource = null;
+        materialEntries.Clear();
+        ClearMaterial();
         QuizItems.ItemsSource = null;
         quizEntries.Clear();
         ClearQuiz();

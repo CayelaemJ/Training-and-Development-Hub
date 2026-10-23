@@ -74,3 +74,19 @@ test("Windows learner can take assigned practice quizzes with real graded feedba
   assert.match(api, /api\/quizzes\/\{quizId\}\/attempts\/by-key/);
   assert.doesNotMatch(controller, /WebView2|hardcodedCorrectAnswer/);
 });
+
+test("Windows previews user-owned study materials with paging and session cleanup", () => {
+  const view = file("native-apps/windows/CABO.Native/MainWindow.xaml");
+  const controller = file("native-apps/windows/CABO.Native/NativeMaterialWindow.cs");
+  const main = file("native-apps/windows/CABO.Native/MainWindow.xaml.cs");
+  const api = file("native-apps/windows/CABO.Native/NativeLearningService.cs");
+  assert.match(view, /MaterialSelected/);
+  assert.match(view, /Read next section/);
+  assert.match(controller, /ReadMaterialAsync/);
+  assert.match(controller, /materialContent \+= page\.Text/);
+  assert.match(controller, /activeMaterial\?\.Id != id/);
+  assert.match(controller, /ClearRecords\(\)/);
+  assert.match(main, /ClearMaterial\(\)/);
+  assert.match(api, /api\/materials\/\{id\}\/preview\?offset=\{offset\}/);
+  assert.doesNotMatch(controller, /File\.WriteAll|WebView2|cachedPassword/);
+});

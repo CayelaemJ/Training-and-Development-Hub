@@ -23,7 +23,17 @@
    <TextBlock Text="Your current CABO account data" FontSize="18"/>
    <ListView x:Name="OverviewItems" MaxHeight="260"/>
    <TextBlock Text="Study materials" FontSize="18" FontWeight="SemiBold"/>
-   <ListView x:Name="MaterialItems" MaxHeight="260"/>
+   <ListView x:Name="MaterialItems" MaxHeight="260" SelectionChanged="MaterialSelected"/>
+   <StackPanel x:Name="MaterialPanel" Visibility="Collapsed" Spacing="12">
+    <TextBlock x:Name="MaterialTitle" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+    <TextBlock Text="Private online learning material. No offline copy is stored on this device." TextWrapping="Wrap"/>
+    <TextBlock x:Name="MaterialText" TextWrapping="Wrap" IsTextSelectionEnabled="True" MaxWidth="860"/>
+    <StackPanel Orientation="Horizontal" Spacing="12">
+     <Button x:Name="MaterialNextButton" Content="Read next section" Click="ReadNextMaterial"/>
+     <Button x:Name="MaterialCloseButton" Content="Close material" Click="CloseMaterial"/>
+    </StackPanel>
+    <TextBlock x:Name="MaterialStatus" TextWrapping="Wrap"/>
+   </StackPanel>
    <TextBlock Text="Practice tests" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="QuizItems" MaxHeight="260" SelectionChanged="QuizSelected"/>
    <StackPanel x:Name="QuizPanel" Visibility="Collapsed" Spacing="10">
@@ -39,7 +49,7 @@
    </StackPanel>
    <TextBlock Text="Institution registry (authorised platform accounts only)" TextWrapping="Wrap" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="OrganizationItems" MaxHeight="260"/>
-   <TextBlock Text="This Windows client uses the secure CABO backend. Practice assessments are graded by the CABO backend; no marks are invented or cached locally. Materials remain online-only on Windows." TextWrapping="Wrap"/>
+   <TextBlock Text="This Windows client uses the secure CABO backend. Practice assessments are graded by the CABO backend; no marks are invented or cached locally. Materials are private, paged and online-only on Windows." TextWrapping="Wrap"/>
   </StackPanel>
  </ScrollViewer>
 </Window>
