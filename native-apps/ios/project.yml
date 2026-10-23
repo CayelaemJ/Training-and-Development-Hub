@@ -16,6 +16,7 @@ targets:
       - path: NativeHomeView.swift
       - path: NativeSession.swift
       - path: NativeQuizView.swift
+      - path: NativeMaterialView.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub
