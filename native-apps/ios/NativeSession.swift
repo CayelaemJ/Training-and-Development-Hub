@@ -35,6 +35,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var guardians: [GuardianInvitation] = []
     @Published var guardianGuidance = ""
     @Published var staffSchools: [StaffSchool] = []
+    @Published var adminOrganizations: [String] = []
     @Published var journey: [String] = []
     @Published var learnerHelp: [String] = []
 
@@ -181,6 +182,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 .compactMap { $0["label"] as? String }
             var nextGuardians: [GuardianInvitation] = []
             var nextStaff: [StaffSchool] = []
+            var nextAdminOrganizations: [String] = []
             var nextJourney: [String] = []
             var nextLearnerHelp: [String] = []
             var nextMaterials: [String] = []
@@ -189,7 +191,13 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextQuizSummaries: [NativeQuizSummary] = []
             var nextGuidance = ""
 
-            if verifiedRole == "parent" {
+            if verifiedRole == "superadmin" {
+                // Read-only registry via audited, server-authorized endpoint.
+                let data = try await request("api/platform/overview")
+                let registry = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                nextAdminOrganizations = (registry["organizations"] as? [[String: Any]] ?? [])
+                    .prefix(100).compactMap { row in row["name"] as? String }
+            } else if verifiedRole == "parent" {
                 let parentData = try await request("api/native/mobile/parent")
                 let parent = try JSONSerialization.jsonObject(with: parentData) as? [String: Any] ?? [:]
                 nextGuidance = parent["guidance"] as? String ?? ""
@@ -270,6 +278,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             guardians = nextGuardians
             guardianGuidance = nextGuidance
             staffSchools = nextStaff
+            adminOrganizations = nextAdminOrganizations
             journey = nextJourney
             learnerHelp = Array(nextLearnerHelp.prefix(20))
             materials = nextMaterials
@@ -279,7 +288,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Connected securely to CABO"
         } catch {
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-            guardians = []; staffSchools = []; journey = []; learnerHelp = []; guardianGuidance = ""
+            guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
@@ -363,7 +372,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-        guardians = []; staffSchools = []; journey = []; guardianGuidance = ""
+        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; guardianGuidance = ""
         status = "Signed out on this device."
         busy = false
     }
