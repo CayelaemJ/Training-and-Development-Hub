@@ -39,9 +39,14 @@ internal data class LearnerAcademicReport(
     val subjects: List<GuardianSubject>, val attendanceRate: Int?,
     val presentDays: Int, val recordedDays: Int
 ) { val id: String get() = "$organizationId:$year" }
+internal data class SupportTicket(
+    val id: Int, val organizationId: Int, val concept: String,
+    val status: String, val version: Int
+)
 internal data class StaffWorkspace(
     val organizationId: Int, val courses: List<String>, val supportSummary: List<String>,
-    val tickets: List<String>, val notice: String?
+    val tickets: List<String>, val notice: String?,
+    val ticketItems: List<SupportTicket> = emptyList()
 )
 internal data class NativeLearning(
     val portal: NativePortal,
