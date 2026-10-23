@@ -25,10 +25,21 @@
    <TextBlock Text="Study materials" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="MaterialItems" MaxHeight="260"/>
    <TextBlock Text="Practice tests" FontSize="18" FontWeight="SemiBold"/>
-   <ListView x:Name="QuizItems" MaxHeight="260"/>
+   <ListView x:Name="QuizItems" MaxHeight="260" SelectionChanged="QuizSelected"/>
+   <StackPanel x:Name="QuizPanel" Visibility="Collapsed" Spacing="10">
+    <TextBlock x:Name="QuizTitle" TextWrapping="Wrap" FontSize="20" FontWeight="SemiBold"/>
+    <TextBlock Text="Select one option for every question. Answers are graded by the secure CABO server." TextWrapping="Wrap"/>
+    <StackPanel x:Name="QuizQuestions" Spacing="12"/>
+    <StackPanel Orientation="Horizontal" Spacing="10">
+     <Button x:Name="QuizSubmitButton" Content="Submit assessment" Click="SubmitQuiz" IsEnabled="False"/>
+     <Button x:Name="QuizCheckButton" Content="Check saved submission" Click="CheckQuiz" Visibility="Collapsed"/>
+     <Button x:Name="QuizCloseButton" Content="Close test" Click="CloseQuiz"/>
+    </StackPanel>
+    <TextBlock x:Name="QuizResults" TextWrapping="Wrap" />
+   </StackPanel>
    <TextBlock Text="Institution registry (authorised platform accounts only)" TextWrapping="Wrap" FontSize="18" FontWeight="SemiBold"/>
    <ListView x:Name="OrganizationItems" MaxHeight="260"/>
-   <TextBlock Text="This Windows client uses the secure CABO backend. Quizzes and materials are currently read-only on Windows; no score is invented or saved locally." TextWrapping="Wrap"/>
+   <TextBlock Text="This Windows client uses the secure CABO backend. Practice assessments are graded by the CABO backend; no marks are invented or cached locally. Materials remain online-only on Windows." TextWrapping="Wrap"/>
   </StackPanel>
  </ScrollViewer>
 </Window>
