@@ -22,6 +22,7 @@ jobs:
           bash -n scripts/render-native-test-start.sh
           node --check lib/db/scripts/native-test-db-guard.mjs
           node --check scripts/smoke-native-test-login.mjs
+          node --check scripts/native-preview-pending.mjs
       - run: pnpm run typecheck
       - run: pnpm run build
         env:
