@@ -11,6 +11,13 @@
     <Button x:Name="RefreshButton" Content="Refresh" Click="RefreshDashboard" IsEnabled="False"/>
     <Button x:Name="SignOutButton" Content="Sign out" Click="SignOut" IsEnabled="False"/>
    </StackPanel>
+   <StackPanel x:Name="TestLoginPanel" Visibility="Collapsed" Spacing="10">
+    <TextBlock Text="Isolated demo account only" FontSize="17" FontWeight="SemiBold"/>
+    <TextBox x:Name="TestUsername" Header="Test username" Text="cabo_test" MaxLength="80"/>
+    <PasswordBox x:Name="TestPassword" Header="Test password" MaxLength="200"/>
+    <Button x:Name="TestSignInButton" Content="Sign in to test environment" Click="SignInTest"/>
+    <TextBlock Text="For fictional learner data only. Test sign-in is disabled in release builds." TextWrapping="Wrap"/>
+   </StackPanel>
    <ProgressRing x:Name="BusyIndicator" IsActive="False" Width="26" Height="26" HorizontalAlignment="Left"/>
    <TextBlock x:Name="RoleLabel" Text="Not signed in" FontSize="22" FontWeight="SemiBold"/>
    <TextBlock Text="Your current CABO account data" FontSize="18"/>
