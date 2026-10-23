@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
     private var nextPage by mutableStateOf<Int?>(null)
     private var studyBusy by mutableStateOf(false)
     private var studySubmitted by mutableStateOf(false)
+    private var studyUnconfirmed by mutableStateOf(false)
+    private var submissionKey by mutableStateOf("")
     private var studyMessage by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,7 +45,8 @@ class MainActivity : ComponentActivity() {
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
                         attempt = attempt, busy = studyBusy, submitted = studySubmitted,
-                        message = studyMessage,
+                        message = studyMessage, uncertain = studyUnconfirmed,
+                        recover = { recoverQuiz() },
                         answer = { question, option ->
                             if (!studySubmitted && !studyBusy && question in answers.indices) {
                                 answers = answers.toMutableList().also { it[question] = option }
@@ -135,6 +138,8 @@ class MainActivity : ComponentActivity() {
         attempt = null
         studyMessage = null
         studySubmitted = false
+        studyUnconfirmed = false
+        submissionKey = java.util.UUID.randomUUID().toString()
         studyBusy = true
         lifecycleScope.launch {
             try {
@@ -155,13 +160,33 @@ class MainActivity : ComponentActivity() {
         studyBusy = true
         lifecycleScope.launch {
             try {
-                val graded = api.submitQuiz(quiz.id, answers.map { it!! })
+                val graded = api.submitQuiz(quiz.id, answers.map { it!! }, submissionKey)
                 if (graded.quizId != quiz.id || graded.totalQuestions != quiz.questions.size)
                     throw IllegalStateException("Unexpected grade response")
                 attempt = graded
+                studyUnconfirmed = false
                 studyMessage = "Practice assessment graded by CABO."
             } catch (_: Exception) {
-                studyMessage = "Submission status cannot be confirmed. Check the web assessment history before another attempt."
+                studyUnconfirmed = true
+                studyMessage = "Submission status uncertain. Check its status without posting twice."
+            } finally { studyBusy = false }
+        }
+    }
+
+    private fun recoverQuiz() {
+        val id = activeQuiz?.id ?: return
+        if (studyBusy || !studySubmitted || submissionKey.isEmpty()) return
+        studyBusy = true
+        lifecycleScope.launch {
+            try {
+                val graded = api.lookupQuiz(id, submissionKey)
+                if (graded.totalQuestions != activeQuiz?.questions?.size)
+                    throw IllegalStateException("Result mismatch")
+                attempt = graded
+                studyUnconfirmed = false
+                studyMessage = "Saved result confirmed by CABO."
+            } catch (_: Exception) {
+                studyMessage = "Result not confirmed yet. Contact your educator if it remains unavailable."
             } finally { studyBusy = false }
         }
     }
@@ -202,6 +227,8 @@ class MainActivity : ComponentActivity() {
         studyText = ""
         nextPage = null
         studySubmitted = false
+        studyUnconfirmed = false
+        submissionKey = ""
         studyMessage = null
     }
 
