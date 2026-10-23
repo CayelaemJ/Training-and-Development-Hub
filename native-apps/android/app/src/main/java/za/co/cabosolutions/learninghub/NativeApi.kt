@@ -383,7 +383,8 @@ internal class NativeApi(private val context: Context) {
         }.take(20)
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            materialEntries = materialEntries, quizEntries = quizEntries)
+            materialEntries = materialEntries, quizEntries = quizEntries,
+            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
     }
 
     suspend fun fetchQuiz(id: Int): PracticeQuiz =
