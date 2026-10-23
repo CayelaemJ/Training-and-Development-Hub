@@ -32,3 +32,13 @@ test("isolated test deploy refuses to push a schema to an unmarked existing data
   assert.match(start, /if \[\[ "\$mode" == "EMPTY" \]\]/);
   assert.match(start, /elif \[\[ "\$mode" == "READY" \]\]/);
 });
+
+test("unconfigured staging runs a non-API pending page rather than opening sign-in", () => {
+  const pending = readFileSync("scripts/native-preview-pending.mjs", "utf8");
+  assert.match(start, /native-preview-pending\.mjs/);
+  assert.match(start, /-z "\$\{DATABASE_URL:-\}"/);
+  assert.match(pending, /req\.url === "\/" && req\.method === "GET"/);
+  assert.match(pending, /writeHead\(503/);
+  assert.match(pending, /test_setup_pending/);
+  assert.doesNotMatch(pending, /api\/native\/test-login|createSession|DATABASE_URL/);
+});
