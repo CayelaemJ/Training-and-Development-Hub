@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db, usersTable, nativeAuthCodesTable } from "@workspace/db";
 import { createSession, deleteSession, getSession, getSessionId } from "../lib/auth";
+import { nativeTestLoginEnabled, verifyNativeTestLogin } from "../lib/nativeTestLoginPolicy";
 import {
   nativeAuthEnabled, nativeRedirect, validPkceChallenge, validPkceVerifier,
   validCode, validState, randomNativeCode, codeDigest, verifyPkce,
@@ -16,6 +17,51 @@ const noStore = (_req: unknown, res: import("express").Response, next: () => voi
   next();
 };
 router.use("/native", noStore);
+
+// This optional password route exists ONLY for a separately isolated dummy-data
+// pilot. Ordinary device login continues to use RFC8252 PKCE and the real OIDC
+// provider; no test password, secret or email is ever bundled in native clients.
+const testFailures = new Map<string, { attempts: number; blockedUntil: number }>();
+router.post("/native/test-login", async (req, res) => {
+  if (!nativeTestLoginEnabled(process.env)) { res.sendStatus(404); return; }
+  const ip = req.ip ?? "unknown";
+  const now = Date.now();
+  const previous = testFailures.get(ip);
+  if (previous && previous.attempts >= 6 && previous.blockedUntil > now) {
+    res.setHeader("Retry-After", "900");
+    res.status(429).json({ error: "Too many sign-in attempts. Try again later." });
+    return;
+  }
+  const username = req.body?.username;
+  const password = req.body?.password;
+  let valid = false;
+  try { valid = verifyNativeTestLogin(username, password, process.env); }
+  catch { valid = false; }
+  if (!valid) {
+    if (testFailures.size > 2000) testFailures.clear();
+    const attempts = previous && previous.blockedUntil > now ? previous.attempts + 1 : 1;
+    testFailures.set(ip, { attempts, blockedUntil: now + 15 * 60_000 });
+    res.status(401).json({ error: "Incorrect test account credentials." });
+    return;
+  }
+  testFailures.delete(ip);
+  // Test ID cannot be assigned to any institutional learner. The opt-in
+  // deployment MUST have its own Neon database populated with dummy data.
+  const [user] = await db.insert(usersTable)
+    .values({ id: "cabo-isolated-test-learner", firstName: "CABO", lastName: "Tester" })
+    .onConflictDoUpdate({
+      target: usersTable.id,
+      set: { firstName: "CABO", lastName: "Tester" }
+    }).returning();
+  const sid = await createSession({
+    user: { id: user.id, email: user.email, firstName: user.firstName,
+            lastName: user.lastName, profileImageUrl: user.profileImageUrl },
+    access_token: "cabo-native-session-v1",
+    expires_at: Math.floor(now / 1000) + NATIVE_SESSION_SECONDS
+  });
+  res.status(200).json({ access_token: sid, token_type: "Bearer",
+                         expires_in: NATIVE_SESSION_SECONDS });
+});
 
 // Browser phase: authenticate with the existing OIDC identity provider in
 // system browser, then create a short-lived code bound to PKCE S256.
