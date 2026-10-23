@@ -421,7 +421,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; guardianGuidance = ""
+        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""
         status = "Signed out on this device."
         busy = false
     }
