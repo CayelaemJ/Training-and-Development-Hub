@@ -543,38 +543,64 @@ router.post("/quizzes/:id/attempts", async (req, res): Promise<void> => {
   }));
   const correctCount = feedback.filter((item) => item.isCorrect).length;
   const percentage = Math.round((correctCount / feedback.length) * 1000) / 10;
-  const [attempt] = await db
-    .insert(quizAttemptsTable)
-    .values({
-      userId: req.user.id,
-      quizId: quiz.id,
-      answers: body.data.answers,
-      correctCount,
-      totalQuestions: quiz.questions.length,
-      percentage,
-      feedback,
-      ...(key ? { requestKey: key } : {}),
-    })
-    .onConflictDoNothing()
-    .returning();
-
-  if (!attempt && key) {
-    const [existing] = await db.select().from(quizAttemptsTable)
-      .where(and(eq(quizAttemptsTable.userId, req.user.id),
-                 eq(quizAttemptsTable.requestKey, key))).limit(1);
-    if (!existing || existing.quizId !== quiz.id ||
-        JSON.stringify(existing.answers) !== JSON.stringify(body.data.answers)) {
-      res.status(409).json({ error: "This submission key is already in use." }); return;
+  // Preserve the old SQL/ORM contract unless the reviewed migration and
+  // per-request idempotency flag are both active. This prevents returning a
+  // not-yet-existent database column on established web installations.
+  const submission = {
+    userId: req.user.id,
+    quizId: quiz.id,
+    answers: body.data.answers,
+    correctCount,
+    totalQuestions: quiz.questions.length,
+    percentage,
+    feedback,
+  };
+  let attempt: typeof quizAttemptsTable.$inferSelect | undefined;
+  let replayed = false;
+  if (key) {
+    // One key per user across all quizzes. The partial unique index arbitrates
+    // concurrent duplicate calls atomically; a replay cannot change answers.
+    const created = await db.execute(sql`
+      INSERT INTO quiz_attempts
+        (user_id, quiz_id, answers, correct_count, total_questions,
+         percentage, feedback, request_key)
+      VALUES
+        (${req.user.id}, ${quiz.id}, ${JSON.stringify(body.data.answers)}::jsonb,
+         ${correctCount}, ${quiz.questions.length}, ${percentage},
+         ${JSON.stringify(feedback)}::jsonb, ${key})
+      ON CONFLICT (user_id, request_key) WHERE request_key IS NOT NULL
+        DO NOTHING
+      RETURNING id
+    `);
+    const freshId = Number(created.rows[0]?.id);
+    if (Number.isSafeInteger(freshId) && freshId > 0) {
+      [attempt] = await db.select().from(quizAttemptsTable)
+        .where(and(eq(quizAttemptsTable.id, freshId),
+                   eq(quizAttemptsTable.userId, req.user.id))).limit(1);
+    } else {
+      const result = await db.execute(sql`
+        SELECT id, quiz_id, answers FROM quiz_attempts
+        WHERE user_id=${req.user.id} AND request_key=${key} LIMIT 1
+      `);
+      const item = result.rows[0];
+      if (!item || Number(item.quiz_id) !== quiz.id ||
+          JSON.stringify(item.answers) !== JSON.stringify(body.data.answers)) {
+        res.status(409).json({ error: "This submission key is already in use." }); return;
+      }
+      const oldId = Number(item.id);
+      [attempt] = await db.select().from(quizAttemptsTable)
+        .where(and(eq(quizAttemptsTable.id, oldId),
+                   eq(quizAttemptsTable.userId, req.user.id))).limit(1);
+      replayed = true;
     }
-    res.setHeader("Cache-Control", "private, no-store");
-    res.status(200).json(SubmitQuizAttemptResponse.parse(existing));
-    return;
+  } else {
+    [attempt] = await db.insert(quizAttemptsTable).values(submission).returning();
   }
   if (!attempt) {
-    res.status(409).json({ error: "Assessment submission conflict." }); return;
+    res.status(409).json({ error: "Assessment submission could not be confirmed." }); return;
   }
   res.setHeader("Cache-Control", "private, no-store");
-  res.status(201).json(SubmitQuizAttemptResponse.parse(attempt));
+  res.status(replayed ? 200 : 201).json(SubmitQuizAttemptResponse.parse(attempt));
 });
 
 // Resolves an interrupted native submit without creating another attempt.
@@ -591,10 +617,18 @@ router.get("/quizzes/:id/attempts/by-key/:key", async (req, res): Promise<void> 
   if (!id.success || !/^[a-zA-Z0-9_-]{16,64}$/.test(key)) {
     res.status(400).json({ error: "Invalid assessment request." }); return;
   }
+  const result = await db.execute(sql`
+    SELECT id FROM quiz_attempts
+    WHERE quiz_id=${id.data} AND user_id=${req.user.id}
+      AND request_key=${key} LIMIT 1
+  `);
+  const requestId = Number(result.rows[0]?.id);
+  if (!Number.isSafeInteger(requestId) || requestId <= 0) {
+    res.status(404).json({ error: "No matching submission yet." }); return;
+  }
   const [attempt] = await db.select().from(quizAttemptsTable)
-    .where(and(eq(quizAttemptsTable.quizId, id.data),
-               eq(quizAttemptsTable.userId, req.user.id),
-               eq(quizAttemptsTable.requestKey, key))).limit(1);
+    .where(and(eq(quizAttemptsTable.id, requestId),
+               eq(quizAttemptsTable.userId, req.user.id))).limit(1);
   if (!attempt) { res.status(404).json({ error: "No matching submission yet." }); return; }
   res.json(SubmitQuizAttemptResponse.parse(attempt));
 });
