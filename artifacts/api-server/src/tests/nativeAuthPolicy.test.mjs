@@ -14,10 +14,11 @@ test("native auth is disabled unless explicitly opted in", () => {
   assert.equal(nativeAuthEnabled({ CABO_NATIVE_AUTH_ENABLED: "false" }), false);
   assert.equal(nativeAuthEnabled({ CABO_NATIVE_AUTH_ENABLED: "true" }), true);
 });
-test("only fixed native Android redirect is registered", () => {
+test("only fixed native callbacks are registered", () => {
   assert.equal(nativeRedirect("cabo-android"), "cabo-learninghub-android://auth");
   assert.equal(nativeRedirect("cabo-ios"), "cabo-learninghub-ios://auth");
-  for(const id of ["web", "cabo-windows", "https://evil.test", "", null])
+  assert.equal(nativeRedirect("cabo-windows"), "http://127.0.0.1:47787/auth");
+  for(const id of ["web", "https://evil.test", "http://127.0.0.1:9000/auth", "", null])
     assert.equal(nativeRedirect(id), null);
 });
 test("PKCE RFC7636 S256 validates exact verifier and challenge", () => {
