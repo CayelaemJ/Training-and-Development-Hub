@@ -25,6 +25,15 @@ internal data class NativePortal(val role: String, val summary: List<String>, va
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
+internal data class GuardianSubject(val name: String, val percentage: Double, val assessmentCount: Int)
+internal data class GuardianAcademicReport(
+    val learnerId: String, val learnerName: String, val organizationId: Int,
+    val year: Int, val grade: String, val average: Double?,
+    val subjects: List<GuardianSubject>, val attendanceRate: Int?,
+    val presentDays: Int, val recordedDays: Int, val official: Boolean
+) {
+    val id: String get() = "$learnerId:$organizationId:$year"
+}
 internal data class StaffWorkspace(
     val organizationId: Int, val courses: List<String>, val supportSummary: List<String>,
     val tickets: List<String>, val notice: String?
@@ -35,6 +44,8 @@ internal data class NativeLearning(
     val quizzes: List<String>,
     val guardians: List<GuardianInvite> = emptyList(),
     val parentGuidance: String = "",
+    val parentReports: List<GuardianAcademicReport> = emptyList(),
+    val parentReportNotice: String = "",
     val staff: List<StaffWorkspace> = emptyList(),
     val journey: List<String> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
@@ -202,10 +213,41 @@ internal class NativeApi(private val context: Context) {
                     item.optString("learnerName").takeUnless { it.isBlank() || it == "null" },
                     item.optBoolean("verifiedForRead"))
             }
+            var notice = "Verified progress reports are unavailable right now."
+            val reports = try {
+                val payload = request("/api/native/mobile/parent/reports", auth = true)
+                notice = payload.optString("guidance")
+                val rows = payload.optJSONArray("reports") ?: JSONArray()
+                (0 until minOf(rows.length(), 20)).mapNotNull { i ->
+                    val row = rows.optJSONObject(i) ?: return@mapNotNull null
+                    val id = row.optString("learnerId")
+                    val org = row.optInt("organizationId")
+                    if (id.isBlank() || org <= 0) return@mapNotNull null
+                    val scores = row.optJSONArray("subjects") ?: JSONArray()
+                    val subjects = (0 until scores.length()).mapNotNull { j ->
+                        val score = scores.optJSONObject(j) ?: return@mapNotNull null
+                        GuardianSubject(score.optString("name"), score.optDouble("percentage"),
+                            score.optInt("assessmentCount"))
+                    }
+                    val attendance = row.optJSONObject("attendance") ?: JSONObject()
+                    GuardianAcademicReport(
+                        id, row.optString("learnerName"), org,
+                        row.optInt("year"), row.optString("grade"),
+                        if (row.isNull("average")) null else row.optDouble("average"),
+                        subjects,
+                        if (attendance.isNull("rate")) null else attendance.optInt("rate"),
+                        attendance.optInt("presentDays"), attendance.optInt("recordedDays"),
+                        row.optBoolean("official")
+                    )
+                }
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                emptyList()
+            }
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(),
-                guardians = relationships,
-                parentGuidance = response.optString("guidance")
+                guardians = relationships, parentGuidance = response.optString("guidance"),
+                parentReports = reports, parentReportNotice = notice
             )
         }
 
