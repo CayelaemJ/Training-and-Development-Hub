@@ -149,6 +149,76 @@ router.get("/materials", async (req, res): Promise<void> => {
   res.json(ListMaterialsResponse.parse(materials));
 });
 
+// Read-only, account-scoped study material preview for native clients.
+// Paged plain text avoids releasing private object-storage locations or
+// downloading very large documents on low-data phones.
+router.get("/materials/:id/preview", async (req, res): Promise<void> => {
+  if (!requireAuth(req, res)) return;
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  const id = z.coerce.number().int().positive().safeParse(req.params.id);
+  const offset = z.coerce.number().int().min(0).max(2_000_000).safeParse(req.query.offset ?? 0);
+  if (!id.success || !offset.success) {
+    res.status(400).json({ error: "Choose a valid material and reading position." });
+    return;
+  }
+  const [material] = await db.select({
+    id: studyMaterialsTable.id,
+    title: studyMaterialsTable.title,
+    fileName: studyMaterialsTable.fileName,
+    objectPath: studyMaterialsTable.objectPath,
+  }).from(studyMaterialsTable).where(and(
+    eq(studyMaterialsTable.id, id.data),
+    eq(studyMaterialsTable.userId, req.user.id),
+  )).limit(1);
+  if (!material) {
+    res.status(404).json({ error: "This learning material is not available to your account." });
+    return;
+  }
+  try {
+    const cached = await cachedMaterial(material.id, req.user.id);
+    let text = cached.text;
+    if (!text) {
+      const local = material.objectPath.startsWith("/railway-uploads/");
+      const [blob] = local
+        ? await db.select({ bytes: materialUploadBlobsTable.bytes })
+            .from(materialUploadBlobsTable)
+            .where(and(eq(materialUploadBlobsTable.objectPath, material.objectPath),
+                       eq(materialUploadBlobsTable.userId, req.user.id))).limit(1)
+        : [];
+      const buffer = local
+        ? blob?.bytes
+        : await readObjectBuffer(
+            (await objectStorageService.getObjectEntityFile(material.objectPath)).createReadStream()
+          );
+      if (!buffer) {
+        res.status(404).json({ error: "The original material is unavailable." });
+        return;
+      }
+      // Never start paid OCR or AI vision merely because a learner opens a
+      // preview; cached text already produced with consent may be displayed.
+      text = await extractMaterialText(material.fileName, buffer, { allowAiReading: false });
+    }
+    const start = Math.min(offset.data, text.length);
+    const end = Math.min(start + 16_000, text.length);
+    res.json({
+      id: material.id,
+      title: material.title,
+      text: text.slice(start, end),
+      offset: start,
+      nextOffset: end < text.length ? end : null,
+      totalCharacters: text.length,
+    });
+  } catch (error) {
+    if (error instanceof MaterialReadError) {
+      res.status(422).json({ error: error.message });
+      return;
+    }
+    req.log.error({ materialId: material.id, errorType: error instanceof Error ? error.name : "Unknown" }, "Native material preview unavailable");
+    res.status(503).json({ error: "Could not open this learning material. Please retry later." });
+  }
+});
+
 router.post("/materials", async (req, res): Promise<void> => {
   if (!requireAuth(req, res)) return;
   const parsed = CreateMaterialBody.safeParse(req.body);
