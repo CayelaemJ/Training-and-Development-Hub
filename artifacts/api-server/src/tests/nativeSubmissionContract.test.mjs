@@ -10,12 +10,14 @@ test("superadmin never activates in production even with leaked test flags", () 
   const id = "cabo-isolated-test-learner";
   const enabled = {
     CABO_ENVIRONMENT: "testing", ENABLE_CABO_SUPERADMIN: "true",
+    CABO_TEST_DATABASE_ISOLATED: "true",
     CABO_SUPERADMIN_USER_ID: id
   };
   assert.equal(isTestSuperadmin(id, enabled), true);
   assert.equal(isTestSuperadmin("someone-else", enabled), false);
   assert.equal(isTestSuperadmin(id, { ...enabled, CABO_ENVIRONMENT: "production" }), false);
   assert.equal(isTestSuperadmin(id, { ...enabled, ENABLE_CABO_SUPERADMIN: "false" }), false);
+  assert.equal(isTestSuperadmin(id, { ...enabled, CABO_TEST_DATABASE_ISOLATED: "false" }), false);
   assert.equal(isTestSuperadmin(id, { ...enabled, CABO_SUPERADMIN_USER_ID: "" }), false);
 });
 
