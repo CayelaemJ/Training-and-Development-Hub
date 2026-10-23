@@ -11,6 +11,16 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import android.util.Base64
 
+internal data class MaterialSummary(val id: Int, val title: String)
+internal data class QuizSummary(val id: Int, val title: String, val questionCount: Int, val latestScore: Double?)
+internal data class QuizQuestion(val prompt: String, val options: List<String>)
+internal data class PracticeQuiz(val id: Int, val title: String, val questions: List<QuizQuestion>)
+internal data class QuizFeedback(val questionIndex: Int, val isCorrect: Boolean, val explanation: String)
+internal data class QuizAttempt(val id: Int, val quizId: Int, val correctCount: Int,
+    val totalQuestions: Int, val percentage: Double, val feedback: List<QuizFeedback>)
+internal data class MaterialPage(val id: Int, val title: String, val text: String,
+    val offset: Int, val nextOffset: Int?)
+
 internal data class NativePortal(val role: String, val summary: List<String>, val areas: List<String>)
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
@@ -27,7 +37,9 @@ internal data class NativeLearning(
     val parentGuidance: String = "",
     val staff: List<StaffWorkspace> = emptyList(),
     val journey: List<String> = emptyList(),
-    val learnerHelp: List<String> = emptyList()
+    val learnerHelp: List<String> = emptyList(),
+    val materialEntries: List<MaterialSummary> = emptyList(),
+    val quizEntries: List<QuizSummary> = emptyList()
 )
 
 internal class NativeApi(private val context: Context) {
@@ -202,20 +214,29 @@ internal class NativeApi(private val context: Context) {
             )
         }
 
-        val materials = try {
+        val materialEntries = try {
             getArray("/api/materials").let { arr ->
                 (0 until arr.length()).mapNotNull { i ->
-                    arr.optJSONObject(i)?.optString("title")?.takeIf { it.isNotBlank() }
+                    val row = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val id = row.optInt("id")
+                    val title = row.optString("title")
+                    if (id > 0 && title.isNotBlank()) MaterialSummary(id, title) else null
                 }.take(30)
             }
         } catch (error: Exception) {
             if (!hasSession()) throw error
             emptyList()
         }
-        val quizzes = try {
+        val quizEntries = try {
             getArray("/api/quizzes").let { arr ->
                 (0 until arr.length()).mapNotNull { i ->
-                    arr.optJSONObject(i)?.optString("title")?.takeIf { it.isNotBlank() }
+                    val row = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val id = row.optInt("id")
+                    val title = row.optString("title")
+                    if (id <= 0 || title.isBlank()) null else QuizSummary(
+                        id, title, row.optInt("questionCount"),
+                        if (row.isNull("latestScore")) null else row.optDouble("latestScore")
+                    )
                 }.take(30)
             }
         } catch (error: Exception) {
@@ -246,9 +267,52 @@ internal class NativeApi(private val context: Context) {
                 emptyList()
             }
         }.take(20)
-        NativeLearning(NativePortal(role, summary, cards), materials, quizzes,
-            journey = journey, learnerHelp = learnerHelp)
+        NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
+            quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
+            materialEntries = materialEntries, quizEntries = quizEntries)
     }
+
+    suspend fun fetchQuiz(id: Int): PracticeQuiz =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0)
+            val obj = request("/api/quizzes/$id", auth = true)
+            val questions = obj.getJSONArray("questions")
+            val result = (0 until questions.length()).map { i ->
+                val q = questions.getJSONObject(i)
+                val a = q.getJSONArray("options")
+                QuizQuestion(q.getString("prompt"),
+                    (0 until a.length()).map { index -> a.getString(index) })
+            }
+            require(obj.getInt("id") == id && result.isNotEmpty() &&
+                result.all { it.options.isNotEmpty() }) { "Invalid assessment content" }
+            PracticeQuiz(id, obj.getString("title"), result)
+        }
+
+    suspend fun submitQuiz(id: Int, answers: List<Int>): QuizAttempt =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0 && answers.isNotEmpty() && answers.all { it >= 0 })
+            val json = request("/api/quizzes/$id/attempts",
+                JSONObject().put("answers", JSONArray(answers)), auth = true)
+            val rows = json.getJSONArray("feedback")
+            val feedback = (0 until rows.length()).map { i ->
+                val row = rows.getJSONObject(i)
+                QuizFeedback(row.getInt("questionIndex"),
+                    row.getBoolean("isCorrect"), row.getString("explanation"))
+            }
+            require(json.getInt("quizId") == id) { "Mismatched assessment result" }
+            QuizAttempt(json.getInt("id"), id, json.getInt("correctCount"),
+                json.getInt("totalQuestions"), json.getDouble("percentage"), feedback)
+        }
+
+    suspend fun fetchMaterialPage(id: Int, offset: Int): MaterialPage =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0 && offset >= 0)
+            val obj = request("/api/materials/$id/preview?offset=$offset", auth = true)
+            val next = if (obj.isNull("nextOffset")) null else obj.getInt("nextOffset")
+            require(obj.getInt("id") == id && obj.getInt("offset") == offset &&
+                (next == null || next > offset)) { "Invalid reading position" }
+            MaterialPage(id, obj.getString("title"), obj.getString("text"), offset, next)
+        }
 
     suspend fun respondToGuardianInvite(invitationId: Int, accept: Boolean): Unit =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
