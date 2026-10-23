@@ -39,7 +39,8 @@ internal data class NativeLearning(
     val journey: List<String> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
-    val quizEntries: List<QuizSummary> = emptyList()
+    val quizEntries: List<QuizSummary> = emptyList(),
+    val adminOrganizations: List<String> = emptyList()
 )
 
 internal class NativeApi(private val context: Context) {
@@ -156,6 +157,19 @@ internal class NativeApi(private val context: Context) {
 
         // Role is resolved by CABO on the server. Device size is presentation
         // only, never a permission to access another person's information.
+        if (role == "superadmin") {
+            // Audited, backend-authorized registry only; no learner PII.
+            val json = request("/api/platform/overview", auth = true)
+            val items = json.optJSONArray("organizations") ?: JSONArray()
+            val names = (0 until minOf(items.length(), 100)).mapNotNull { i ->
+                items.optJSONObject(i)?.optString("name")?.takeIf { it.isNotBlank() }
+            }
+            return@withContext NativeLearning(
+                NativePortal(role, summary, cards), emptyList(), emptyList(),
+                adminOrganizations = names
+            )
+        }
+
         if (role == "parent") {
             val response = request("/api/native/mobile/parent", auth = true)
             val arr = response.optJSONArray("relationships") ?: JSONArray()
