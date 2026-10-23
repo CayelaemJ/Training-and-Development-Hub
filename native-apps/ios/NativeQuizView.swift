@@ -47,6 +47,8 @@ struct NativeQuizView: View {
     @State private var attempt: NativeQuizAttempt?
     @State private var busy = false
     @State private var submissionStarted = false
+    @State private var submissionUnconfirmed = false
+    @State private var requestKey = UUID().uuidString.lowercased()
     @State private var message: String?
 
     private var complete: Bool {
@@ -112,6 +114,14 @@ struct NativeQuizView: View {
                             Text("Submit only when ready. An interrupted submission must be checked on the web before another attempt.")
                                 .font(.footnote).foregroundColor(.secondary)
                         }
+                    }
+
+                    if submissionUnconfirmed && !busy {
+                        Button("Check submission status") {
+                            Task { await recover() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                     }
 
                     if let attempt {
@@ -180,16 +190,36 @@ struct NativeQuizView: View {
         defer { busy = false }
         do {
             let submitted = try await session.submitQuiz(
-                id: quiz.id, answers: answers.compactMap { $0 })
+                id: quiz.id, answers: answers.compactMap { $0 }, requestKey: requestKey)
             guard submitted.quizId == quiz.id,
                   submitted.totalQuestions == quiz.questions.count else {
                 message = "CABO returned an unexpected result. Check your assessment history."
                 return
             }
             attempt = submitted
+            submissionUnconfirmed = false
             message = "Answers submitted and graded by CABO."
         } catch {
-            message = "Submission status could not be confirmed. Do not submit again yet. Check your CABO web assessment history first."
+            submissionUnconfirmed = true
+            message = "Submission status is uncertain. Check its status without submitting again."
+        }
+    }
+
+    private func recover() async {
+        guard submissionStarted, !busy, let quiz else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let result = try await session.findSubmittedQuiz(id: quiz.id, requestKey: requestKey)
+            guard result.quizId == quiz.id, result.totalQuestions == quiz.questions.count else {
+                message = "Result mismatch. Contact your educator."
+                return
+            }
+            attempt = result
+            submissionUnconfirmed = false
+            message = "CABO confirmed the saved assessment result."
+        } catch {
+            message = "Result not yet confirmed. Keep this screen available and contact your educator if needed."
         }
     }
 }
