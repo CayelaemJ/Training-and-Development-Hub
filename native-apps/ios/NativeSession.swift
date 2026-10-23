@@ -41,7 +41,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     // Test-login is a build-time opt-in, never enabled by a server response.
     var testLoginAvailable: Bool {
-        Bundle.main.object(forInfoDictionaryKey: "CABO_ENABLE_TEST_LOGIN") as? Bool == true
+        Bundle.main.object(forInfoDictionaryKey: "CABO_ENABLE_TEST_LOGIN") as? Bool == true &&
+            origin.host != "cabo-learning-hub-pilot.onrender.com"
     }
     private let origin: URL = {
         let source = Bundle.main.object(forInfoDictionaryKey: "CABO_API_ORIGIN") as? String ?? ""
