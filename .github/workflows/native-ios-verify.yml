@@ -1,0 +1,35 @@
+name: CABO native iOS build verification
+on:
+  pull_request:
+    paths:
+      - 'native-apps/ios/**'
+      - '.github/workflows/native-ios-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios-simulator-build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select installed Xcode
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project from source
+        working-directory: native-apps/ios
+        run: xcodegen generate
+      - name: Compile iPhone simulator app without signing
+        working-directory: native-apps/ios
+        run: |
+          xcodebuild \
+            -project CABOLearningHub.xcodeproj \
+            -scheme CABOLearningHub \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Explain validation scope
+        run: echo 'Simulator compilation only. Physical iPhone sign-in, Keychain, notifications and store signing require a separate device test.'
