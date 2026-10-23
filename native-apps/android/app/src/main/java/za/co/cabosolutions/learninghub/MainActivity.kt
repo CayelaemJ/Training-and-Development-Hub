@@ -29,6 +29,9 @@ class MainActivity : ComponentActivity() {
     private var screen by mutableStateOf<NativeLearning?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
+    private var selectedSupportTicket by mutableStateOf<SupportTicket?>(null)
+    private var supportReply by mutableStateOf("")
+    private var supportReplyAttempted by mutableStateOf(false)
     private var activeQuiz by mutableStateOf<PracticeQuiz?>(null)
     private var answers by mutableStateOf<List<Int?>>(emptyList())
     private var attempt by mutableStateOf<QuizAttempt?>(null)
@@ -62,6 +65,13 @@ class MainActivity : ComponentActivity() {
                         nextOffset = nextPage, busy = studyBusy, message = studyMessage,
                         next = { readNextPage() }, close = { closeStudy() }
                     )
+                    selectedSupportTicket != null -> NativeSupportReplyScreen(
+                        ticket = selectedSupportTicket!!, reply = supportReply,
+                        busy = studyBusy, attempted = supportReplyAttempted,
+                        message = studyMessage,
+                        onReply = { supportReply = it }, submit = { sendSupportReply() },
+                        close = { closeStudy() }
+                    )
                     else -> NativeHome(
                         status = status, busy = busy, data = screen,
                         signIn = { startSignIn() }, refresh = { loadDashboard() },
@@ -73,7 +83,8 @@ class MainActivity : ComponentActivity() {
                         signOut = { signOut() },
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
                         openQuiz = { openQuiz(it) },
-                        openMaterial = { openMaterial(it) }
+                        openMaterial = { openMaterial(it) },
+                        openSupportTicket = { openSupportTicket(it) }
                     )
                 }
             }
