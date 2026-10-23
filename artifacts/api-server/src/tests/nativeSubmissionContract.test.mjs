@@ -25,10 +25,11 @@ test("quiz attempt uniqueness requires migration and explicit environment flag",
   const server = src("artifacts/api-server/src/routes/training.ts");
   assert.match(migration, /ADD COLUMN IF NOT EXISTS request_key/);
   assert.match(migration, /UNIQUE INDEX IF NOT EXISTS uq_quiz_attempts_user_request_key/);
-  assert.match(schema, /requestKey: varchar\("request_key"/);
+  assert.doesNotMatch(schema, /requestKey: varchar\("request_key"/);
   assert.match(server, /CABO_QUIZ_IDEMPOTENCY_ENABLED === "true"/);
-  assert.match(server, /onConflictDoNothing\(\)/);
-  assert.match(server, /existing\.quizId !== quiz\.id/);
+  assert.match(server, /ON CONFLICT \(user_id, request_key\) WHERE request_key IS NOT NULL/);
+  assert.match(server, /JSON\.stringify\(item\.answers\) !== JSON\.stringify\(body\.data\.answers\)/);
+  assert.match(server, /db\.insert\(quizAttemptsTable\)\.values\(submission\)\.returning\(\)/);
   assert.match(server, /eq\(quizAttemptsTable\.userId, req\.user\.id\)/);
   assert.match(server, /router\.get\("\/quizzes\/:id\/attempts\/by-key\/:key"/);
 });
