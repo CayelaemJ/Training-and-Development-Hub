@@ -4,6 +4,7 @@ import SwiftUI
 // a sidebar + content pane on iPad and a single touch-first view on iPhone.
 struct NativeHomeView: View {
     @StateObject private var session = NativeSession()
+    @State private var selectedQuiz: NativeQuizSummary?
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
 
@@ -43,6 +44,9 @@ struct NativeHomeView: View {
         .navigationViewStyle(StackNavigationViewStyle())
         .tint(clay)
         .task { await session.restore() }
+        .sheet(item: $selectedQuiz) { quiz in
+            NativeQuizView(session: session, item: quiz)
+        }
     }
 
     private var mainScroll: some View {
@@ -185,8 +189,31 @@ struct NativeHomeView: View {
         if session.quizzes.isEmpty {
             infoTile("No tests available", "Your assessments will appear here when assigned.", system: "checkmark.circle")
         }
-        ForEach(session.quizzes, id: \.self) { title in
-            infoTile(title, "My practice test", system: "checkmark.circle")
+        ForEach(session.quizSummaries) { quiz in
+            Button {
+                selectedQuiz = quiz
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle").foregroundColor(clay)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(quiz.title).font(.headline)
+                        Text("\(quiz.questionCount) questions")
+                            .font(.subheadline).foregroundColor(.secondary)
+                        if let score = quiz.latestScore {
+                            Text("Previous score: \(score.formatted())%")
+                                .font(.footnote).foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundColor(.secondary)
+                }
+                .padding(16)
+                .background(Color(UIColor.secondarySystemBackground),
+                            in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(session.busy)
+            .accessibilityHint("Opens a CABO practice assessment to complete and submit")
         }
         title("My learning support")
         if session.learnerHelp.isEmpty {
