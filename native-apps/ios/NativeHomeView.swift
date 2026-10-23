@@ -4,6 +4,8 @@ import SwiftUI
 // a sidebar + content pane on iPad and a single touch-first view on iPhone.
 struct NativeHomeView: View {
     @StateObject private var session = NativeSession()
+    @State private var testUsername = "cabo_test"
+    @State private var testPassword = ""
     @State private var selectedQuiz: NativeQuizSummary?
     @State private var selectedMaterial: NativeMaterialSummary?
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -76,6 +78,27 @@ struct NativeHomeView: View {
                 Button("Sign in securely") { session.signIn() }
                     .buttonStyle(.borderedProminent).disabled(session.busy)
                     .controlSize(.large)
+                if session.testLoginAvailable {
+                    Divider()
+                    Text("Isolated test account").font(.headline)
+                    TextField("Test username", text: $testUsername)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+                    SecureField("Test password", text: $testPassword)
+                        .textContentType(.password)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Sign in to test environment") {
+                        let secret = testPassword
+                        testPassword = ""
+                        Task { await session.signInTest(username: testUsername, password: secret) }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(session.busy || testUsername.isEmpty || testPassword.isEmpty)
+                    Text("Only for an isolated dummy-data CABO pilot. Real school accounts use secure browser sign-in.")
+                        .font(.footnote).foregroundColor(.secondary)
+                }
                 Text("Sign in to access learning and family services. A pending invitation never grants child-record access.")
                     .font(.footnote)
             } else {
