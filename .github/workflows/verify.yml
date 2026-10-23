@@ -17,6 +17,11 @@ jobs:
       - run: node --test artifacts/api-server/src/tests/*.test.mjs
       - run: node scripts/test-learner-support.mjs
       - run: node scripts/test-uploads.mjs
+      - name: Verify isolated native demo scripts
+        run: |
+          bash -n scripts/render-native-test-start.sh
+          node --check lib/db/scripts/native-test-db-guard.mjs
+          node --check scripts/smoke-native-test-login.mjs
       - run: pnpm run typecheck
       - run: pnpm run build
         env:
