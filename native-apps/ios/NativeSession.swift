@@ -313,13 +313,13 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                                 }
                         }
                         nextStaff.append(StaffSchool(
-                            id: org, subjects: courses, support: support, tickets: ticketNames, notice: nil
+                            id: org, subjects: courses, support: support, tickets: ticketNames, ticketItems: ticketItems, notice: nil
                         ))
                     } catch {
                         // Do not treat authorization failure as an empty classroom.
                         if keychainToken() == nil { throw error }
                         nextStaff.append(StaffSchool(
-                            id: org, subjects: [], support: [], tickets: [],
+                            id: org, subjects: [], support: [], tickets: [], ticketItems: [],
                             notice: "This school's learning-support module may not be enabled."
                         ))
                     }
