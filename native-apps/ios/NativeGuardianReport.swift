@@ -31,3 +31,19 @@ struct NativeGuardianReportEnvelope: Decodable {
     let reports: [NativeGuardianReport]
     let guidance: String
 }
+
+struct NativeLearnerReport: Decodable, Identifiable {
+    let learnerId: String
+    let year: Int
+    let grade: String
+    let subjects: [NativeReportSubject]
+    let average: Double?
+    let attendance: NativeReportAttendance
+    let official: Bool
+    let visibility: String
+    let status: String
+    // Institution ID is included in the client-side identity, never inferred
+    // from a report body or accepted from untrusted links.
+    var organizationId: Int = 0
+    var id: String { String(organizationId) + ":" + String(year) }
+}

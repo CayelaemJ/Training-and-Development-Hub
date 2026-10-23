@@ -106,6 +106,7 @@ public sealed partial class MainWindow : Window
             var data = await service.DashboardAsync(cts.Token);
             RoleLabel.Text = "My CABO role: " + data.Role;
             OverviewItems.ItemsSource = data.Summary;
+            LearnerReportItems.ItemsSource = data.LearnerReports;
             materialEntries = data.MaterialEntries.ToList();
             MaterialItems.ItemsSource = materialEntries.Select(x => x.Title).ToList();
             quizEntries = data.QuizEntries.ToList();
@@ -129,6 +130,7 @@ public sealed partial class MainWindow : Window
     {
         RoleLabel.Text = "Not signed in";
         OverviewItems.ItemsSource = null;
+        LearnerReportItems.ItemsSource = null;
         MaterialItems.ItemsSource = null;
         materialEntries.Clear();
         ClearMaterial();

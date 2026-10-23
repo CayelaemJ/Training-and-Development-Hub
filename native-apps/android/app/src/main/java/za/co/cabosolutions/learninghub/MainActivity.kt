@@ -512,6 +512,40 @@ private fun RoleContent(
         } else {
             item { Text("My academic progress", style = MaterialTheme.typography.titleMedium) }
             items(data.portal.summary + data.journey) { NativeCard(it, "Current CABO account data") }
+            item {
+                Text("My academic report", style = MaterialTheme.typography.titleMedium)
+                if (data.learnerReportNotice.isNotBlank())
+                    Text(data.learnerReportNotice, style = MaterialTheme.typography.bodySmall)
+            }
+            if (data.learnerReports.isEmpty()) item {
+                NativeCard("No report preview", "A verified enrolment and published assessments are required.")
+            }
+            items(data.learnerReports, key = { it.id }) { report ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("${report.grade} · ${report.year}",
+                            style = MaterialTheme.typography.titleLarge)
+                        report.average?.let {
+                            Text("Published assessment average: $it%",
+                                style = MaterialTheme.typography.titleMedium)
+                        }
+                        report.attendanceRate?.let { rate ->
+                            Text("Attendance: $rate% (${report.presentDays} of ${report.recordedDays} recorded days)")
+                        } ?: Text("Attendance not recorded.")
+                        if (report.subjects.isEmpty()) Text("No published subject marks yet.")
+                        report.subjects.forEach { subject ->
+                            Row(Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(subject.name, modifier = Modifier.weight(1f))
+                                Text("${subject.percentage}%")
+                            }
+                        }
+                        Text("Draft learner preview. Not an officially issued report card.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             item { Text("Study materials", style = MaterialTheme.typography.titleMedium) }
             if (data.materialEntries.isEmpty()) item { Text("No study materials available yet.") }
             else items(data.materialEntries, key = { it.id }) { material ->
