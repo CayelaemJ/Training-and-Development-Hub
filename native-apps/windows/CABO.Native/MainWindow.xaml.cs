@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Title = "CABO Learning Hub";
+        TestLoginPanel.Visibility = service.TestLoginEnabled ? Visibility.Visible : Visibility.Collapsed;
         UpdateButtons();
         if (service.HasSession) _ = RefreshAsync();
     }
@@ -23,6 +24,9 @@ public sealed partial class MainWindow : Window
         SignInButton.IsEnabled = !busy && !service.HasSession;
         RefreshButton.IsEnabled = !busy && service.HasSession;
         SignOutButton.IsEnabled = !busy && service.HasSession;
+        TestSignInButton.IsEnabled = !busy && !service.HasSession && service.TestLoginEnabled;
+        TestUsername.IsEnabled = !busy && !service.HasSession;
+        TestPassword.IsEnabled = !busy && !service.HasSession;
         BusyIndicator.IsActive = busy;
     }
 
@@ -41,6 +45,29 @@ public sealed partial class MainWindow : Window
             ServiceStatus.Text = "Secure sign-in was not completed. Check the pilot server and try again.";
         }
         finally { busy = false; UpdateButtons(); }
+        if (service.HasSession) await RefreshAsync();
+    }
+
+    private async void SignInTest(object sender, RoutedEventArgs args)
+    {
+        if (busy || !service.TestLoginEnabled) return;
+        var username = TestUsername.Text;
+        var password = TestPassword.Password;
+        TestPassword.Password = ""; // Never retain the plaintext in the control.
+        busy = true;
+        UpdateButtons();
+        ServiceStatus.Text = "Connecting to isolated CABO demonstration…";
+        try {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            await service.SignInTestAsync(username, password, cts.Token);
+            ServiceStatus.Text = "Test account signed in.";
+        } catch (Exception) {
+            ServiceStatus.Text = "Test sign-in failed. Confirm the isolated server and credentials.";
+        } finally {
+            password = "";
+            busy = false;
+            UpdateButtons();
+        }
         if (service.HasSession) await RefreshAsync();
     }
 
