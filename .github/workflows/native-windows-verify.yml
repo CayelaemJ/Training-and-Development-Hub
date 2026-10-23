@@ -19,12 +19,27 @@ jobs:
       # WinUI 3 desktop resource packaging targets require Visual Studio's
       # MSBuild, not the standalone dotnet SDK's incomplete AppxPackage tasks.
       - uses: microsoft/setup-msbuild@v2
-      - name: Restore and compile WinUI 3 using Visual Studio MSBuild
-        shell: pwsh
-        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -verbosity:minimal
-      - name: Compile isolated test-only Windows variant (no credentials)
+      - name: Compile isolated test-only Windows variant (never archived)
         shell: pwsh
         run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=true -verbosity:minimal
+      - name: Rebuild standard Windows client with demo sign-in disabled
+        shell: pwsh
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -t:Rebuild -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=false -verbosity:minimal
+      - name: Package non-test-only Windows debug directory
+        shell: pwsh
+        run: |
+          $target = Get-ChildItem "native-apps/windows/CABO.Native/bin" -Recurse -Filter "CABO.Native.exe" -File | Select-Object -First 1
+          if (-not $target) { throw "Compiled WinUI executable not found" }
+          $folder = $target.Directory.FullName
+          New-Item -ItemType Directory -Force "native-apps/windows/artifacts" | Out-Null
+          Compress-Archive -Path (Join-Path $folder '*') -DestinationPath "native-apps/windows/artifacts/CABO-Windows-DEBUG-test-only.zip" -Force
+      - name: Upload Windows DEBUG artifact (not signed or certified)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CABO-Windows-DEBUG-no-test-login
+          path: native-apps/windows/artifacts/CABO-Windows-DEBUG-test-only.zip
+          retention-days: 2
+          if-no-files-found: error
       - name: Validation boundary
         shell: pwsh
         run: Write-Output 'Build validation only; no signing, physical Windows lab run, MSIX, or native authentication verified.'
