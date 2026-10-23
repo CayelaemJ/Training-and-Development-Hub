@@ -29,6 +29,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var summary: [String] = []
     @Published var workspaces: [String] = []
     @Published var materials: [String] = []
+    @Published var materialSummaries: [NativeMaterialSummary] = []
     @Published var quizzes: [String] = []
     @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var guardians: [GuardianInvitation] = []
@@ -180,6 +181,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextJourney: [String] = []
             var nextLearnerHelp: [String] = []
             var nextMaterials: [String] = []
+            var nextMaterialSummaries: [NativeMaterialSummary] = []
             var nextQuizzes: [String] = []
             var nextQuizSummaries: [NativeQuizSummary] = []
             var nextGuidance = ""
@@ -234,8 +236,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     }
                 }
             } else {
-                nextMaterials = (try? JSONDecoder().decode([NativeResource].self,
-                    from: await request("api/materials")))?.prefix(30).map(\.title) ?? []
+                nextMaterialSummaries = Array((try? JSONDecoder().decode([NativeMaterialSummary].self,
+                    from: await request("api/materials")))?.prefix(30) ?? [])
+                nextMaterials = nextMaterialSummaries.map(\.title)
                 nextQuizSummaries = Array((try? JSONDecoder().decode([NativeQuizSummary].self,
                     from: await request("api/quizzes")))?.prefix(30) ?? [])
                 nextQuizzes = nextQuizSummaries.map(\.title)
@@ -267,16 +270,27 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             journey = nextJourney
             learnerHelp = Array(nextLearnerHelp.prefix(20))
             materials = nextMaterials
+            materialSummaries = nextMaterialSummaries
             quizzes = nextQuizzes
             quizSummaries = nextQuizSummaries
             status = "Connected securely to CABO"
         } catch {
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
             guardians = []; staffSchools = []; journey = []; learnerHelp = []; guardianGuidance = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
         }
+    }
+
+    // Account-scoped, paged source text. Never cache private learner documents
+    // to persistent storage without a reviewed offline permission policy.
+    func loadMaterialPreview(id: Int, offset: Int) async throws -> NativeMaterialPage {
+        guard role != nil, id > 0, offset >= 0 else {
+            throw NSError(domain: "CABO", code: 400)
+        }
+        let data = try await request("api/materials/\(id)/preview?offset=\(offset)")
+        return try JSONDecoder().decode(NativeMaterialPage.self, from: data)
     }
 
     // Source-of-truth practice assessment API. All results are returned by the server;
@@ -335,7 +349,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             _ = try? await URLSession.shared.data(for: request)
         }
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
         guardians = []; staffSchools = []; journey = []; guardianGuidance = ""
         status = "Signed out on this device."
         busy = false
