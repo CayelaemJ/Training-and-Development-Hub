@@ -1,8 +1,12 @@
 import { Router, type IRouter } from "express";
-import { and, eq, inArray } from "drizzle-orm";
-import { db, guardianRelationshipsTable, verifiedEnrollmentsTable, usersTable } from "@workspace/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod/v4";
+import { db, guardianRelationshipsTable, guardianVerificationEventsTable,
+  verifiedEnrollmentsTable, usersTable } from "@workspace/db";
 import { parentMobileView } from "../lib/parentMobilePolicy";
 import { nativeAuthEnabled } from "../lib/nativeAuthPolicy";
+import { canReadChildReport } from "../lib/guardianPolicy";
+import { gather } from "./reportCards";
 import { getSession, getSessionId } from "../lib/auth";
 
 // Parent-first mobile read model. This is a deliberately small response:
@@ -53,6 +57,76 @@ router.get("/native/mobile/parent", async (req, res) => {
       r, activeIds, byId
     )),
     guidance: "Accepting an invitation is not proof of guardianship. School verification is required before viewing a child's progress.",
+  });
+});
+// Guardian reports use the SAME server-side lawful access checks as web
+// report cards. A pending/accepted invitation never reveals grades or identity.
+router.get("/native/mobile/parent/reports", async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (!nativeAuthEnabled(process.env)) { res.sendStatus(404); return; }
+  if (!req.get("authorization")?.startsWith("Bearer ") || !req.isAuthenticated()) {
+    res.sendStatus(401); return;
+  }
+  const sid = getSessionId(req);
+  const session = sid ? await getSession(sid) : null;
+  if (session?.access_token !== "cabo-native-session-v1") {
+    res.sendStatus(403); return;
+  }
+  const yearParam = z.coerce.number().int().min(2000).max(2200)
+    .safeParse(req.query.year ?? new Date().getUTCFullYear());
+  if (!yearParam.success) { res.sendStatus(400); return; }
+  const year = yearParam.data;
+  const relationships = await db.select({
+    id: guardianRelationshipsTable.id,
+    learnerId: guardianRelationshipsTable.learnerId,
+    status: guardianRelationshipsTable.status
+  }).from(guardianRelationshipsTable)
+    .where(and(eq(guardianRelationshipsTable.guardianId, req.user.id),
+               eq(guardianRelationshipsTable.status, "verified"))).limit(30);
+
+  const reports: Array<{
+    learnerId: string; learnerName: string; organizationId: number;
+    year: number; grade: string; subjects: Array<{name:string;percentage:number;assessmentCount:number}>;
+    average: number|null;
+    attendance: {recordedDays:number;presentDays:number;rate:number|null};
+    official: false; status: "draft_preview";
+  }> = [];
+  for (const relation of relationships) {
+    const enrolments = await db.select({
+      organizationId: verifiedEnrollmentsTable.organizationId
+    }).from(verifiedEnrollmentsTable).where(and(
+      eq(verifiedEnrollmentsTable.learnerId, relation.learnerId),
+      eq(verifiedEnrollmentsTable.status, "active"),
+      eq(verifiedEnrollmentsTable.academicYear, year)
+    )).limit(8);
+    for (const { organizationId } of enrolments) {
+      const [event] = await db.select({decision: guardianVerificationEventsTable.decision})
+        .from(guardianVerificationEventsTable).where(and(
+          eq(guardianVerificationEventsTable.relationshipId, relation.id),
+          eq(guardianVerificationEventsTable.organizationId, organizationId)
+        )).orderBy(desc(guardianVerificationEventsTable.createdAt),
+                   desc(guardianVerificationEventsTable.id)).limit(1);
+      if (!canReadChildReport("verified", event?.decision === "verified", true))
+        continue;
+      const report = await gather(organizationId, relation.learnerId, year);
+      if (!report) continue;
+      const [user] = await db.select({
+        firstName: usersTable.firstName, lastName: usersTable.lastName
+      }).from(usersTable).where(eq(usersTable.id, relation.learnerId)).limit(1);
+      reports.push({
+        learnerId: relation.learnerId,
+        learnerName: [user?.firstName,user?.lastName].filter(Boolean).join(" ") || "Verified learner",
+        organizationId, year, grade: report.grade, subjects: report.subjects,
+        average: report.average, attendance: report.attendance,
+        official: false, status: "draft_preview",
+      });
+      if (reports.length >= 20) break;
+    }
+    if (reports.length >= 20) break;
+  }
+  res.json({
+    year, reports,
+    guidance: "Draft progress only. Verified school guardianship and active enrolment are required. These are not officially issued report cards."
   });
 });
 export default router;
