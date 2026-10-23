@@ -114,12 +114,15 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
-    private func request(_ path: String, method: String = "GET", body: Data? = nil, authorized: Bool = true) async throws -> Data {
+    private func request(_ path: String, method: String = "GET", body: Data? = nil, authorized: Bool = true, idempotencyKey: String? = nil) async throws -> Data {
         var request = URLRequest(url: origin.appendingPathComponent(path))
         request.httpMethod = method
         request.timeoutInterval = 12
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let idempotencyKey {
+            request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        }
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -301,13 +304,23 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         return try JSONDecoder().decode(NativePracticeQuiz.self, from: data)
     }
 
-    func submitQuiz(id: Int, answers: [Int]) async throws -> NativeQuizAttempt {
+    func submitQuiz(id: Int, answers: [Int], requestKey: String) async throws -> NativeQuizAttempt {
         guard role != nil, id > 0, !answers.isEmpty, answers.allSatisfy({ $0 >= 0 }) else {
             throw NSError(domain: "CABO", code: 400)
         }
         let payload = try JSONEncoder().encode(NativeQuizAnswers(answers: answers))
         let data = try await request("api/quizzes/\(id)/attempts",
-                                     method: "POST", body: payload)
+                                     method: "POST", body: payload,
+                                     idempotencyKey: requestKey)
+        return try JSONDecoder().decode(NativeQuizAttempt.self, from: data)
+    }
+
+    // Read-only result recovery. Never make a second POST after a timeout.
+    func findSubmittedQuiz(id: Int, requestKey: String) async throws -> NativeQuizAttempt {
+        guard role != nil, id > 0, !requestKey.isEmpty else {
+            throw NSError(domain: "CABO", code: 400)
+        }
+        let data = try await request("api/quizzes/\(id)/attempts/by-key/\(requestKey)")
         return try JSONDecoder().decode(NativeQuizAttempt.self, from: data)
     }
 
