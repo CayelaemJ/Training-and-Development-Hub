@@ -453,6 +453,33 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         let answers: [Int]
     }
 
+    func replyToTicket(_ ticket: NativeSupportTicket, body: String) async -> Bool {
+        let educators = ["teacher", "assessor", "headmaster", "deputy_headmaster",
+                         "department_head", "grade_head"]
+        let reply = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, let role, educators.contains(role),
+              ticket.organizationId > 0, ticket.id > 0, ticket.version > 0,
+              (2...4000).contains(reply.count) else { return false }
+        busy = true
+        do {
+            let json = try JSONSerialization.data(withJSONObject: [
+                "version": ticket.version,
+                "action": ["kind": "reply", "body": reply]
+            ] as [String: Any])
+            _ = try await request(
+                "api/organizations/\(ticket.organizationId)/support/\(ticket.id)/actions",
+                method: "POST", body: json
+            )
+            busy = false
+            await refresh()
+            return true
+        } catch {
+            busy = false
+            status = "Support reply outcome uncertain. Check the ticket's history before retrying."
+            return false
+        }
+    }
+
     func decideGuardian(invitationId: Int, accept: Bool) async {
         guard !busy, invitationId > 0 else { return }
         busy = true
