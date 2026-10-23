@@ -40,6 +40,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var adminOrganizations: [String] = []
     @Published var journey: [String] = []
     @Published var learnerHelp: [String] = []
+    @Published var learnerReports: [NativeLearnerReport] = []
+    @Published var learnerReportNotice = ""
 
     // Test-login is a build-time opt-in, never enabled by a server response.
     var testLoginAvailable: Bool {
@@ -236,6 +238,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextAdminOrganizations: [String] = []
             var nextJourney: [String] = []
             var nextLearnerHelp: [String] = []
+            var nextLearnerReports: [NativeLearnerReport] = []
+            var nextLearnerReportNotice = ""
             var nextMaterials: [String] = []
             var nextMaterialSummaries: [NativeMaterialSummary] = []
             var nextQuizzes: [String] = []
@@ -315,6 +319,40 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 nextQuizSummaries = Array((try? JSONDecoder().decode([NativeQuizSummary].self,
                     from: await request("api/quizzes")))?.prefix(30) ?? [])
                 nextQuizzes = nextQuizSummaries.map(\.title)
+                let currentYear = Calendar.current.component(.year, from: Date())
+                for org in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
+                    do {
+                        let data = try await request("api/reports/me?organizationId=\(org)&year=\(currentYear)")
+                        let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                        guard let learnerId = raw["learnerId"] as? String,
+                              let grade = raw["grade"] as? String,
+                              let attendance = raw["attendance"] as? [String: Any] else { continue }
+                        let subjects = (raw["subjects"] as? [[String: Any]] ?? []).compactMap { row -> NativeReportSubject? in
+                            guard let name = row["name"] as? String,
+                                  let percentage = row["percentage"] as? NSNumber else { return nil }
+                            return NativeReportSubject(
+                                name: name, percentage: percentage.doubleValue,
+                                assessmentCount: row["assessmentCount"] as? Int ?? 0
+                            )
+                        }
+                        let attendanceRow = NativeReportAttendance(
+                            recordedDays: attendance["recordedDays"] as? Int ?? 0,
+                            presentDays: attendance["presentDays"] as? Int ?? 0,
+                            rate: attendance["rate"] as? Int
+                        )
+                        nextLearnerReports.append(NativeLearnerReport(
+                            learnerId: learnerId, year: currentYear, grade: grade,
+                            subjects: subjects,
+                            average: (raw["average"] as? NSNumber)?.doubleValue,
+                            attendance: attendanceRow, official: false,
+                            visibility: "learner_only", status: "draft_preview",
+                            organizationId: org
+                        ))
+                    } catch {
+                        if keychainToken() == nil { throw error }
+                        nextLearnerReportNotice = "Some academic reports could not be loaded."
+                    }
+                }
                 for org in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(3)) {
                     if let data = try? await request("api/organizations/\(org)/support"),
                        let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -345,6 +383,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             adminOrganizations = nextAdminOrganizations
             journey = nextJourney
             learnerHelp = Array(nextLearnerHelp.prefix(20))
+            learnerReports = nextLearnerReports
+            learnerReportNotice = nextLearnerReportNotice
             materials = nextMaterials
             materialSummaries = nextMaterialSummaries
             quizzes = nextQuizzes
@@ -352,7 +392,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Connected securely to CABO"
         } catch {
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-            guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""
+            guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
@@ -436,7 +476,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""
+        guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         status = "Signed out on this device."
         busy = false
     }
