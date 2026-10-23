@@ -103,7 +103,6 @@ export const quizAttemptsTable = pgTable(
       .notNull()
       .references(() => quizzesTable.id, { onDelete: "cascade" }),
     answers: jsonb("answers").$type<number[]>().notNull(),
-    requestKey: varchar("request_key", { length: 64 }),
     correctCount: integer("correct_count").notNull(),
     totalQuestions: integer("total_questions").notNull(),
     percentage: real("percentage").notNull(),
