@@ -57,3 +57,20 @@ test("Windows uses native WinUI, loopback PKCE and DPAPI rather than a browser w
   assert.match(window, /NativeLearningService/);
   assert.doesNotMatch(client, /WebView2|WebView\s*\(/);
 });
+
+test("Windows learner can take assigned practice quizzes with real graded feedback", () => {
+  const view = file("native-apps/windows/CABO.Native/MainWindow.xaml");
+  const controller = file("native-apps/windows/CABO.Native/NativeQuizWindow.cs");
+  const api = file("native-apps/windows/CABO.Native/NativeLearningService.cs");
+  assert.match(view, /QuizSelected/);
+  assert.match(view, /QuizSubmitButton/);
+  assert.match(view, /Check saved submission/);
+  assert.match(controller, /OpenQuizAsync/);
+  assert.match(controller, /SubmitQuizAsync/);
+  assert.match(controller, /CheckQuizSubmissionAsync/);
+  assert.match(controller, /submitted = true/);
+  assert.match(controller, /ShowAttempt/);
+  assert.match(api, /Idempotency-Key/);
+  assert.match(api, /api\/quizzes\/\{quizId\}\/attempts\/by-key/);
+  assert.doesNotMatch(controller, /WebView2|hardcodedCorrectAnswer/);
+});
