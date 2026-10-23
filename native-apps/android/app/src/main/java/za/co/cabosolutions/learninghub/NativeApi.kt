@@ -34,6 +34,11 @@ internal data class GuardianAcademicReport(
 ) {
     val id: String get() = "$learnerId:$organizationId:$year"
 }
+internal data class LearnerAcademicReport(
+    val organizationId: Int, val year: Int, val grade: String, val average: Double?,
+    val subjects: List<GuardianSubject>, val attendanceRate: Int?,
+    val presentDays: Int, val recordedDays: Int
+) { val id: String get() = "$organizationId:$year" }
 internal data class StaffWorkspace(
     val organizationId: Int, val courses: List<String>, val supportSummary: List<String>,
     val tickets: List<String>, val notice: String?
