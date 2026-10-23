@@ -335,7 +335,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             _ = try? await URLSession.shared.data(for: request)
         }
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []
         guardians = []; staffSchools = []; journey = []; guardianGuidance = ""
         status = "Signed out on this device."
         busy = false
