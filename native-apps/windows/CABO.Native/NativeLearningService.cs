@@ -16,6 +16,9 @@ using System.Threading.Tasks;
 
 namespace CABO.Native;
 
+public record NativeMaterialSummary(int Id, string Title);
+public record NativeMaterialPage(int Id, string Title, string Text, int Offset, int? NextOffset);
+
 public record NativeQuizSummary(int Id, string Title, int QuestionCount, double? LatestScore);
 public record NativeQuizQuestion(string Prompt, IReadOnlyList<string> Options);
 public record NativeQuizDetail(int Id, string Title, IReadOnlyList<NativeQuizQuestion> Questions);
@@ -27,6 +30,7 @@ public record NativeDashboard(
     string Role,
     IReadOnlyList<string> Summary,
     IReadOnlyList<string> Materials,
+    IReadOnlyList<NativeMaterialSummary> MaterialEntries,
     IReadOnlyList<string> Quizzes,
     IReadOnlyList<string> Organizations,
     IReadOnlyList<NativeQuizSummary> QuizEntries
@@ -231,6 +235,28 @@ public sealed class NativeLearningService
             root.GetProperty("percentage").GetDouble(), feedback);
     }
 
+    public async Task<NativeMaterialPage> ReadMaterialAsync(int id, int offset,
+        CancellationToken cancellation)
+    {
+        if (id <= 0 || offset < 0 || offset > 2_000_000)
+            throw new ArgumentException("Invalid material reading position.");
+        using var json = await FetchAsync($"api/materials/{id}/preview?offset={offset}",
+            cancellation);
+        var root = json.RootElement;
+        var returnedId = root.GetProperty("id").GetInt32();
+        var returnedOffset = root.GetProperty("offset").GetInt32();
+        if (returnedId != id || returnedOffset != offset)
+            throw new InvalidOperationException("Mismatched material position.");
+        var body = root.GetProperty("text").GetString() ?? "";
+        var marker = root.GetProperty("nextOffset");
+        int? nextOffset = marker.ValueKind == JsonValueKind.Null
+            ? null : marker.GetInt32();
+        if (body.Length > 16_000 || (nextOffset is not null && nextOffset <= offset))
+            throw new InvalidOperationException("Invalid material page.");
+        return new NativeMaterialPage(id, root.GetProperty("title").GetString() ??
+            "Study material", body, offset, nextOffset);
+    }
+
     public async Task<NativeQuizDetail> OpenQuizAsync(int quizId, CancellationToken cancellation)
     {
         if (quizId <= 0) throw new ArgumentOutOfRangeException(nameof(quizId));
@@ -292,6 +318,7 @@ public sealed class NativeLearningService
                 summary.Add($"{item.Name}: {item.Value}");
 
         var materials = new List<string>();
+        var materialEntries = new List<NativeMaterialSummary>();
         var quizzes = new List<string>();
         var organizations = new List<string>();
         var quizEntries = new List<NativeQuizSummary>();
@@ -305,9 +332,16 @@ public sealed class NativeLearningService
                     .Where(v => !string.IsNullOrWhiteSpace(v))!);
         } else if (role == "learner") {
             using var materialResult = await FetchAsync("api/materials", cancellation);
-            if (materialResult.RootElement.ValueKind == JsonValueKind.Array)
-                materials.AddRange(materialResult.RootElement.EnumerateArray().Take(30)
-                    .Select(v => v.GetProperty("title").GetString() ?? ""));
+            if (materialResult.RootElement.ValueKind == JsonValueKind.Array) {
+                foreach (var row in materialResult.RootElement.EnumerateArray().Take(30)) {
+                    var id = row.GetProperty("id").GetInt32();
+                    var title = row.GetProperty("title").GetString() ?? "Study material";
+                    if (id > 0) {
+                        materialEntries.Add(new NativeMaterialSummary(id, title));
+                        materials.Add(title);
+                    }
+                }
+            }
             using var quizResult = await FetchAsync("api/quizzes", cancellation);
             if (quizResult.RootElement.ValueKind == JsonValueKind.Array) {
                 foreach (var v in quizResult.RootElement.EnumerateArray().Take(30)) {
@@ -323,7 +357,7 @@ public sealed class NativeLearningService
                 }
             }
         }
-        return new NativeDashboard(role, summary, materials, quizzes, organizations, quizEntries);
+        return new NativeDashboard(role, summary, materials, materialEntries, quizzes, organizations, quizEntries);
     }
 
     public async Task SignOutAsync(CancellationToken cancellation)
