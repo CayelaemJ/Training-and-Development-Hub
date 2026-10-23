@@ -15,6 +15,7 @@ const lines = [
   "For an isolated, disposable CABO pilot with dummy learner records ONLY:",
   "CABO_ENVIRONMENT=testing",
   "ENABLE_CABO_TEST_LOGIN=true",
+  "ENABLE_CABO_NATIVE_TEST_LOGIN=true",
   "CABO_TEST_LOGIN_USERNAME=cabo_test",
   "CABO_TEST_PASSWORD_HASH=" + salt.toString("hex") + ":" + hash,
   "ENABLE_CABO_SUPERADMIN=true",
@@ -22,6 +23,8 @@ const lines = [
   "",
   "Store these as private Render environment variables, not in GitHub or an app build.",
   "The superadmin gate MUST remain disabled in all school/production deployments.",
+  "BEFORE using these credentials, verify a separate disposable database and set CABO_TEST_DATABASE_ISOLATED=true manually.",
+  "Never set the isolated-database flag on a real school service.",
   "Rotate this credential after testing; treat any copied output as sensitive."
 ];
 process.stdout.write(lines.join("\n") + "\n");
