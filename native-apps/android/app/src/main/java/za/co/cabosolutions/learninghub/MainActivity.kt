@@ -339,13 +339,22 @@ private fun RoleContent(
         val role = data.portal.role
         item {
             Text(when(role) {
+                "superadmin" -> "Platform governance"
                 "parent" -> "Family connection"
                 "teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head" -> "Teaching & school support"
                 else -> "My learning journey"
             }, style = MaterialTheme.typography.headlineSmall)
             Text("Your CABO role: $role", style = MaterialTheme.typography.bodySmall)
         }
-        if (role == "parent") {
+        if (role == "superadmin") {
+            item { Text("Platform governance", style = MaterialTheme.typography.titleMedium) }
+            item { Text("Read-only organisation registry. Private learner records remain restricted.") }
+            items(data.portal.summary) { NativeCard(it, "CABO registry summary") }
+            if (data.adminOrganizations.isEmpty()) item { NativeCard("No organisations", "No registered organisations to display.") }
+            items(data.adminOrganizations) { name ->
+                NativeCard(name, "CABO institution registry")
+            }
+        } else if (role == "parent") {
             item {
                 Text("Guardian invitations", style = MaterialTheme.typography.titleMedium)
                 Text(data.parentGuidance, style = MaterialTheme.typography.bodySmall)
