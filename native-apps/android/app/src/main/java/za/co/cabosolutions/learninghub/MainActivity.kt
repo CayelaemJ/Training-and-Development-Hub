@@ -24,20 +24,47 @@ class MainActivity : ComponentActivity() {
     private var status by mutableStateOf("CABO native Android preview")
     private var busy by mutableStateOf(false)
     private var screen by mutableStateOf<NativeLearning?>(null)
+    private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
+    private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
+    private var activeQuiz by mutableStateOf<PracticeQuiz?>(null)
+    private var answers by mutableStateOf<List<Int?>>(emptyList())
+    private var attempt by mutableStateOf<QuizAttempt?>(null)
+    private var studyText by mutableStateOf("")
+    private var nextPage by mutableStateOf<Int?>(null)
+    private var studyBusy by mutableStateOf(false)
+    private var studySubmitted by mutableStateOf(false)
+    private var studyMessage by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFFC4673A), secondary = Color(0xFF1D6B6B))) {
-                NativeHome(
-                    status = status,
-                    busy = busy,
-                    data = screen,
-                    signIn = { startSignIn() },
-                    refresh = { loadDashboard() },
-                    signOut = { signOut() },
-                    respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) }
-                )
+                when {
+                    selectedQuiz != null -> NativeQuizScreen(
+                        summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
+                        attempt = attempt, busy = studyBusy, submitted = studySubmitted,
+                        message = studyMessage,
+                        answer = { question, option ->
+                            if (!studySubmitted && !studyBusy && question in answers.indices) {
+                                answers = answers.toMutableList().also { it[question] = option }
+                            }
+                        },
+                        submit = { submitQuiz() }, close = { closeStudy() }
+                    )
+                    selectedMaterial != null -> NativeMaterialScreen(
+                        summary = selectedMaterial!!, content = studyText,
+                        nextOffset = nextPage, busy = studyBusy, message = studyMessage,
+                        next = { readNextPage() }, close = { closeStudy() }
+                    )
+                    else -> NativeHome(
+                        status = status, busy = busy, data = screen,
+                        signIn = { startSignIn() }, refresh = { loadDashboard() },
+                        signOut = { signOut() },
+                        respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
+                        openQuiz = { openQuiz(it) },
+                        openMaterial = { openMaterial(it) }
+                    )
+                }
             }
         }
         if (intent.data?.scheme == "cabo-learninghub-android") handleCallback(intent)
@@ -100,11 +127,90 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun openQuiz(summary: QuizSummary) {
+        if (busy || studyBusy || screen == null) return
+        selectedQuiz = summary
+        activeQuiz = null
+        answers = emptyList()
+        attempt = null
+        studyMessage = null
+        studySubmitted = false
+        studyBusy = true
+        lifecycleScope.launch {
+            try {
+                val loaded = api.fetchQuiz(summary.id)
+                activeQuiz = loaded
+                answers = List(loaded.questions.size) { null }
+            } catch (_: Exception) {
+                studyMessage = "Cannot open this test. Check your connection and return to your dashboard."
+            } finally { studyBusy = false }
+        }
+    }
+
+    private fun submitQuiz() {
+        val quiz = activeQuiz ?: return
+        if (studyBusy || studySubmitted || answers.size != quiz.questions.size ||
+            answers.any { it == null }) return
+        studySubmitted = true // Do not reset after a network timeout: it might have committed.
+        studyBusy = true
+        lifecycleScope.launch {
+            try {
+                val graded = api.submitQuiz(quiz.id, answers.map { it!! })
+                if (graded.quizId != quiz.id || graded.totalQuestions != quiz.questions.size)
+                    throw IllegalStateException("Unexpected grade response")
+                attempt = graded
+                studyMessage = "Practice assessment graded by CABO."
+            } catch (_: Exception) {
+                studyMessage = "Submission status cannot be confirmed. Check the web assessment history before another attempt."
+            } finally { studyBusy = false }
+        }
+    }
+
+    private fun openMaterial(summary: MaterialSummary) {
+        if (busy || studyBusy || screen == null) return
+        selectedMaterial = summary
+        studyText = ""
+        nextPage = 0
+        studyMessage = null
+        readNextPage()
+    }
+
+    private fun readNextPage() {
+        val id = selectedMaterial?.id ?: return
+        val offset = nextPage ?: return
+        if (studyBusy) return
+        studyBusy = true
+        lifecycleScope.launch {
+            try {
+                val page = api.fetchMaterialPage(id, offset)
+                studyText += page.text
+                nextPage = page.nextOffset
+                studyMessage = null
+            } catch (_: Exception) {
+                studyMessage = "Cannot read this document right now. A text-based version or an internet connection may be required."
+            } finally { studyBusy = false }
+        }
+    }
+
+    private fun closeStudy() {
+        if (studyBusy) return
+        selectedQuiz = null
+        selectedMaterial = null
+        activeQuiz = null
+        answers = emptyList()
+        attempt = null
+        studyText = ""
+        nextPage = null
+        studySubmitted = false
+        studyMessage = null
+    }
+
     private fun signOut() {
         if (busy) return
         busy = true
         lifecycleScope.launch {
             api.signOut()
+            closeStudy()
             screen = null
             status = "Signed out on this device."
             busy = false
@@ -120,7 +226,9 @@ private fun NativeHome(
     signIn: () -> Unit,
     refresh: () -> Unit,
     signOut: () -> Unit,
-    respondToInvite: (Int, Boolean) -> Unit
+    respondToInvite: (Int, Boolean) -> Unit,
+    openQuiz: (QuizSummary) -> Unit,
+    openMaterial: (MaterialSummary) -> Unit
 ) {
     Scaffold(topBar = {
         Surface(color = Color(0xFF0D1117)) {
@@ -148,7 +256,7 @@ private fun NativeHome(
                         Text("Tablet layout • touch, keyboard and accessibility supported",
                             style = MaterialTheme.typography.bodySmall)
                     }
-                    RoleContent(Modifier.weight(0.65f), data, busy, respondToInvite)
+                    RoleContent(Modifier.weight(0.65f), data, busy, respondToInvite, openQuiz, openMaterial)
                 }
             } else {
                 Column(Modifier.fillMaxSize()) {
@@ -159,7 +267,7 @@ private fun NativeHome(
                         Spacer(Modifier.height(8.dp))
                         SessionButtons(data, busy, signIn, refresh, signOut)
                     }
-                    RoleContent(Modifier.weight(1f), data, busy, respondToInvite)
+                    RoleContent(Modifier.weight(1f), data, busy, respondToInvite, openQuiz, openMaterial)
                 }
             }
         }
@@ -188,7 +296,10 @@ private fun SessionButtons(
 
 @Composable
 private fun RoleContent(
-    modifier: Modifier, data: NativeLearning?, busy: Boolean, respondToInvite: (Int, Boolean) -> Unit
+    modifier: Modifier, data: NativeLearning?, busy: Boolean,
+    respondToInvite: (Int, Boolean) -> Unit,
+    openQuiz: (QuizSummary) -> Unit,
+    openMaterial: (MaterialSummary) -> Unit
 ) {
     LazyColumn(modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (data == null) {
@@ -270,11 +381,30 @@ private fun RoleContent(
             item { Text("My academic progress", style = MaterialTheme.typography.titleMedium) }
             items(data.portal.summary + data.journey) { NativeCard(it, "Current CABO account data") }
             item { Text("Study materials", style = MaterialTheme.typography.titleMedium) }
-            if (data.materials.isEmpty()) item { Text("No study materials available yet.") }
-            else items(data.materials) { NativeCard(it, "My material") }
+            if (data.materialEntries.isEmpty()) item { Text("No study materials available yet.") }
+            else items(data.materialEntries, key = { it.id }) { material ->
+                ElevatedCard(onClick = { openMaterial(material) }, modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(material.title, style = MaterialTheme.typography.titleMedium)
+                        Text("Read your learning material", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             item { Text("Practice tests", style = MaterialTheme.typography.titleMedium) }
-            if (data.quizzes.isEmpty()) item { Text("No tests available yet.") }
-            else items(data.quizzes) { NativeCard(it, "My practice test") }
+            if (data.quizEntries.isEmpty()) item { Text("No tests available yet.") }
+            else items(data.quizEntries, key = { it.id }) { quiz ->
+                ElevatedCard(onClick = { openQuiz(quiz) }, modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(quiz.title, style = MaterialTheme.typography.titleMedium)
+                        Text("${quiz.questionCount} questions", style = MaterialTheme.typography.bodySmall)
+                        quiz.latestScore?.let {
+                            Text("Previous score: $it%", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             item { Text("My learning support", style = MaterialTheme.typography.titleMedium) }
             if (data.learnerHelp.isEmpty()) item { Text("No personal help requests to display.") }
             else items(data.learnerHelp) { NativeCard(it, "My support request") }
