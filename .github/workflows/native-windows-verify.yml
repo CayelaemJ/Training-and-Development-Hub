@@ -16,12 +16,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Restore WinUI 3 dependencies
+      # WinUI 3 desktop resource packaging targets require Visual Studio's
+      # MSBuild, not the standalone dotnet SDK's incomplete AppxPackage tasks.
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore and compile WinUI 3 using Visual Studio MSBuild
         shell: pwsh
-        run: dotnet restore native-apps/windows/CABO.Native/CABO.Native.csproj
-      - name: Compile native Windows x64 debug client
-        shell: pwsh
-        run: dotnet build native-apps/windows/CABO.Native/CABO.Native.csproj --no-restore -c Debug -p:Platform=x64
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -verbosity:minimal
       - name: Validation boundary
         shell: pwsh
         run: Write-Output 'Build validation only; no signing, physical Windows lab run, MSIX, or native authentication verified.'
