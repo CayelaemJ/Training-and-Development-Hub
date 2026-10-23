@@ -16,12 +16,20 @@ using System.Threading.Tasks;
 
 namespace CABO.Native;
 
+public record NativeQuizSummary(int Id, string Title, int QuestionCount, double? LatestScore);
+public record NativeQuizQuestion(string Prompt, IReadOnlyList<string> Options);
+public record NativeQuizDetail(int Id, string Title, IReadOnlyList<NativeQuizQuestion> Questions);
+public record NativeQuizFeedback(int QuestionIndex, bool IsCorrect, string Explanation);
+public record NativeQuizAttempt(int Id, int QuizId, int CorrectCount, int TotalQuestions,
+    double Percentage, IReadOnlyList<NativeQuizFeedback> Feedback);
+
 public record NativeDashboard(
     string Role,
     IReadOnlyList<string> Summary,
     IReadOnlyList<string> Materials,
     IReadOnlyList<string> Quizzes,
-    IReadOnlyList<string> Organizations
+    IReadOnlyList<string> Organizations,
+    IReadOnlyList<NativeQuizSummary> QuizEntries
 );
 
 // Windows uses a loopback RFC8252 authorization-code handoff with PKCE.
@@ -208,6 +216,70 @@ public sealed class NativeLearningService
             cancellationToken: cancellation);
     }
 
+    private static NativeQuizAttempt ParseAttempt(JsonElement root, int quizId)
+    {
+        if (root.GetProperty("quizId").GetInt32() != quizId)
+            throw new InvalidOperationException("Unexpected assessment result.");
+        var feedback = root.GetProperty("feedback").EnumerateArray().Select(f =>
+            new NativeQuizFeedback(f.GetProperty("questionIndex").GetInt32(),
+                f.GetProperty("isCorrect").GetBoolean(),
+                f.GetProperty("explanation").GetString() ?? "")).ToArray();
+        return new NativeQuizAttempt(
+            root.GetProperty("id").GetInt32(), quizId,
+            root.GetProperty("correctCount").GetInt32(),
+            root.GetProperty("totalQuestions").GetInt32(),
+            root.GetProperty("percentage").GetDouble(), feedback);
+    }
+
+    public async Task<NativeQuizDetail> OpenQuizAsync(int quizId, CancellationToken cancellation)
+    {
+        if (quizId <= 0) throw new ArgumentOutOfRangeException(nameof(quizId));
+        using var result = await FetchAsync($"api/quizzes/{quizId}", cancellation);
+        var root = result.RootElement;
+        if (root.GetProperty("id").GetInt32() != quizId)
+            throw new InvalidOperationException("Unexpected quiz.");
+        var questions = root.GetProperty("questions").EnumerateArray().Select(q =>
+            new NativeQuizQuestion(q.GetProperty("prompt").GetString() ?? "",
+                q.GetProperty("options").EnumerateArray()
+                    .Select(o => o.GetString() ?? "").ToArray())).ToArray();
+        if (questions.Length == 0 || questions.Any(q => q.Options.Count == 0))
+            throw new InvalidOperationException("Incomplete assessment.");
+        return new NativeQuizDetail(quizId, root.GetProperty("title").GetString() ?? "Practice test", questions);
+    }
+
+    public async Task<NativeQuizAttempt> SubmitQuizAsync(
+        int quizId, IReadOnlyList<int> answers, string requestKey, CancellationToken cancellation)
+    {
+        if (quizId <= 0 || answers.Count == 0 || answers.Any(v => v < 0) ||
+            !System.Text.RegularExpressions.Regex.IsMatch(requestKey, "^[A-Za-z0-9_-]{16,64}$"))
+            throw new ArgumentException("Invalid assessment submission.");
+        if (string.IsNullOrEmpty(token)) throw new UnauthorizedAccessException("Sign-in required.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/quizzes/{quizId}/attempts");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Add("Idempotency-Key", requestKey);
+        request.Content = JsonContent.Create(new { answers });
+        using var response = await Http.SendAsync(request, cancellation);
+        if (response.StatusCode == HttpStatusCode.Unauthorized) {
+            ClearToken();
+            throw new UnauthorizedAccessException("Session expired.");
+        }
+        response.EnsureSuccessStatusCode();
+        using var result = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(cancellation), cancellationToken: cancellation);
+        return ParseAttempt(result.RootElement, quizId);
+    }
+
+    // A lost response is NOT retried as a POST: query the persisted attempt.
+    public async Task<NativeQuizAttempt> CheckQuizSubmissionAsync(
+        int quizId, string requestKey, CancellationToken cancellation)
+    {
+        if (quizId <= 0 || !System.Text.RegularExpressions.Regex.IsMatch(
+            requestKey, "^[A-Za-z0-9_-]{16,64}$")) throw new ArgumentException("Invalid request.");
+        using var result = await FetchAsync(
+            $"api/quizzes/{quizId}/attempts/by-key/{Uri.EscapeDataString(requestKey)}", cancellation);
+        return ParseAttempt(result.RootElement, quizId);
+    }
+
     public async Task<NativeDashboard> DashboardAsync(CancellationToken cancellation)
     {
         using var portal = await FetchAsync("api/portal/me", cancellation);
@@ -222,6 +294,7 @@ public sealed class NativeLearningService
         var materials = new List<string>();
         var quizzes = new List<string>();
         var organizations = new List<string>();
+        var quizEntries = new List<NativeQuizSummary>();
         if (role == "superadmin") {
             // Audited, privileged endpoint; never assume role solely from UI state.
             using var registry = await FetchAsync("api/platform/overview", cancellation);
@@ -236,11 +309,21 @@ public sealed class NativeLearningService
                 materials.AddRange(materialResult.RootElement.EnumerateArray().Take(30)
                     .Select(v => v.GetProperty("title").GetString() ?? ""));
             using var quizResult = await FetchAsync("api/quizzes", cancellation);
-            if (quizResult.RootElement.ValueKind == JsonValueKind.Array)
-                quizzes.AddRange(quizResult.RootElement.EnumerateArray().Take(30)
-                    .Select(v => v.GetProperty("title").GetString() ?? ""));
+            if (quizResult.RootElement.ValueKind == JsonValueKind.Array) {
+                foreach (var v in quizResult.RootElement.EnumerateArray().Take(30)) {
+                    var id = v.GetProperty("id").GetInt32();
+                    var title = v.GetProperty("title").GetString() ?? "Practice test";
+                    var count = v.GetProperty("questionCount").GetInt32();
+                    double? lastScore = v.TryGetProperty("latestScore", out var score) &&
+                        score.ValueKind == JsonValueKind.Number ? score.GetDouble() : null;
+                    if (id > 0) {
+                        quizEntries.Add(new NativeQuizSummary(id, title, count, lastScore));
+                        quizzes.Add(title);
+                    }
+                }
+            }
         }
-        return new NativeDashboard(role, summary, materials, quizzes, organizations);
+        return new NativeDashboard(role, summary, materials, quizzes, organizations, quizEntries);
     }
 
     public async Task SignOutAsync(CancellationToken cancellation)
