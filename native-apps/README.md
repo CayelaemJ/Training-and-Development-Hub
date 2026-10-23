@@ -1,6 +1,6 @@
 # CABO native application programme — implementation progress
 
-**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, and learner study/testing listings. Windows WinUI 3 remains an initial signed-out preview. **Not production-ready, native-compiled, physically device-tested or published.**
+**Status:** genuine Android Compose and iOS SwiftUI native clients with teacher/learner tablet layouts and parent smartphone flows; native sign-in source, scoped course/support reads, guardian invitation decisions, learner study listings, and native iOS practice quiz submission/results source. Windows WinUI 3 remains an initial signed-out preview. **Not production-ready, native-compiled, physically device-tested or published.**
 
 These are standalone native interfaces, **not browser wrappers, PWAs or React WebViews**. The existing PR #40 web application stays available as a separate channel.
 
@@ -9,7 +9,7 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 | Platform | Implemented in this branch | Still required |
 | --- | --- | --- |
 | Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token encryption; learner materials/quizzes/journey/help requests; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout | Real Android Studio/Gradle compile, emulator/device test, full native quiz-taking, upload picker, offline strategy, signed APK/AAB |
-| iOS — Swift / SwiftUI | Adaptive iPhone/iPad SwiftUI parent/learner/educator screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role data, assigned teaching subjects, restricted parent invite decisions, authorized support queues; native sign-out; callback Info.plist and XcodeGen definition | Real Xcode compile, iPhone/iPad tests, upload picker, interactive assessments, app signing and TestFlight/App Store review |
+| iOS — Swift / SwiftUI | Adaptive iPhone/iPad SwiftUI parent/learner/educator screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; live role data, assigned teaching subjects, restricted parent invite decisions, authorized support queues; native quiz fetching, answer selection, submission and genuine grading feedback (UNCOMPILED); native sign-out; callback Info.plist and XcodeGen definition | Real Xcode compile, iPhone/iPad tests, API sign-in/submission integration, upload picker, server-side quiz idempotency, app signing and TestFlight/App Store review |
 | Windows — C# / WinUI 3 | Initial XAML UI and backend reachability | Native OAuth redirect, Windows DPAPI/credential vault storage, dashboard, documents, packaging, Windows builds and QA |
 | Web — React + TypeScript | Previously merged PR #40 | Existing web release gates remain unchanged |
 
@@ -55,8 +55,12 @@ Do not enable native authorization on a live school database without rollback, a
 
 ## Next feature milestone
 
-After real physical-device native sign-in works: implement **complete learner practice-test interaction, educator response/marking actions, and guardian-authorised child reports** on Android and iOS (load quiz details, choose an answer, submit once, display score and source feedback) using the existing CABO API. Follow with document upload selection and write-safe offline drafts, then Windows parity. Educator, parent, guardian and government portals require separate authorized native experiences; never show routes based solely on the client-supplied role.
+After real physical-device native sign-in works: validate **the iOS learner practice-test interaction on a signed physical build**, then implement Android quiz parity, educator response/marking actions, and guardian-authorised child reports (load quiz details, choose an answer, submit once, display score and source feedback) using the existing CABO API. Follow with document upload selection and write-safe offline drafts, then Windows parity. Educator, parent, guardian and government portals require separate authorized native experiences; never show routes based solely on the client-supplied role.
 
 Security notes: no AI provider key is embedded in any client, no second learner database is created, and the native UI must never assume that a network failure means a submission failed or can be retried blindly.
 
 Relevant native OAuth best practice: https://www.rfc-editor.org/rfc/rfc8252.html
+
+## iOS practice assessment implementation (unverified on device)
+
+`NativeQuizView.swift` now requests each learner-owned quiz using `GET /api/quizzes/:id`, renders its real server-provided questions and answer options, then sends answers to `POST /api/quizzes/:id/attempts`. The server returns the persisted score and question explanations. The screen prevents duplicate taps and treats a failed/uncertain submission as potentially committed, so it does **not** offer blind retries. **Server-level durable idempotency is still pending**, as is recovery of an attempt after an interrupted network response. This is practice feedback, not teacher-approved certification. Add native build and signed-in API integration tests before declaring the feature delivered.
