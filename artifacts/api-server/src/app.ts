@@ -8,8 +8,10 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import {permittedBrowserOrigin} from "./lib/originPolicy";
+import { apiRateLimit } from "./middlewares/rateLimit";
 
 const app: Express = express();
+app.set("trust proxy", process.env.TRUST_PROXY_HOPS === "1" ? 1 : false);
 
 app.use(
   pinoHttp({
@@ -38,6 +40,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
+app.use("/api", apiRateLimit);
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
