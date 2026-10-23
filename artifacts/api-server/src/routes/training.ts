@@ -525,6 +525,15 @@ router.post("/quizzes/:id/attempts", async (req, res): Promise<void> => {
     return;
   }
 
+  // Durable duplicate protection is opt-in until the additive Neon migration
+  // has been validated. Without the feature flag, existing web behavior is kept.
+  const keyHeader = req.get("Idempotency-Key");
+  const keyEnabled = process.env.CABO_QUIZ_IDEMPOTENCY_ENABLED === "true";
+  const key = keyEnabled && keyHeader ? keyHeader : null;
+  if (keyHeader && !/^[a-zA-Z0-9_-]{16,64}$/.test(keyHeader)) {
+    res.status(400).json({ error: "Invalid submission request key." }); return;
+  }
+
   const feedback: StoredFeedback[] = quiz.questions.map((question, index) => ({
     questionIndex: index,
     selectedOption: body.data.answers[index],
@@ -544,12 +553,50 @@ router.post("/quizzes/:id/attempts", async (req, res): Promise<void> => {
       totalQuestions: quiz.questions.length,
       percentage,
       feedback,
+      ...(key ? { requestKey: key } : {}),
     })
+    .onConflictDoNothing()
     .returning();
 
-  res
-    .status(201)
-    .json(SubmitQuizAttemptResponse.parse(attempt));
+  if (!attempt && key) {
+    const [existing] = await db.select().from(quizAttemptsTable)
+      .where(and(eq(quizAttemptsTable.userId, req.user.id),
+                 eq(quizAttemptsTable.requestKey, key))).limit(1);
+    if (!existing || existing.quizId !== quiz.id ||
+        JSON.stringify(existing.answers) !== JSON.stringify(body.data.answers)) {
+      res.status(409).json({ error: "This submission key is already in use." }); return;
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json(SubmitQuizAttemptResponse.parse(existing));
+    return;
+  }
+  if (!attempt) {
+    res.status(409).json({ error: "Assessment submission conflict." }); return;
+  }
+  res.setHeader("Cache-Control", "private, no-store");
+  res.status(201).json(SubmitQuizAttemptResponse.parse(attempt));
+});
+
+// Resolves an interrupted native submit without creating another attempt.
+// The request key belongs to the signed-in user and can never reveal
+// another learner's answers or feedback.
+router.get("/quizzes/:id/attempts/by-key/:key", async (req, res): Promise<void> => {
+  if (!requireAuth(req, res)) return;
+  res.setHeader("Cache-Control", "private, no-store");
+  if (process.env.CABO_QUIZ_IDEMPOTENCY_ENABLED !== "true") {
+    res.status(404).json({ error: "Submission status lookup is not enabled." }); return;
+  }
+  const id = z.coerce.number().int().positive().safeParse(req.params.id);
+  const key = typeof req.params.key === "string" ? req.params.key : "";
+  if (!id.success || !/^[a-zA-Z0-9_-]{16,64}$/.test(key)) {
+    res.status(400).json({ error: "Invalid assessment request." }); return;
+  }
+  const [attempt] = await db.select().from(quizAttemptsTable)
+    .where(and(eq(quizAttemptsTable.quizId, id.data),
+               eq(quizAttemptsTable.userId, req.user.id),
+               eq(quizAttemptsTable.requestKey, key))).limit(1);
+  if (!attempt) { res.status(404).json({ error: "No matching submission yet." }); return; }
+  res.json(SubmitQuizAttemptResponse.parse(attempt));
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {
