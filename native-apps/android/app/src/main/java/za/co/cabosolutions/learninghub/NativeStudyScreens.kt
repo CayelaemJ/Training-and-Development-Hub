@@ -19,6 +19,8 @@ internal fun NativeQuizScreen(
     busy: Boolean,
     submitted: Boolean,
     message: String?,
+    uncertain: Boolean,
+    recover: () -> Unit,
     answer: (Int, Int) -> Unit,
     submit: () -> Unit,
     close: () -> Unit
@@ -72,6 +74,11 @@ internal fun NativeQuizScreen(
                 }
                 Text("If the connection breaks during submission, check your assessment history. Do not submit again blindly.",
                     style = MaterialTheme.typography.bodySmall)
+            }
+            if (uncertain && !busy) {
+                Button(onClick = recover, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("Check submission status")
+                }
             }
             attempt?.let { result ->
                 ElevatedCard(Modifier.fillMaxWidth()) {
