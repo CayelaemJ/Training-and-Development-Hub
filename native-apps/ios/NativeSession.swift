@@ -18,6 +18,7 @@ struct StaffSchool: Identifiable {
     let subjects: [String]
     let support: [String]
     let tickets: [String]
+    let ticketItems: [NativeSupportTicket]
     let notice: String?
 }
 
