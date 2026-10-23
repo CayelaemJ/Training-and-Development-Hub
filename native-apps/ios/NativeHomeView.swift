@@ -8,6 +8,7 @@ struct NativeHomeView: View {
     @State private var testPassword = ""
     @State private var selectedQuiz: NativeQuizSummary?
     @State private var selectedMaterial: NativeMaterialSummary?
+    @State private var selectedSupportTicket: NativeSupportTicket?
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
 
@@ -52,6 +53,7 @@ struct NativeHomeView: View {
             if current == nil {
                 selectedQuiz = nil
                 selectedMaterial = nil
+                selectedSupportTicket = nil
                 testPassword = ""
             }
         }
@@ -60,6 +62,9 @@ struct NativeHomeView: View {
         }
         .sheet(item: $selectedMaterial) { material in
             NativeMaterialView(session: session, item: material)
+        }
+        .sheet(item: $selectedSupportTicket) { ticket in
+            NativeSupportReplyView(session: session, ticket: ticket)
         }
     }
 
