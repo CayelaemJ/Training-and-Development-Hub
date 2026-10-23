@@ -293,8 +293,19 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                             support = summary.map { "\($0.key): \($0.value)" }.sorted()
                         }
                         var ticketNames: [String] = []
+                        var ticketItems: [NativeSupportTicket] = []
                         if let data = try? await request("api/organizations/\(org)/support"),
                            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            ticketItems = Array((obj["items"] as? [[String: Any]] ?? []).prefix(20))
+                                .compactMap { row in
+                                    guard let id = row["id"] as? Int, id > 0,
+                                          let version = row["version"] as? Int, version > 0,
+                                          let concept = row["concept"] as? String else { return nil }
+                                    return NativeSupportTicket(
+                                        id: id, organizationId: org, concept: String(concept.prefix(160)),
+                                        status: row["status"] as? String ?? "open", version: version
+                                    )
+                                }
                             ticketNames = Array((obj["items"] as? [[String: Any]] ?? []).prefix(20))
                                 .compactMap { ticket in
                                     guard let concept = ticket["concept"] as? String else { return nil }
