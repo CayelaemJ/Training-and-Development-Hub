@@ -33,7 +33,8 @@ public record NativeDashboard(
     IReadOnlyList<NativeMaterialSummary> MaterialEntries,
     IReadOnlyList<string> Quizzes,
     IReadOnlyList<string> Organizations,
-    IReadOnlyList<NativeQuizSummary> QuizEntries
+    IReadOnlyList<NativeQuizSummary> QuizEntries,
+    IReadOnlyList<string> LearnerReports
 );
 
 // Windows uses a loopback RFC8252 authorization-code handoff with PKCE.
@@ -322,6 +323,7 @@ public sealed class NativeLearningService
         var quizzes = new List<string>();
         var organizations = new List<string>();
         var quizEntries = new List<NativeQuizSummary>();
+        var learnerReports = new List<string>();
         if (role == "superadmin") {
             // Audited, privileged endpoint; never assume role solely from UI state.
             using var registry = await FetchAsync("api/platform/overview", cancellation);
@@ -331,6 +333,44 @@ public sealed class NativeLearningService
                     .Select(v => v.TryGetProperty("name", out var n) ? n.GetString() : null)
                     .Where(v => !string.IsNullOrWhiteSpace(v))!);
         } else if (role == "learner") {
+            // Learner ID always comes from the bearer token: the device never
+            // passes another person's ID to the self-report endpoint.
+            if (root.TryGetProperty("organizationIds", out var ids) &&
+                ids.ValueKind == JsonValueKind.Array) {
+                foreach (var org in ids.EnumerateArray().Take(5)) {
+                    if (org.ValueKind != JsonValueKind.Number) continue;
+                    var id = org.GetInt32();
+                    if (id <= 0) continue;
+                    try {
+                        using var report = await FetchAsync(
+                            $"api/reports/me?organizationId={id}&year={DateTime.UtcNow.Year}",
+                            cancellation);
+                        var value = report.RootElement;
+                        var year = value.GetProperty("year").GetInt32();
+                        var grade = value.GetProperty("grade").GetString() ?? "";
+                        learnerReports.Add($"Institution {id} · {grade} · {year} · Draft progress");
+                        if (value.TryGetProperty("average", out var average) &&
+                            average.ValueKind == JsonValueKind.Number)
+                            learnerReports.Add($"Published average: {average.GetDouble():0.#}%");
+                        if (value.TryGetProperty("attendance", out var attendance) &&
+                            attendance.TryGetProperty("rate", out var rate) &&
+                            rate.ValueKind == JsonValueKind.Number)
+                            learnerReports.Add($"Attendance: {rate.GetInt32()}%");
+                        if (value.TryGetProperty("subjects", out var subjects) &&
+                            subjects.ValueKind == JsonValueKind.Array)
+                            foreach (var subject in subjects.EnumerateArray().Take(20)) {
+                                var name = subject.GetProperty("name").GetString() ?? "Subject";
+                                var percentage = subject.GetProperty("percentage").GetDouble();
+                                learnerReports.Add($"{name}: {percentage:0.#}%");
+                            }
+                        learnerReports.Add("Draft preview; not an officially issued report card.");
+                    } catch (UnauthorizedAccessException) {
+                        throw;
+                    } catch (Exception) {
+                        // No enrolment or published grades is not fabricated as a 0%.
+                    }
+                }
+            }
             using var materialResult = await FetchAsync("api/materials", cancellation);
             if (materialResult.RootElement.ValueKind == JsonValueKind.Array) {
                 foreach (var row in materialResult.RootElement.EnumerateArray().Take(30)) {
@@ -357,7 +397,7 @@ public sealed class NativeLearningService
                 }
             }
         }
-        return new NativeDashboard(role, summary, materials, materialEntries, quizzes, organizations, quizEntries);
+        return new NativeDashboard(role, summary, materials, materialEntries, quizzes, organizations, quizEntries, learnerReports);
     }
 
     public async Task SignOutAsync(CancellationToken cancellation)
