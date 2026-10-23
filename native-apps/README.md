@@ -88,3 +88,19 @@ The requested `cabo_test` account is supported by the existing isolated test-log
 The Windows pilot opens the system browser and starts a short-lived loopback listener bound specifically to 127.0.0.1:47787. It uses PKCE S256, a 256-bit random state, verifies the returned code before exchange, and stores only the CABO session token with DPAPI CurrentUser on Windows. Successful API reads use Bearer over HTTPS; sign-out revokes the session where online and clears local encrypted credentials regardless of network availability. Unlike the prior preview, merely opening a web login is no longer presented as authenticating the native app.
 
 This new code has **not** been validated on a physical Windows machine. It uses a fixed callback port to limit server redirect targets; if that port is occupied, sign-in should fail closed. Before broader rollout, move to dynamic RFC8252 loopback ports and test endpoint and binding security, device timeouts, DPAPI recovery, proxy behavior, school lab profiles and WinUI desktop accessibility. Review the OIDC registration/legacy test account distinction. No production credentials or child records should be used in these tests.
+
+## Next iteration: isolated `cabo_test` native sign-in (source implemented)
+
+The backend now exposes `POST /api/native/test-login`, gated by five explicit server-side test-only settings and a valid salted scrypt hash, and issues a revocable one-hour native bearer session. Rate limiting prevents repeated brute-force attempts. This complements but does **not** replace the browser OIDC flow for real learners and staff. No literal test password is embedded in GitHub.
+
+The iOS app includes a credential field disabled by default in `Info.plist`, and the Android app's equivalent is disabled by default in Gradle. Even when a tester deliberately compiles with the flag enabled, the app suppresses the test account form when using the normal public CABO pilot API. An isolated HTTPS test origin must be compiled into a disposable development build. Test credentials are sent only to that HTTPS API, never written to app storage; only the bearer token is stored in platform-managed secure storage.
+
+**Operator validation still required before enabling:**
+- Inspect and provision a separate Neon database containing **dummy records only**, including the isolated test principal.
+- Verify the Render service's `DATABASE_URL` points to that isolated database, not an existing school or public pilot.
+- Run and verify reviewed migrations on the isolated database; confirm the organisation/role registry and native authorization behaviour.
+- Store the salted verifier and feature flags as Render private variables. Only after confirming isolation, set `CABO_TEST_DATABASE_ISOLATED=true`. Superadmin elevation remains controlled separately by `ENABLE_CABO_SUPERADMIN=true` and the pinned dummy principal.
+- Compile a private Android/iOS development build against the exact isolated HTTPS service and test login, sign-out, account isolation, token expiration and no data from other roles.
+- Rotate the demo password before wider stakeholder distribution. **Do not publish or deploy demo password login on the public CABO Learning Hub.**
+
+The native login path is **code complete, not activated or end-to-end verified**. Physical-device testing, document uploads, school pilots and signed-store releases remain outstanding.
