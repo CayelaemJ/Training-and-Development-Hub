@@ -77,6 +77,11 @@ export function identifyCountryScopedSchoolRoute(
   // A percent sign after decoding indicates ambiguous/double-encoded routing.
   // Reject rather than interpreting a different school route from Express.
   if(routePath.includes("%")) return {kind:"invalid"};
+  // Guardian school discovery performs its own per-school clearance and
+  // latest verification checks before returning school names/identifiers.
+  // This is the only unscoped native-parent route allowed in a country pilot.
+  if(routePath==="/native/mobile/parent/schools")
+    return {kind:"not_scoped"};
   // Transfer records can reveal a learner and their origin school. A recipient
   // school's approval alone is not authority to expose origin-country data.
   // Keep incoming queues and decisions closed until both schools' clearances,
