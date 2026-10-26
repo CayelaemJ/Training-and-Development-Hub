@@ -69,9 +69,9 @@ router.get("/guardian/issued-reports/:learnerId",async(req,res)=>{
  const org=positive.safeParse(req.query.organizationId);if(!org.success){res.sendStatus(400);return}
  const [relation]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,req.params.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
  if(!relation){res.sendStatus(403);return}
- const [authority]=await db.select({id:guardianVerificationEventsTable.id}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,relation.id),eq(guardianVerificationEventsTable.organizationId,org.data),eq(guardianVerificationEventsTable.decision,"verified"))).limit(1);
+ const [authority]=await db.select({decision:guardianVerificationEventsTable.decision}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,relation.id),eq(guardianVerificationEventsTable.organizationId,org.data))).orderBy(desc(guardianVerificationEventsTable.createdAt),desc(guardianVerificationEventsTable.id)).limit(1);
  const [enrolled]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,req.params.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
- if(!authority||!enrolled){res.sendStatus(403);return}
+ if(authority?.decision!=="verified"||!enrolled){res.sendStatus(403);return}
  const rows=await db.select({id:issuedSchoolReportsTable.id,academicYear:issuedSchoolReportsTable.academicYear,contentHash:issuedSchoolReportsTable.contentHash,snapshot:issuedSchoolReportsTable.snapshot}).from(issuedSchoolReportsTable).where(and(eq(issuedSchoolReportsTable.organizationId,org.data),eq(issuedSchoolReportsTable.learnerId,req.params.learnerId),eq(issuedSchoolReportsTable.status,"issued")));
  res.setHeader("Cache-Control","private, no-store");res.json(rows);
 });
@@ -83,9 +83,9 @@ router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
  if(!item){res.sendStatus(404);return}
  if(req.user.id!==item.learnerId&&!await schoolManager(item.organizationId,req.user.id)){
   const [relation]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,item.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
-  const [authority]=relation?await db.select({id:guardianVerificationEventsTable.id}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,relation.id),eq(guardianVerificationEventsTable.organizationId,item.organizationId),eq(guardianVerificationEventsTable.decision,"verified"))).limit(1):[];
+  const [authority]=relation?await db.select({decision:guardianVerificationEventsTable.decision}).from(guardianVerificationEventsTable).where(and(eq(guardianVerificationEventsTable.relationshipId,relation.id),eq(guardianVerificationEventsTable.organizationId,item.organizationId))).orderBy(desc(guardianVerificationEventsTable.createdAt),desc(guardianVerificationEventsTable.id)).limit(1):[];
   const [enrolled]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,item.organizationId),eq(verifiedEnrollmentsTable.learnerId,item.learnerId),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
-  if(!relation||!authority||!enrolled){res.sendStatus(403);return}
+  if(!relation||authority?.decision!=="verified"||!enrolled){res.sendStatus(403);return}
  }
  const hashValid=item.digestAlgorithm==="canonical-json-v2"?contentDigest(item.snapshot)===item.contentHash:null;
  let signatureValid=false;
