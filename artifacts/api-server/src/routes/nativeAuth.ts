@@ -3,6 +3,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { db, usersTable, nativeAuthCodesTable } from "@workspace/db";
 import { createSession, deleteSession, getSession, getSessionId } from "../lib/auth";
 import { nativeTestLoginEnabled, verifyNativeTestLogin } from "../lib/nativeTestLoginPolicy";
+import { configuredPrincipals } from "../lib/testPrincipals";
 import {
   nativeAuthEnabled, nativeRedirect, validPkceChallenge, validPkceVerifier,
   validCode, validState, randomNativeCode, codeDigest, verifyPkce,
@@ -34,8 +35,11 @@ router.post("/native/test-login", async (req, res) => {
   }
   const username = req.body?.username;
   const password = req.body?.password;
+  const fixture = typeof username === "string"
+    ? configuredPrincipals(process.env.CABO_TEST_USERS_JSON).find(principal => principal.username === username)
+    : undefined;
   let valid = false;
-  try { valid = verifyNativeTestLogin(username, password, process.env); }
+  try { valid = verifyNativeTestLogin(username, password, process.env, fixture); }
   catch { valid = false; }
   if (!valid) {
     if (testFailures.size > 2000) testFailures.clear();
@@ -45,13 +49,16 @@ router.post("/native/test-login", async (req, res) => {
     return;
   }
   testFailures.delete(ip);
-  // Test ID cannot be assigned to any institutional learner. The opt-in
-  // deployment MUST have its own Neon database populated with dummy data.
+  // The pinned superadmin ID cannot be assigned to an institutional learner.
+  // Other principals must pass configuredPrincipals' cabo-fixture-* validation.
+  const profile = fixture
+    ? { id: fixture.userId, email: fixture.email, firstName: fixture.firstName, lastName: fixture.lastName }
+    : { id: "cabo-isolated-test-learner", firstName: "CABO", lastName: "Tester" };
   const [user] = await db.insert(usersTable)
-    .values({ id: "cabo-isolated-test-learner", firstName: "CABO", lastName: "Tester" })
+    .values(profile)
     .onConflictDoUpdate({
       target: usersTable.id,
-      set: { firstName: "CABO", lastName: "Tester" }
+      set: { email: profile.email ?? null, firstName: profile.firstName, lastName: profile.lastName }
     }).returning();
   const sid = await createSession({
     user: { id: user.id, email: user.email, firstName: user.firstName,
