@@ -99,6 +99,12 @@ test("Botswana revoked school blocked, unscoped AI, uploads and transfers denied
  }
  assert.equal((await get("A","/organizations/invalid/attendance/me")).status,400);
 });
+test("portal navigation omits unscoped learner/guardian aggregate counts",async()=>{
+ const portal=await get("A","/portal/me");
+ assert.equal(portal.status,200);
+ assert.equal(portal.json?.countryScopedRecordsRequired,true);
+ assert.deepEqual(portal.json?.summary,{});
+});
 test("latest revoked guardian verification denies issued reports",async()=>{
  const guardian=await get("guardian",
    `/guardian/issued-reports/${userA}?organizationId=${cfg.zaOne}`);
