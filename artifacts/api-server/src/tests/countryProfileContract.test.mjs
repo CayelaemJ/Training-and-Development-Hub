@@ -22,7 +22,7 @@ test("school API validates explicit country, prevents reclassification and check
  assert.ok(route.indexOf('.for("update")') < route.indexOf('const [previous]=await tx.select'));
 
  assert.match(route,/assessInstitutionProfileSubmission\(/);
- assert.match(route,/status\(409\)/);
+ assert.match(route,/res\.status\(outcome\.error==="not_found"\?404:409\)/);
  assert.match(route,/legalCertification:false/);
 });
 test("country selection and warnings are visible in institution frontend",()=>{
