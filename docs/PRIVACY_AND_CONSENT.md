@@ -1,5 +1,8 @@
 # Privacy, Safety and Consent — Design Requirements
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 This document is a technical design checklist, not a legal compliance certification. Obtain qualified South African POPIA and employment-law review before production use.
 
 ## Data minimisation

@@ -1,6 +1,10 @@
-# Training & Development Hub — a CABO Solutions product
+# CABO Learning Hub — Connected Education and Lifelong Development Platform
 
-A flexible learning and assessment application for individual learners, students, teachers and future company training programmes.
+**Every learner. Every milestone. Every possibility.**
+
+CABO Learning Hub, a CABO Solutions product, is a learner-centred digital ecosystem linking learning and assessments, academic progress, personal development, educator support, institutional governance, reporting and future pathways. **It is not simply a learning management system (LMS): learning delivery is one component of a wider connected education platform.**
+
+**Platform definition and claims:** [Identity and positioning](docs/PLATFORM_IDENTITY.md) · [Messaging guide](docs/GO_TO_MARKET_MESSAGING.md) · [Presentation storyboard](docs/PRESENTATION_STORYBOARD.md). Features described below may be prototypes, pilots or future milestones. Consult the [delivery register](docs/PHASES_1_TO_4_DELIVERY_REGISTER.md) before making release claims.
 
 ## Current capabilities
 
