@@ -1,5 +1,8 @@
 # CABO: Phases 1–4 Delivery Register — 8 October 2026
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 This file explicitly differentiates committed code from end-to-end validated functionality. A passing build is **not** proof of school, university, recruitment, psychometric or production readiness.
 
 ## Phase 1: Identity, permissions, platform reliability
