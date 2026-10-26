@@ -18,7 +18,7 @@ Open the deployed `/install` page. Android users install through Chrome; iPhone/
 
 This release is not an APK, AAB, IPA, EXE or app-store listing. No store publication or signed native build has occurred. Store distribution is a subsequent channel that requires CABO-owned developer accounts, signing credentials, an agreed permanent production domain, store metadata/privacy declarations, real-device acceptance and store review. Apple requires meaningful app functionality beyond a repackaged website. Do not advertise store availability before approval.
 
-The existing Render deployment is an isolated pilot with the data continuity and operational limitations documented in LEARNER_SUCCESS_RELEASE.md. Installing the pilot does not complete the Railway production cutover. Before distributing permanently, choose the stable production origin; changing origin creates a separate app/storage identity.
+The existing Render deployment is an isolated pilot with the data continuity and operational limitations documented in LEARNER_SUCCESS_RELEASE.md. Installing the pilot does not constitute a production cutover. Before distributing permanently, choose the stable production origin; changing origin creates a separate app/storage identity.
 
 ## Verification and limits
 
