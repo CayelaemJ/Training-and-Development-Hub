@@ -71,6 +71,8 @@ export function identifyCountryScopedSchoolRoute(
   // current transfer lawful basis and explicit source/recipient approval exist.
   if (/^\/organizations\/[^/]+\/transfers(?:\/|$)/.test(path))
     return {kind:"unscoped_sensitive"};
+  if (path === "/dashboard" || path === "/development/overview")
+    return {kind:"unscoped_sensitive"};
   const direct = /^\/organizations\/([^/]+)(?:\/|$)/.exec(path);
   if (direct) {
     // Only an institution's metadata may be configured without learner approval.
