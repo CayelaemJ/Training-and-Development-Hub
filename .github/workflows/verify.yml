@@ -17,6 +17,7 @@ jobs:
       - run: node --test artifacts/api-server/src/tests/*.test.mjs
       - run: node scripts/test-learner-support.mjs
       - run: node scripts/test-uploads.mjs
+      - run: node scripts/test-passport.mjs
       - name: Verify isolated native demo scripts
         run: |
           bash -n scripts/render-native-test-start.sh

@@ -21,6 +21,7 @@ jobs:
             node --test artifacts/api-server/src/tests/*.test.mjs
             node scripts/test-learner-support.mjs
             node scripts/test-uploads.mjs
+            node scripts/test-passport.mjs
       - run:
           name: Typecheck and build all workspaces
           command: pnpm run build
