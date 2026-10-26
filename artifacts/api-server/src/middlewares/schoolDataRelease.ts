@@ -35,6 +35,10 @@ export async function schoolDataReleaseMiddleware(req: Request, res: Response, n
       approvalCountry: institutionDataClearancesTable.countryCode,
       approvalState: institutionDataClearancesTable.state,
       evidenceReference: institutionDataClearancesTable.evidenceReference,
+      transferState: institutionDataClearancesTable.transferState,
+      transferAssessmentReference: institutionDataClearancesTable.transferAssessmentReference,
+      botswanaLocalCopyReference: institutionDataClearancesTable.botswanaLocalCopyReference,
+      botswanaLocalCopyVerifiedAt: institutionDataClearancesTable.botswanaLocalCopyVerifiedAt,
       approvedAt: institutionDataClearancesTable.approvedAt,
       expiresAt: institutionDataClearancesTable.expiresAt,
     }).from(institutionSetupTable)
