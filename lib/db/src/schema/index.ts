@@ -51,3 +51,5 @@ export * from "./learnerSupport";
 
 export * from "./educationFrameworks";
 export * from "./nativeAuth";
+
+export * from "./institutionDataClearances";

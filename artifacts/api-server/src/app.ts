@@ -9,6 +9,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import {permittedBrowserOrigin} from "./lib/originPolicy";
 import { apiRateLimit } from "./middlewares/rateLimit";
+import { schoolDataReleaseMiddleware } from "./middlewares/schoolDataRelease";
 
 const app: Express = express();
 app.set("trust proxy", process.env.TRUST_PROXY_HOPS === "1" ? 1 : false);
@@ -42,6 +43,12 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
+// Explicit rollout flag. Remains off on established Render services until
+// both migrations, per-school clearance evidence and blocked-route client
+// migrations have passed synthetic staging end-to-end tests.
+if (process.env.CABO_COUNTRY_PILOT_ENFORCEMENT === "true") {
+  app.use("/api", schoolDataReleaseMiddleware);
+}
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
