@@ -16,13 +16,12 @@ test("school API validates explicit country, prevents reclassification and check
  const route=read("../routes/institutionSetup.ts");
  assert.match(route,/countryCode:z\.enum\(\["ZA","BW"\]\)\.nullish\(\)/);
  assert.match(route,/countryChangeNeedsReview\(/);
- assert.match(route,/db\.transaction\(async tx=>/);
- assert.match(route,/\.where\(eq\(organizationsTable\.id,orgId\)\)\.for\("update"\)/);
- // Parent organisation is locked before reading or saving classification.
- assert.ok(route.indexOf('.for("update")') < route.indexOf('const [previous]=await tx.select'));
+ assert.match(route,/setWhere:or\(/);
+ assert.match(route,/isNull\(institutionSetupTable\.countryCode\)/);
+ assert.match(route,/eq\(institutionSetupTable\.countryCode,countryCode\?\?""\)/);
 
  assert.match(route,/assessInstitutionProfileSubmission\(/);
- assert.match(route,/res\.status\(outcome\.error==="not_found"\?404:409\)/);
+ assert.match(route,/res\.status\(409\)/);
  assert.match(route,/legalCertification:false/);
 });
 test("country selection and warnings are visible in institution frontend",()=>{
