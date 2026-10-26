@@ -25,8 +25,9 @@ The four `[DEMO]` organisations, 13 initial role fixtures, four courses, four as
 
 - `/api/healthz` returned 200.
 - Superadmin smoke verified native bearer login, demo-only registry, logout and token revocation.
-- Parent smoke verified the accepted-but-unverified relationship is redacted: no learner name or ID; logout revoked its bearer.
-- Anonymous/invalid bearer requests were rejected by protected parent, portal and platform endpoints.
-- CI, typecheck, build, CircleCI, Snyk and browser/mobile release checks passed for the synthetic-principal login change.
+- Parent smoke previously verified accepted-but-unverified relationship redaction and token revocation.
+- School-scoped latest-decision checks were merged in PR #74 and deployed to Render at commit `fdf5911e257bc1ca170597f14c86a346bff81601`.
+- CI regression cases for matching approval, unrelated school, missing or revoked review, pending guardian and missing enrollment passed, along with typecheck, build, CircleCI, Snyk and browser/mobile checks.
+- After deployment, anonymous requests to the parent overview, guardian report, issued-report and report-integrity endpoints returned 401.
 
-An accepted relationship is not guardian verification. Authenticated tests for verified active access, school-specific revocation, missing review, cross-school relationships and unenrolled learners remain before release. Physical devices, production OIDC, legal review and independent penetration testing are also still required.
+The authenticated Render flow that grants access after a school approval and denies it after revocation still needs an end-to-end run with the synthetic guardian and school administrator. Physical devices, production OIDC, legal review and independent penetration testing are also still required.

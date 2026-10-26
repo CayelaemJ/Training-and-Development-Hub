@@ -1,6 +1,6 @@
 # CABO isolated native test setup — Render and Neon
 
-**Status as of 26 October 2026.** This runbook describes the dedicated test preview only. The public CABO pilot and production school systems are separate and were not changed by this setup.
+**Status as of 26 October 2026.** This runbook describes the dedicated test preview only. The public CABO pilot and production school systems are separate and were not changed by this setup. School-specific latest-decision authorization is deployed on the preview at commit `fdf5911e257bc1ca170597f14c86a346bff81601`.
 
 ## Isolated service and database
 
@@ -31,10 +31,10 @@ PR #71 added support for separately configured synthetic role principals through
 - Render health check: `/api/healthz` returned 200.
 - Native superadmin smoke: bearer issuance, superadmin role, demo-only organisation registry, logout and post-logout rejection passed.
 - Synthetic parent smoke: sign-in passed; its accepted-but-unverified guardian relationship returned no learner name or learner ID; logout revoked the token. Repeat it with `scripts/smoke-native-parent-fixture.mjs`, using `CABO_TEST_BASE_URL` and `CABO_TEST_PARENT_PASSWORD` from a private runner.
-- Anonymous and invalid bearer requests to the parent, portal and platform overview endpoints returned 401.
-- Unit, typecheck, build, CircleCI, Snyk and the GitHub browser/mobile release workflow passed for the fixture-login change.
+- Anonymous requests to the parent overview, guardian report, issued-report and report-integrity endpoints returned 401 after the latest deploy.
+- Regression cases for school approval, unrelated school, missing or revoked decisions, pending guardians and missing enrollment passed in CI; typecheck, build, CircleCI, Snyk and browser/mobile release checks also passed.
 
-These checks do not prove school-verified guardian access. The test fixture contains an accepted relationship, not a verified guardian approval with active enrolment. Separate verified, revoked, missing-review, cross-school and unenrolled cases remain required before release.
+The existing live parent fixture remains accepted but unverified. An authenticated Render exercise that grants access after a school approval and denies it after revocation is still required; policy unit tests do not replace that end-to-end check.
 
 ## Safe operations
 
@@ -46,5 +46,5 @@ Keep `ENABLE_CABO_DEMO_SEED=true`, native test login and superadmin elevation on
 
 - Physical Android, iPhone/iPad and Windows device sign-in, accessibility, secure storage and low-end-device performance.
 - Production OIDC/PKCE callbacks and store-signed release builds.
-- School-specific guardian verification, active-enrolment authorization, revocation and cross-school denial through authenticated parent sessions.
+- Authenticated Render verification and revocation through parent and school administrator sessions; CI covers missing-review, cross-school and unenrolled denial cases.
 - Independent penetration testing, POPIA/DPIA and school governance sign-off, restore rehearsal, monitoring/alerting and production cutover.
