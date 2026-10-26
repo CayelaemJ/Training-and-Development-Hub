@@ -3,7 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, guardianRelationshipsTable, guardianVerificationEventsTable,
   verifiedEnrollmentsTable, usersTable } from "@workspace/db";
-import { parentMobileView } from "../lib/parentMobilePolicy";
+import { parentMobileView, approvedNativeParentLearnerIds } from "../lib/parentMobilePolicy";
 import { nativeAuthEnabled } from "../lib/nativeAuthPolicy";
 import { canReadChildReport } from "../lib/guardianPolicy";
 import { gather } from "./reportCards";
@@ -38,15 +38,42 @@ router.get("/native/mobile/parent", async (req, res) => {
   const candidateIds = relationships
     .filter(r => r.status === "verified").map(r => r.learnerId);
   const eligible = candidateIds.length
-    ? await db.select({ learnerId: verifiedEnrollmentsTable.learnerId })
+    ? await db.select({
+        learnerId: verifiedEnrollmentsTable.learnerId,
+        organizationId: verifiedEnrollmentsTable.organizationId,
+      })
         .from(verifiedEnrollmentsTable)
         .where(and(
           inArray(verifiedEnrollmentsTable.learnerId, candidateIds),
           eq(verifiedEnrollmentsTable.status, "active")
-        ))
+        )).limit(500)
     : [];
-  const activeIds = new Set(eligible.map(r => r.learnerId));
-  const nameIds = [...new Set(candidateIds.filter(id => activeIds.has(id)))];
+  const relationshipIds = relationships
+    .filter(r => r.status === "verified").map(r => r.id);
+  const organizationIds = [...new Set(eligible.map(r => r.organizationId))];
+  // All matching review events are sorted newest first. Truncated/missing
+  // evidence fails closed; a revoked latest review never grants a learner name.
+  const reviews = relationshipIds.length && organizationIds.length
+    ? await db.select({
+        relationshipId: guardianVerificationEventsTable.relationshipId,
+        organizationId: guardianVerificationEventsTable.organizationId,
+        decision: guardianVerificationEventsTable.decision,
+      }).from(guardianVerificationEventsTable)
+        .where(and(
+          inArray(guardianVerificationEventsTable.relationshipId, relationshipIds),
+          inArray(guardianVerificationEventsTable.organizationId, organizationIds),
+        ))
+        .orderBy(desc(guardianVerificationEventsTable.createdAt),
+                 desc(guardianVerificationEventsTable.id))
+        .limit(3000)
+    : [];
+  const latestDecisions = new Map<string, string>();
+  for (const review of reviews) {
+    const key = review.relationshipId + ":" + review.organizationId;
+    if (!latestDecisions.has(key)) latestDecisions.set(key, review.decision);
+  }
+  const approvedIds = approvedNativeParentLearnerIds(relationships, eligible, latestDecisions);
+  const nameIds = [...approvedIds];
   const names = nameIds.length
     ? await db.select({ id: usersTable.id, firstName: usersTable.firstName })
         .from(usersTable).where(inArray(usersTable.id, nameIds))
@@ -54,7 +81,7 @@ router.get("/native/mobile/parent", async (req, res) => {
   const byId = new Map(names.map(u => [u.id, u.firstName]));
   res.json({
     relationships: relationships.map(r => parentMobileView(
-      r, activeIds, byId
+      r, approvedIds, byId
     )),
     guidance: "Accepting an invitation is not proof of guardianship. School verification is required before viewing a child's progress.",
   });
