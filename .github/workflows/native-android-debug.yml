@@ -43,8 +43,15 @@ jobs:
           avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
           echo "no" | "$avdmanager" create avd --force --name cabo-api-23 --package "system-images;android-23;default;x86_64"
           "$sdkroot/emulator/emulator" -avd cabo-api-23 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect > /tmp/cabo-emulator.log 2>&1 &
-          adb wait-for-device
-          timeout 240 bash -c 'until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == "1" ]]; do sleep 2; done'
+          if ! timeout 300 adb wait-for-device; then
+            cat /tmp/cabo-emulator.log
+            exit 1
+          fi
+          if ! timeout 300 bash -c 'until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == "1" ]]; do sleep 2; done'; then
+            cat /tmp/cabo-emulator.log
+            adb devices -l || true
+            exit 1
+          fi
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
