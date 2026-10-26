@@ -37,7 +37,7 @@ Two other open draft security fixes are:
 
 Both showed successful CircleCI verify, Snyk security and Snyk license statuses at audit time. Review their documented staging gates before release.
 
-Other open work includes PR #49 (native internal test bundles), PR #51 (CircleCI security scan suite), PR #44 (lifelong learning passport), and Dependabot updates #53–#57. CI success on a commit is not evidence of app-store signing, physical-device behavior, or production privacy verification.
+PR #49 (native internal test bundles) has been merged. Its iOS and Windows CI builds passed, but the short-retention artifacts have expired; the fresh-build workflow guides and builds are being exercised in PR #66. PR #51 (CircleCI security scan suite) remains open: CircleCI `verify` and Snyk checks passed, while `security_suite` failed on build #301. The CircleCI log interface is not available in this workspace, so the failing scan and remediation are not yet verified. PR #44 (lifelong learning passport) and Dependabot updates #53–#57 also remain open. CI success on a commit is not evidence of app-store signing, physical-device behavior, or production privacy verification.
 
 
 ## Current isolated-test environment check
@@ -56,10 +56,17 @@ The next staging work is now: inspect the failed pre-deploy execution and safe t
 - Reviewed root structure, native-apps README, device inclusion matrix, multiplatform/install documentation, active PR list and commit statuses.
 - Confirmed no Flutter/Dart workspace is present.
 - Recorded that native clients exist but their platform-specific release evidence is incomplete.
-- No source changes, deployments, merges or production data changes were made during the audit.
+- No production data changes were made. PR #49's CI workflow-only change was merged after its CircleCI, Snyk, iOS and Windows checks passed; no deployment or release signing was performed.
 - Tests/builds: not run; this audit used read-only GitHub repository data.
 - Branch: `docs/native-platform-audit-checkpoint-20261026`.
-- Next: finish review and the synthetic isolated-staging verification for PR #60; record evidence in its PR, then address the remaining high-priority auth PRs #58 and #59. Resume the Android, iOS and Windows release gates after privacy/auth blockers are handled.
+- Next: diagnose the failed Railway pre-deploy timeout without re-running schema push; then restore isolated synthetic staging and verify PR #60. Review PR #58 and #59 release gates. PR #66 is currently building fresh platform test artifacts; PR #51's security scan failure still needs CircleCI logs. Resume signed Android/iOS/Windows release work after privacy/auth blockers are verified.
+
+## Additional activity after the initial audit
+
+- Merged PR #49 after checking CircleCI verify, Snyk, iOS simulator build and Windows build statuses. Artifacts were no longer downloadable at the time of follow-up.
+- Inspected isolated Railway test deployment status and failure logs. The prior build succeeded but its database pre-deploy command exceeded the 300-second timeout; the test API is not running.
+- Static-read PR #60 patch and PR #58/#59 diffs; no staging or physical-device claims were made.
+- Opened PR #66 with platform test-artifact guides to trigger fresh Android, iOS simulator and Windows CI builds. Those runs are queued or in progress.
 
 ## Resume instructions
 
