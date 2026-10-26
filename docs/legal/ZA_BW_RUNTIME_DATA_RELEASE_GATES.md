@@ -4,6 +4,12 @@
 ## Why this PR exists
 Country tagging in school setup does not prevent learner data from being processed. This stacked change adds a **separate school-specific release register** and middleware which requires a current, same-country clearance record before letting organisation-scoped data routes pass. It prevents a school admin from unilaterally clearing their own school using the setup UI.
 
+## Transfer and Botswana copy evidence
+- Each clearance row includes `transfer_state`: `unreviewed` (deny), `no_transfer` (reviewed finding), or `approved_transfer` (reviewed legal mechanism). A nonempty internal transfer assessment reference is mandatory.
+- For **Botswana approved transfers**, a nonempty `botswana_local_copy_reference` and actual timestamp `botswana_local_copy_verified_at` are mandatory before runtime approval. A reference/timestamp must point to independently verified, safely retained evidence — they do **not** themselves create an in-country copy.
+- For `no_transfer`, confirm no foreign access by cloud hosting, AI inference, backup, analytics, email, mobile SDKs or support vendors; storing a string `no_transfer` does not make the claim true.
+- This stricter internal rule applies for Botswana transfers where DPA 2024 s74 actually applies. Botswana counsel must classify any circumstances outside its legal scope. Do not defeat the gate by misclassifying overseas transfers as local.
+
 ## Integration and default behaviour
 - This PR depends on the country schema and `country_code` migration in **PR #62**.
 - **Hard fail-closed**, not a silently disabled flag: unknown countries, missing records, expired/revoked/mismatched clearances, malformed organisation IDs and database failures deny protected data routes.
