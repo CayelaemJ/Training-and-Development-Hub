@@ -39,6 +39,15 @@ Both showed successful CircleCI verify, Snyk security and Snyk license statuses 
 
 Other open work includes PR #49 (native internal test bundles), PR #51 (CircleCI security scan suite), PR #44 (lifelong learning passport), and Dependabot updates #53–#57. CI success on a commit is not evidence of app-store signing, physical-device behavior, or production privacy verification.
 
+
+## Current isolated-test environment check
+
+Railway project `CABO Learner Hub - Isolated Test`, environment `testing`, is accessible. The API service points at repository branch `main`. Its latest deployment, from 2026-10-16, is **FAILED** at `PRE_DEPLOY_COMMAND`: the pre-deploy command timed out after 300 seconds. The build itself completed. The configured pre-deploy command runs `pnpm --filter @workspace/db run push` and then `create-test-readonly-role.mjs`; the logs do not identify which command stalled. The service has no live instance, so authenticated synthetic staging checks cannot run now.
+
+Railway's environment inventory showed one API service and a 5 GB volume not mounted on a service; it did not show a PostgreSQL service. The repository's `docs/RAILWAY_TESTING.md` says PostgreSQL is provisioned inside that Railway project. Since the resolved `DATABASE_URL` was not inspected, its target is unknown; confirm the actual test database target and correct the documentation/configuration drift before deploying. Do not re-run schema push or change the service source until the timeout cause and database target are understood.
+
+The next staging work is now: inspect the failed pre-deploy execution and safe test database target; repair the isolated environment without touching production or deleting existing test data; deploy the PR #60 branch only after verifying the deployment will use the isolated synthetic-data database; then run and record the guardian authorization scenarios. If account-level credentials or a database-target confirmation are unavailable, keep the environment blocked and continue independent static review and native CI work.
+
 ## Iteration log
 
 ### Iteration 1 — repository and platform audit
