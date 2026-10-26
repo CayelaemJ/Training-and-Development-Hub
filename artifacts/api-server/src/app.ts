@@ -35,12 +35,13 @@ app.use(
 app.use((req,res,next)=>{res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("X-Frame-Options","DENY");next()});
 app.use(cors({credentials:true,origin:(origin,callback)=>callback(null,origin&&permittedBrowserOrigin(origin,process.env)?origin:false)}));
 app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedBrowserOrigin(req.headers.origin,process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
+// Reject abusive API traffic before cookie/session lookups and body parsing.
+// The limiter keys on req.originalUrl and req.ip, neither requires body or auth.
+app.use("/api", apiRateLimit);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
-
-app.use("/api", apiRateLimit);
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
