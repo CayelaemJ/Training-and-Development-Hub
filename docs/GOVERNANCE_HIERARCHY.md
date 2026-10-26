@@ -71,4 +71,4 @@ A hierarchy confers **management responsibility**, not unrestricted visibility o
 - Organisation owner can bootstrap only one root.
 - Role revocation blocks future delegated reads.
 - Existing school exams, marking and enrolment endpoints preserve independent security checks.
-- PostgreSQL schema reviewed and migrated against the dedicated Railway test database.
+- PostgreSQL schema reviewed and migrated against the dedicated Neon test database.
