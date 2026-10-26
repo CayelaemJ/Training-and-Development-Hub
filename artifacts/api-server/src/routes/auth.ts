@@ -70,7 +70,7 @@ async function upsertUser(claims: Record<string, unknown>) {
 }
 
 // Password auth is available only on the isolated Render testing deployment.
-// Its verifier is supplied as a salted scrypt hash via Railway secrets, never source code.
+// Its verifier is supplied as a salted scrypt hash via Render secrets, never source code.
 const failures = new Map<string,{count:number;until:number}>();
 router.post('/test-login', async (req:Request,res:Response) => {
  if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'){res.sendStatus(404);return;}
