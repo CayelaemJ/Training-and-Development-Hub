@@ -1,5 +1,8 @@
 # CABO Role-Based Portals and Academic Permissions
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 ## Why a hierarchy needs more than separate menus
 
 The interface must reflect the **server's** permissions. A hidden button is not protection: every API endpoint must authenticate, constrain institutional scope, and check the requested operation against authorised membership, grants and course assignments.
