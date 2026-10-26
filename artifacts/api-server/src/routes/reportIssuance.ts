@@ -1,4 +1,4 @@
-import {Router,type IRouter} from "express";
+import {Router,type IRouter,type Request,type Response} from "express";
 import {and,desc,eq} from "drizzle-orm";
 import {contentDigest,configuredReportSigner,signingPayload,verifyReportSignature} from "../lib/reportCryptography";
 import {z} from "zod/v4";
@@ -101,10 +101,17 @@ router.get("/guardian/issued-reports/:learnerId",async(req,res)=>{
  res.setHeader("Cache-Control","private, no-store");res.json(rows);
 });
 
-router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
+async function reportIntegrity(req:Request,res:Response){
+ // A country-gated scoped route must also constrain the row to that school.
+ const requestedOrg=req.params.orgId===undefined?null:positive.safeParse(req.params.orgId);
+ if(requestedOrg!==null&&!requestedOrg.success){res.sendStatus(400);return}
+
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const id=positive.safeParse(req.params.reportId);if(!id.success){res.sendStatus(400);return}
- const [item]=await db.select().from(issuedSchoolReportsTable).where(eq(issuedSchoolReportsTable.id,id.data)).limit(1);
+ const [item]=await db.select().from(issuedSchoolReportsTable)
+   .where(requestedOrg?.success
+     ?and(eq(issuedSchoolReportsTable.id,id.data),eq(issuedSchoolReportsTable.organizationId,requestedOrg.data))
+     :eq(issuedSchoolReportsTable.id,id.data)).limit(1);
  if(!item){res.sendStatus(404);return}
  if(req.user.id!==item.learnerId&&!await schoolManager(item.organizationId,req.user.id)){
   const [relation]=await db.select({id:guardianRelationshipsTable.id}).from(guardianRelationshipsTable).where(and(eq(guardianRelationshipsTable.learnerId,item.learnerId),eq(guardianRelationshipsTable.guardianId,req.user.id),eq(guardianRelationshipsTable.status,"verified"))).limit(1);
@@ -124,5 +131,9 @@ router.get("/report-issuance/:reportId/integrity",async(req,res)=>{
  }
  res.setHeader("Cache-Control","private, no-store");
  res.json({id:item.id,status:item.status,hashValid,digestAlgorithm:item.digestAlgorithm,cryptographicallySigned:!!item.signature,signatureValid,signingKeyId:item.signingKeyId,issuerIdentityAccredited:false,warning:"Signature proves configured key possession, not DBE/IEB accreditation or school authority."});
-});
+}
+router.get("/organizations/:orgId/report-issuance/:reportId/integrity",reportIntegrity);
+// Kept for backward compatibility, but the country pilot gate rejects this
+// unscoped legacy path until the client migrates.
+router.get("/report-issuance/:reportId/integrity",reportIntegrity);
 export default router;
