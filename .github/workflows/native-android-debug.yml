@@ -41,7 +41,7 @@ jobs:
           sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           export PATH="$sdkroot/platform-tools:$sdkroot/emulator:$PATH"
           avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
-          echo "no" | "$avdmanager" create avd --force --name cabo-api-23 --package "system-images;android-23;default;x86_64"
+          "$avdmanager" create avd --force --name cabo-api-23 --package "system-images;android-23;default;x86_64" --device pixel
           "$sdkroot/emulator/emulator" -avd cabo-api-23 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect > /tmp/cabo-emulator.log 2>&1 &
           if ! timeout 300 adb wait-for-device; then
             cat /tmp/cabo-emulator.log
