@@ -36,3 +36,12 @@ test("issued reports listing filters BOTH institution and learner and only issue
  assert.match(scoped,/eq\(issuedSchoolReportsTable\.status,"issued"\)/);
  assert.match(scoped,/private, no-store/);
 });
+
+test("browser institution-records screen requests one school at a time",()=>{
+ const page=source("../../../training-platform/src/pages/institution-records.tsx");
+ assert.match(page,/selectedSchool/);
+ assert.match(page,/"\/organizations\/".scoped."\/institution-records\/me"/);
+ assert.doesNotMatch(page,/api<\{enrollments:Enrolment\[\];transfers/);
+ assert.match(page,/disabled=\{true\} onClick=\{\(\)=>act\(\(\)=>api\("\/institution-records\/transfers"/);
+ assert.match(page,/country-specific data-processing approval/);
+});
