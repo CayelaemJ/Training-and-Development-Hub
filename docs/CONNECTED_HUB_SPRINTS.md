@@ -32,4 +32,4 @@ This branch adds a responsive 12-module institution workspace and tenant-scoped 
 
 Versioned schema migrations, environment isolation, integration and browser tests with genuinely distinct users, validated school/university workflows, verified guardians, POPIA legal review for children, approved assessment instruments, accessibility, incident response, signing keys for credential issuance and fully configured storage/backups.
 
-Railway's existing testing environment uses a dedicated Postgres and CI; this branch is NOT automatically deployed or merged. End-to-end platform readiness must be measured against acceptance tests, not the presence of modules in the navigation.
+Render's isolated native-test preview uses its dedicated Neon database and CI; this branch is NOT automatically deployed or merged. End-to-end platform readiness must be measured against acceptance tests, not the presence of modules in the navigation.
