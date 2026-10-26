@@ -4,13 +4,13 @@
 
 This section supersedes the older audit snapshots below.
 
-**Main:** `4c45f992932f688404bd5fb4afe1ec7f1f319aff`.
+**Main:** `276e019daa7b3e2cfc9ea8d618a3713579f59f80`.
 
 - Merged PR #89 hardens cookie-backed mutation origin checks and OIDC callback/return-path validation.
 - Merged PR #88 closes mixed-case/trailing-slash privacy-gate bypasses, blocks cross-jurisdiction transfer metadata under the country gate, and adds isolated synthetic QA evidence.
 - Merged PR #90 adds school-scoped native guardian overview/report routes; global guardian routes remain blocked when strict country enforcement is enabled.
 - Country-pilot enforcement and native OIDC remain off on production. No production database migration or deployment was performed for these merges.
-- PR #86 adds API 23 Android Compose UI tests and short-retention debug APK artifacts. Latest head is `0bae5dddaec3819926965363c32c155287d5fe85`. The API 23 emulator UI tests and both standard/isolated APK builds pass; typecheck, policy tests, secret scan, Semgrep, Snyk and CircleCI pass. The repository browser/build check is still running, so PR #86 remains unmerged pending that final check. Earlier Android runs exposed a missing Compose test BOM and an unsupported Compose assertion; both were corrected.
+- PR #86 is merged as `276e019daa7b3e2cfc9ea8d618a3713579f59f80`. Its latest head `0bae5dddaec3819926965363c32c155287d5fe85` passed three API 23 emulator instrumentation tests (3/3; zero skipped or failed), standard and isolated debug APK builds, repository browser/mobile checks, CircleCI, Snyk, Semgrep, secret scan, typecheck and build. Short-retention artifacts from [workflow run 40330332713](https://github.com/CayelaemJ/Training-and-Development-Hub/actions/runs/40330332713): standard APK artifact `12654439008` and isolated Render test-login APK artifact `12655715550`; both expire 29 October 2026. Earlier Android runs exposed a missing Compose test BOM and an unsupported Compose assertion; both were corrected.
 - Render staging remains the dedicated `cabo-learning-native-isolated-preview` service at `https://cabo-learning-native-isolated-preview.onrender.com`, attached to `feat/real-native-cabo-apps`, with auto-deploy disabled. Its isolated test-login and synthetic-demo setup passed the authenticated API smoke check. No production service shares those settings.
 - The workspace has no local Ansight host, ADB, or emulator. The current Android validation path is the GitHub-hosted emulator; physical-device acceptance is still outstanding.
 
