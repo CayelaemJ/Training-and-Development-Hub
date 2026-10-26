@@ -35,7 +35,7 @@ Endpoints:
 ### Feature flag remains OFF by default
 
 1. Review/apply `lib/db/migrations/20261022_native_auth_codes.sql` in an isolated test database using the existing reviewed migration process. Never run unchecked Drizzle push against production.
-2. Confirm the target environment supports working **browser OIDC** authentication and the registered `/api/callback` URL. Test passwords / Railway test accounts are **not** interchangeable with the real OIDC integration.
+2. Confirm the target environment supports working **browser OIDC** authentication and the registered `/api/callback` URL. The isolated Render password-test route is separate and **not** interchangeable with the real OIDC integration.
 3. Configure `CABO_NATIVE_AUTH_ENABLED=true` **server-side only**, on an isolated environment after migration and verification. Do not add the flag to frontend `VITE_*` variables. Leave this disabled in production until tested.
 4. Open the Android or iOS native sign-in flow; confirm exact custom-scheme callback routing, PKCE state comparison, code replay rejection, expired-code rejection, bearer scoping, logout/revocation, and cross-account isolation.
 5. Before public release, replace the hard-coded **Render pilot** URL with a CABO-controlled permanent HTTPS origin, use app-claimed verified HTTPS redirects (Android App Links / iOS Universal Links), and register the exact production package/bundle identifiers and domain associations. Custom-scheme callbacks in this pilot are protected by PKCE but are not equivalent to verified HTTPS ownership.
@@ -73,7 +73,7 @@ To activate **durable** de-duplication, review and apply `lib/db/migrations/2026
 
 ## Superadmin test account
 
-The requested `cabo_test` account is supported by the existing isolated test-login gate, with a server-side scrypt hash generated using `scripts/configure-cabo-test-login.mjs`. The plaintext password is not committed to any file or app. See `native-apps/TEST_ADMIN_SETUP.md`. **The account has not been activated in Render because the currently public pilot's database isolation and permissions have not been verified.** Never elevate this test principal on a school/production database. Native OIDC login is a separate integration gate, and no native sign-in claim is made based on browser test credentials.
+The requested `cabo_test` account is supported by the existing isolated test-login gate, with a server-side scrypt hash generated using `scripts/configure-cabo-test-login.mjs`. The plaintext password is not committed to any file or app. See `native-apps/TEST_ADMIN_SETUP.md`. **The separate Render native preview is active on its own Neon test database.** The guarded deployment, demo-only registry, superadmin native bearer session, synthetic-parent privacy response and logout revocation have passed API smoke checks. The public CABO pilot remains separate. Native production OIDC and physical-device sign-in are still separate release gates.
 
 ## What's still outstanding
 
@@ -89,15 +89,15 @@ The Windows pilot opens the system browser and starts a short-lived loopback lis
 
 This new code has **not** been validated on a physical Windows machine. It uses a fixed callback port to limit server redirect targets; if that port is occupied, sign-in should fail closed. Before broader rollout, move to dynamic RFC8252 loopback ports and test endpoint and binding security, device timeouts, DPAPI recovery, proxy behavior, school lab profiles and WinUI desktop accessibility. Review the OIDC registration/legacy test account distinction. No production credentials or child records should be used in these tests.
 
-## Next iteration: isolated `cabo_test` native sign-in (source implemented)
+## Isolated native test sign-in (API smoke checked)
 
 The backend now exposes `POST /api/native/test-login`, gated by five explicit server-side test-only settings and a valid salted scrypt hash, and issues a revocable one-hour native bearer session. Rate limiting prevents repeated brute-force attempts. This complements but does **not** replace the browser OIDC flow for real learners and staff. No literal test password is embedded in GitHub.
 
 The iOS app includes a credential field disabled by default in `Info.plist`, and the Android app's equivalent is disabled by default in Gradle. Even when a tester deliberately compiles with the flag enabled, the app suppresses the test account form when using the normal public CABO pilot API. An isolated HTTPS test origin must be compiled into a disposable development build. Test credentials are sent only to that HTTPS API, never written to app storage; only the bearer token is stored in platform-managed secure storage.
 
-**Operator validation still required before enabling:**
-- Inspect and provision a separate Neon database containing **dummy records only**, including the isolated test principal.
-- Verify the Render service's `DATABASE_URL` points to that isolated database, not an existing school or public pilot.
+**Current isolated-preview configuration:** the native test login and superadmin gates are enabled only on the dedicated Render preview; test hashes remain in private Render settings. **Before broader release:**
+- Continue using the separate Neon database containing **dummy records only**; do not connect this setup to a school or public-pilot database.
+- Preserve the Render service's private `DATABASE_URL` binding to the isolated Neon project.
 - Run and verify reviewed migrations on the isolated database; confirm the organisation/role registry and native authorization behaviour.
 - Store the salted verifier and feature flags as Render private variables. Only after confirming isolation, set `CABO_TEST_DATABASE_ISOLATED=true`. Superadmin elevation remains controlled separately by `ENABLE_CABO_SUPERADMIN=true` and the pinned dummy principal.
 - Compile a private Android/iOS development build against the exact isolated HTTPS service and test login, sign-out, account isolation, token expiration and no data from other roles.
