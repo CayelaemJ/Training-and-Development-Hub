@@ -13,7 +13,7 @@
 
 ## Fictional users and example workflows
 
-The seeder creates 13 `cabo-fixture-*` identities with `@example.invalid` addresses. The usernames below are supported by the test-login mechanism **only when** a matching salted-scrypt entry is configured in `CABO_TEST_USERS_JSON` in Railway testing. The seeder itself creates no credentials or passwords.
+The seeder creates 13 `cabo-fixture-*` identities with `@example.invalid` addresses. The usernames below are supported by the test-login mechanism **only when** a matching salted-scrypt entry is configured in `CABO_TEST_USERS_JSON` on the isolated Render test service. The seeder itself creates no credentials or passwords. Native test login can use separately hashed principals from `CABO_TEST_USERS_JSON`; the isolated Render preview currently exercises the synthetic `cabo_parent_south` account.
 
 | Suggested login | Fixture ID suffix | Experience |
 | --- | --- | --- |
@@ -44,8 +44,8 @@ Each test principal must have `userId: "cabo-fixture-<suffix>"`, `email: "<suffi
 
 ## How to activate
 
-1. In the isolated Railway **testing** API service only, set `ENABLE_CABO_DEMO_SEED=true`. Do not set it on a shared environment or production.
-2. Deploy this feature branch. At startup the server seeds the fixtures asynchronously. Check Railway deploy logs for `CABO synthetic fixtures ready`; deployment success alone does not prove the database was seeded.
+1. In the isolated Render **testing** API service only, set `ENABLE_CABO_DEMO_SEED=true`. Do not set it on a shared environment or production.
+2. Deploy this feature branch. At startup the server seeds the fixtures asynchronously. Check Render deploy logs for `CABO synthetic fixtures ready`; deployment success alone does not prove the database was seeded.
 3. Optionally configure `CABO_TEST_USERS_JSON` with salted-scrypt role login verifiers using the already implemented test authentication route. Each role must have a separate test account.
 4. Sign in to the test site and verify the portals. Repeated deploys preserve edited marks and do not duplicate seed rows.
 5. Turn off `ENABLE_CABO_DEMO_SEED` after setup if no new fixtures are needed.
@@ -56,7 +56,7 @@ Each test principal must have `userId: "cabo-fixture-<suffix>"`, `email: "<suffi
 - School headmaster sees only school operations; university head sees only university.
 - Teacher sees Mathematics but cannot mark Physical Sciences; assessor sees the reverse.
 - Learner A sees own marks (82 Mathematics, 74 Physical Sciences), not learner B's (64, 88).
-- Parent cannot retrieve learner grades merely because of the synthetic guardian relationship.
+- Parent smoke check passed for the accepted-but-unverified synthetic relationship: no learner name or learner ID is returned. School-verified, active-enrolment and revocation cases remain untested.
 - Independent-school users cannot access NSC school membership or reports.
 - Employer cannot retrieve learner marks or private psychometric passport data.
 - Generate a Groq-backed written exam from an uploaded *synthetic* document, assign to a demo learner, submit and review AI marks; this workflow requires live authenticated sessions and configured object storage.
