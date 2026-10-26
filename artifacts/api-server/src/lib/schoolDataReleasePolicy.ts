@@ -66,7 +66,7 @@ export function identifyCountryScopedSchoolRoute(
   // These personal records have no trustworthy institution selector. Until the
   // authorised per-school scoping design is implemented they must not be
   // released under the strict country pilot gate.
-  if (/^\/(?:institution-records(?:\/|$)|guardian-relationships(?:\/|$)|learner-journey(?:\/|$)|native\/mobile\/parent(?:\/|$))/.test(path))
+  if (/^\/(?:institution-records(?:\/|$)|guardian-relationships(?:\/|$)|learner-journey(?:\/|$)|native\/mobile\/parent(?:\/|$)|my-assignments\/?$|learner-passport(?:\/|$)|school\/attendance\/me\/?$|school-stages\/me\/?$|report-issuance\/me\/?$|guardian\/issued-reports(?:\/|$)|assignments(?:\/|$)|written-exams(?:\/|$)|quizzes(?:\/|$)|materials(?:\/|$)|storage(?:\/|$)|admissions\/applications(?:\/|$))/.test(path))
     return {kind:"unscoped_sensitive"};
   return {kind:"not_scoped"};
 }
