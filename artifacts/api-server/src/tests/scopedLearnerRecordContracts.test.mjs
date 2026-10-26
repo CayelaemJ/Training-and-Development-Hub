@@ -67,3 +67,17 @@ test("scoped report-integrity URL binds report ID to its school's ID",()=>{
  assert.deepEqual(identifyCountryScopedSchoolRoute("/organizations/11/report-issuance/2/integrity",null),
    {kind:"scoped",orgId:11});
 });
+
+test("AI egress and cross-school intelligence cannot bypass country attribution",()=>{
+ for(const route of [
+   "/development-plans/draft",
+   "/education-command/overview",
+   "/potential/me",
+   "/passport/me",
+   "/career/capabilities",
+   "/opportunities/applications/me",
+   "/platform/overview"
+ ]){
+   assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"unscoped_sensitive",route);
+ }
+});
