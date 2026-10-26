@@ -4,6 +4,7 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import {configuredPrincipals} from '../lib/testPrincipals';
+import { oidcRequestOrigin, safeReturnPath } from '../lib/oidcRedirectPolicy';
 
 import {
   clearSession,
@@ -19,11 +20,8 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
-function getOrigin(req: Request): string {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host =
-    req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-  return `${proto}://${host}`;
+function getOrigin(req: Request): string | null {
+  return oidcRequestOrigin(req.get('host'), process.env);
 }
 
 function setSessionCookie(res: Response, sid: string) {
@@ -46,16 +44,6 @@ function setOidcCookie(res: Response, name: string, value: string) {
   });
 }
 
-function getSafeReturnTo(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !value.startsWith('/') ||
-    value.startsWith('//')
-  ) {
-    return '/';
-  }
-  return value;
-}
 
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
@@ -120,9 +108,11 @@ router.get('/auth/user', (req: Request, res: Response) => {
 
 router.get('/login', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const origin = getOrigin(req);
+  if (!origin) { res.status(400).json({ error: 'Unrecognised sign-in host' }); return; }
+  const callbackUrl = `${origin}/api/callback`;
 
-  const returnTo = getSafeReturnTo(req.query.returnTo);
+  const returnTo = safeReturnPath(req.query.returnTo);
 
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
@@ -151,7 +141,9 @@ router.get('/login', async (req: Request, res: Response) => {
 // parameters not expressed in the schema.
 router.get('/callback', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const origin = getOrigin(req);
+  if (!origin) { res.status(400).json({ error: 'Unrecognised sign-in host' }); return; }
+  const callbackUrl = `${origin}/api/callback`;
 
   const codeVerifier = req.cookies?.code_verifier;
   const nonce = req.cookies?.nonce;
@@ -163,7 +155,7 @@ router.get('/callback', async (req: Request, res: Response) => {
   }
 
   const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
+    `${callbackUrl}?${new URL(req.url, callbackUrl).searchParams}`,
   );
 
   let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
@@ -179,7 +171,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     return;
   }
 
-  const returnTo = getSafeReturnTo(req.cookies?.return_to);
+  const returnTo = safeReturnPath(req.cookies?.return_to);
 
   res.clearCookie('code_verifier', { path: '/' });
   res.clearCookie('nonce', { path: '/' });
@@ -216,7 +208,8 @@ router.get('/callback', async (req: Request, res: Response) => {
 router.get('/logout', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const origin = getOrigin(req);
-  const returnTo = getSafeReturnTo(req.query.returnTo);
+  if (!origin) { res.status(400).json({ error: 'Unrecognised sign-out host' }); return; }
+  const returnTo = safeReturnPath(req.query.returnTo);
   const postLogoutRedirectUrl = new URL(returnTo, `${origin}/`).href;
 
   const sid = getSessionId(req);
