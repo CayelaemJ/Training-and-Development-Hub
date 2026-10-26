@@ -6,7 +6,7 @@ import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {assessInstitutionProfileSubmission,countryChangeNeedsReview} from "../lib/countryCompliancePolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 const profile=z.object({
- countryCode:z.enum(["ZA","BW"]).optional(),
+ countryCode:z.enum(["ZA","BW"]).nullish(),
  institutionType:z.enum(["preprimary","primary","highschool","combined","special","independent","tvet","university","training"]),
  province:z.string().trim().min(2).max(60),
  district:z.string().trim().min(2).max(120),circuit:z.string().trim().max(120).default(""),
