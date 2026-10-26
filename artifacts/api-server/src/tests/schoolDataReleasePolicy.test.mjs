@@ -62,3 +62,38 @@ test("bad org ids and self-report routes fail closed under strict gating",()=>{
  assert.deepEqual(identifyCountryScopedSchoolRoute("/guardian/issued-reports/learner","12"),{kind:"scoped",orgId:12});
  assert.equal(identifyCountryScopedSchoolRoute("/health",undefined).kind,"not_scoped");
 });
+
+test("cross-school transfer queues and decisions remain blocked pending dual-country review",()=>{
+ for (const route of [
+   "/organizations/5/transfers/incoming",
+   "/organizations/5/transfers/12/decision",
+   "/organizations/5/transfers",
+   "/organizations/not-a-school/transfers/incoming",
+ ]) assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"unscoped_sensitive",route);
+ // Independent, per-school learner/attendance data is still permitted when approved.
+ assert.deepEqual(identifyCountryScopedSchoolRoute("/organizations/5/attendance/me",undefined),
+   {kind:"scoped",orgId:5});
+});
+
+test("global learner growth aggregates require school provenance in country pilot",()=>{
+ for(const route of ["/dashboard","/development/overview"])
+   assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"unscoped_sensitive",route);
+ // Provider capability and module descriptions are not individual learner records.
+ for(const route of ["/ai/capabilities","/hub/modules"])
+   assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"not_scoped",route);
+});
+
+test("case-insensitive and trailing-slash Express routes cannot bypass country privacy checks",()=>{
+ for(const path of [
+  "/INSTITUTION-RECORDS/ME","/INSTITUTION-RECORDS/ME/",
+  "/Development-Plans/Draft/","/DEVELOPMENT/OVERVIEW/",
+  "/DASHBOARD/","/%69nstitution-records/me",
+  "/ORGANIZATIONS/5/TRANSFERS/INCOMING/",
+  "/ORGANIZATIONS/5/TRANSFERS/9/DECISION/",
+ ]) assert.equal(identifyCountryScopedSchoolRoute(path,undefined).kind,"unscoped_sensitive",path);
+ for(const path of ["/ORGANIZATIONS/5/ATTENDANCE/ME/","/organizations/5/attendance/me/"])
+  assert.deepEqual(identifyCountryScopedSchoolRoute(path,undefined),{kind:"scoped",orgId:5});
+ assert.equal(identifyCountryScopedSchoolRoute("/ORGANIZATIONS/5/SETUP/").kind,"not_scoped");
+ for(const path of ["/%ZZ/institution-records/me","/institution%252drecords/me"])
+   assert.equal(identifyCountryScopedSchoolRoute(path,undefined).kind,"invalid");
+});

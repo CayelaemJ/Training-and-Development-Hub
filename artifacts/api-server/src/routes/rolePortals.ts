@@ -25,6 +25,16 @@ router.get("/portal/me",async(req,res)=>{
  if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return}
  const current=await resolvePortal(req.user.id);
  res.setHeader("Cache-Control","private, no-store");
+ // In a multi-country child-data pilot do not aggregate personal learner
+ // journeys or guardian relationships across unverified school jurisdictions.
+ // Retain role/navigation only; records are fetched after school approval.
+ if(process.env.CABO_COUNTRY_PILOT_ENFORCEMENT==="true"){
+  res.json({role:current.role,organizationIds:current.organizationIds,
+   scopes:current.scopes,summary:{},
+   cards:cards[current.role].map(([label,href])=>({label,href})),
+   countryScopedRecordsRequired:true});
+  return;
+ }
  let summary:Record<string,number>={};
  if(current.role==="superadmin"){
   const [orgs,members,units]=await Promise.all([
