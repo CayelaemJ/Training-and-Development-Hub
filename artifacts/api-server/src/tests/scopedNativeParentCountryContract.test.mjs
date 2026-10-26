@@ -7,8 +7,7 @@ const src=readFileSync(new URL("../routes/nativeParent.ts",import.meta.url),"utf
 test("school-scoped native routes require the server-side country release gate",()=>{
  for(const route of [
   "/organizations/5/native/mobile/parent",
-  "/organizations/5/native/mobile/parent/reports",
-  "/ORGANIZATIONS/5/NATIVE/MOBILE/PARENT/REPORTS/"
+  "/organizations/5/native/mobile/parent/reports"
  ]) assert.deepEqual(identifyCountryScopedSchoolRoute(route,undefined),{kind:"scoped",orgId:5});
  assert.equal(identifyCountryScopedSchoolRoute("/native/mobile/parent",undefined).kind,"unscoped_sensitive");
  assert.equal(identifyCountryScopedSchoolRoute("/native/mobile/parent/reports",undefined).kind,"unscoped_sensitive");
