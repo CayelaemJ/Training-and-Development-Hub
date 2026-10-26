@@ -59,3 +59,11 @@ test("guardian issued reports require scoped school clearance; direct integrity 
  assert.equal(identifyCountryScopedSchoolRoute("/guardian/issued-reports/student",undefined).kind,"invalid");
  assert.equal(identifyCountryScopedSchoolRoute("/report-issuance/4/integrity",undefined).kind,"unscoped_sensitive");
 });
+
+test("scoped report-integrity URL binds report ID to its school's ID",()=>{
+ const src=source("../routes/reportIssuance.ts");
+ assert.match(src,/router\.get\("\/organizations\/:orgId\/report-issuance\/:reportId\/integrity",reportIntegrity\)/);
+ assert.match(src,/eq\(issuedSchoolReportsTable\.organizationId,requestedOrg\.data\)/);
+ assert.deepEqual(identifyCountryScopedSchoolRoute("/organizations/11/report-issuance/2/integrity",null),
+   {kind:"scoped",orgId:11});
+});
