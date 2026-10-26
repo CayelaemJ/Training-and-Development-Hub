@@ -59,6 +59,31 @@ router.post("/organizations/:orgId/report-issuance/:reportId/decision",async(req
  if("error" in result){res.status(result.code??400).json({error:result.error});return}
  res.json(result);
 });
+/**
+ * School-scoped report listing. The gateway checks this school's country
+ * release before any learner-linked record is read.
+ */
+router.get("/organizations/:orgId/report-issuance/me",async(req,res)=>{
+ if(!req.isAuthenticated()){res.sendStatus(401);return}
+ const org=positive.safeParse(req.params.orgId);
+ if(!org.success){res.sendStatus(400);return}
+ const rows=await db.select({
+   id:issuedSchoolReportsTable.id,
+   organizationId:issuedSchoolReportsTable.organizationId,
+   academicYear:issuedSchoolReportsTable.academicYear,
+   status:issuedSchoolReportsTable.status,
+   contentHash:issuedSchoolReportsTable.contentHash,
+   snapshot:issuedSchoolReportsTable.snapshot,
+ }).from(issuedSchoolReportsTable)
+ .where(and(eq(issuedSchoolReportsTable.organizationId,org.data),
+            eq(issuedSchoolReportsTable.learnerId,req.user.id),
+            eq(issuedSchoolReportsTable.status,"issued")))
+ .orderBy(desc(issuedSchoolReportsTable.createdAt)).limit(100);
+ res.setHeader("Cache-Control","private, no-store");
+ res.setHeader("Referrer-Policy","no-referrer");
+ res.json(rows);
+});
+
 router.get("/report-issuance/me",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const rows=await db.select({id:issuedSchoolReportsTable.id,organizationId:issuedSchoolReportsTable.organizationId,academicYear:issuedSchoolReportsTable.academicYear,status:issuedSchoolReportsTable.status,contentHash:issuedSchoolReportsTable.contentHash,snapshot:issuedSchoolReportsTable.snapshot}).from(issuedSchoolReportsTable).where(and(eq(issuedSchoolReportsTable.learnerId,req.user.id),eq(issuedSchoolReportsTable.status,"issued"))).orderBy(desc(issuedSchoolReportsTable.createdAt));
