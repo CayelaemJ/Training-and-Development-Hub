@@ -37,10 +37,15 @@ router.put("/organizations/:orgId/setup",async(req,res)=>{
  if(!org){res.sendStatus(404);return}
  const [previous]=await db.select({countryCode:institutionSetupTable.countryCode})
    .from(institutionSetupTable).where(eq(institutionSetupTable.organizationId,oid.data)).limit(1);
- const countryCode=body.data.countryCode??previous?.countryCode??null;
+ const previousCode=previous?.countryCode??null;
+ // Never reclassify invalid legacy data; a human must resolve it.
+ if(previousCode!==null && previousCode!=="ZA" && previousCode!=="BW"){
+   res.status(409).json({error:"Existing jurisdiction value requires administrator review"});return;
+ }
+ const countryCode=body.data.countryCode??previousCode;
  // Country changes can affect data-transfer jurisdiction, institutional
  // authority and lawful bases; never silently reclassify an existing school.
- if(countryChangeNeedsReview((previous?.countryCode??null) as "ZA"|"BW"|null,countryCode)){
+ if(countryChangeNeedsReview(previousCode,countryCode)){
    res.status(409).json({error:"Changing an institution's country requires a documented, authorised data-governance migration"});return;
  }
  const decision=assessInstitutionProfileSubmission(countryCode,body.data.status,process.env);
