@@ -1,5 +1,8 @@
 # Environment, Deployment and Test Plan
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 ## Prerequisites
 
 Node 24, pnpm, PostgreSQL, working session authentication and normal application deployment environment. Existing OpenAI key is only needed for written-exam generation and AI marking, not for this phase's voluntary potential profile.
