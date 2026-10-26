@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {oidcRequestOrigin,safeReturnPath} from "../lib/oidcRedirectPolicy.ts";
+import {oidcRequestOrigin,safeReturnPath} from "../lib/originPolicy.ts";
 
 const production = {
  NODE_ENV:"production",
