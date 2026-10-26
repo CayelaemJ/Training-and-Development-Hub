@@ -65,24 +65,36 @@ export function identifyCountryScopedSchoolRoute(
   path: string,
   queryOrgId: unknown,
 ): ScopedRoute {
+  // Express 5 routes are case-insensitive and tolerate a trailing slash by
+  // default. Classify the same canonical path Express can dispatch, otherwise
+  // /INSTITUTION-RECORDS/ME bypasses the privacy gate completely.
+  let routePath: string;
+  try {
+    routePath = decodeURIComponent(path).toLowerCase().replace(/\\/+$/, "") || "/";
+  } catch {
+    return {kind:"invalid"};
+  }
+  // A percent sign after decoding indicates ambiguous/double-encoded routing.
+  // Reject rather than interpreting a different school route from Express.
+  if(routePath.includes("%")) return {kind:"invalid"};
   // Transfer records can reveal a learner and their origin school. A recipient
   // school's approval alone is not authority to expose origin-country data.
   // Keep incoming queues and decisions closed until both schools' clearances,
   // current transfer lawful basis and explicit source/recipient approval exist.
-  if (/^\/organizations\/[^/]+\/transfers(?:\/|$)/.test(path))
+  if (/^\/organizations\/[^/]+\/transfers(?:\/|$)/.test(routePath))
     return {kind:"unscoped_sensitive"};
   if (path === "/dashboard" || path === "/development/overview")
     return {kind:"unscoped_sensitive"};
-  const direct = /^\/organizations\/([^/]+)(?:\/|$)/.exec(path);
+  const direct = /^\/organizations\/([^/]+)(?:\/|$)/.exec(routePath);
   if (direct) {
     // Only an institution's metadata may be configured without learner approval.
-    if (/^\/organizations\/[^/]+\/setup\/?$/.test(path))
+    if (/^\/organizations\/[^/]+\/setup\/?$/.test(routePath))
       return {kind:"not_scoped"};
     if (!/^[1-9][0-9]*$/.test(direct[1]) || !Number.isSafeInteger(Number(direct[1])))
       return {kind:"invalid"};
     return {kind:"scoped",orgId:Number(direct[1])};
   }
-  if (/^\/(?:reports\/me|guardian\/reports\/[^/]+|guardian\/issued-reports\/[^/]+)$/.test(path)) {
+  if (/^\/(?:reports\/me|guardian\/reports\/[^/]+|guardian\/issued-reports\/[^/]+)$/.test(routePath)) {
     const val=typeof queryOrgId==="string"?queryOrgId:"";
     if (!/^[1-9][0-9]*$/.test(val)||!Number.isSafeInteger(Number(val)))
       return {kind:"invalid"};
@@ -91,7 +103,7 @@ export function identifyCountryScopedSchoolRoute(
   // These personal records have no trustworthy institution selector. Until the
   // authorised per-school scoping design is implemented they must not be
   // released under the strict country pilot gate.
-  if (/^\/(?:institution-records(?:\/|$)|guardian-relationships(?:\/|$)|learner-journey(?:\/|$)|native\/mobile\/parent(?:\/|$)|my-assignments\/?$|learner-passport(?:\/|$)|school\/attendance\/me\/?$|school-stages\/me\/?$|report-issuance\/(?:me\/?$|[1-9][0-9]*\/integrity\/?$)|guardian\/issued-reports(?:\/|$)|assignments(?:\/|$)|written-exams(?:\/|$)|quizzes(?:\/|$)|materials(?:\/|$)|storage(?:\/|$)|admissions\/applications(?:\/|$)|development-plans(?:\/|$)|education-command(?:\/|$)|potential(?:\/|$)|passport(?:\/|$)|career(?:\/|$)|opportunities(?:\/|$)|platform(?:\/|$))/.test(path))
+  if (/^\/(?:institution-records(?:\/|$)|guardian-relationships(?:\/|$)|learner-journey(?:\/|$)|native\/mobile\/parent(?:\/|$)|my-assignments\/?$|learner-passport(?:\/|$)|school\/attendance\/me\/?$|school-stages\/me\/?$|report-issuance\/(?:me\/?$|[1-9][0-9]*\/integrity\/?$)|guardian\/issued-reports(?:\/|$)|assignments(?:\/|$)|written-exams(?:\/|$)|quizzes(?:\/|$)|materials(?:\/|$)|storage(?:\/|$)|admissions\/applications(?:\/|$)|development-plans(?:\/|$)|education-command(?:\/|$)|potential(?:\/|$)|passport(?:\/|$)|career(?:\/|$)|opportunities(?:\/|$)|platform(?:\/|$))/.test(routePath))
     return {kind:"unscoped_sensitive"};
   return {kind:"not_scoped"};
 }
