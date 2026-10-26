@@ -12,3 +12,25 @@ export function permittedBrowserOrigin(origin:string|undefined,env:NodeJS.Proces
  if(!origin)return true; // CLI/API calls without browser Origin use authentication; mutating browser calls always send Origin.
  return trustedOrigins(env).has(origin);
 }
+
+/**
+ * A state-changing request carrying browser cookies must prove its origin.
+ * Non-browser clients may authenticate with a Bearer session and omit both
+ * headers, but adding Authorization does not bypass the cookie CSRF check.
+ */
+export function permittedMutationOrigin(
+  headers: { origin?: string; referer?: string; cookie?: string },
+  env: NodeJS.ProcessEnv
+): boolean {
+  if (headers.origin !== undefined) {
+    return permittedBrowserOrigin(headers.origin, env) && headers.origin.length > 0;
+  }
+  if (headers.referer !== undefined) {
+    try {
+      const parsed = new URL(headers.referer);
+      return trustedOrigins(env).has(parsed.origin);
+    } catch { return false; }
+  }
+  // Never silently approve a session-backed mutation lacking origin evidence.
+  return !headers.cookie?.trim();
+}
