@@ -53,6 +53,11 @@ node --test scripts/qa/za-bw-synthetic-smoke.test.mjs
 
 This suite **refuses** any other hostname and performs **GET only**. It checks response bodies rather than HTTP codes alone. A run in regular CircleCI without isolated QA sessions intentionally cannot be substituted for a staging run.
 
+## Severity: Confirmed case-insensitive route bypass before this repair
+An authenticated synthetic learner in the isolated preview received HTTP **200** for `/api/INSTITUTION-RECORDS/ME`, `/API/INSTITUTION-RECORDS/ME`, `/api/DASHBOARD/` and `/api/DEVELOPMENT/OVERVIEW` while the equivalent canonical sensitive paths were blocked or should have been blocked in strict country mode. Express accepts mixed-case route strings by default. The policy matcher previously used case-sensitive regular expressions against the raw request path, allowing unscoped child-data access.
+
+**Remediation in this PR**: normalise decoded paths to lowercase, remove optional trailing slashes and reject malformed/ambiguous percent encodings before applying school/jurisdiction rules. Add positive and negative policy tests, including uppercase API/route combinations, and independent authenticated HTTP regression assertions against the isolated preview after deployment. Do not turn on production country enforcement until the regression is verified on the deployed build.
+
 ## Risk finding and release gate
 The current institution-scoped incoming transfer queue and transfer-decision routes check the **receiving** school only. They may reveal an origin school's learner IDs or other jurisdictional metadata. This phase blocks these routes under country-pilot enforcement until both source and destination authorisations, same-jurisdiction scope (or a lawfully reviewed cross-border mechanism), audit and per-learner consent are enforced and tested. No legacy transfer queue should be exposed to a real school in the meantime.
 
