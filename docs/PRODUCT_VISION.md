@@ -1,4 +1,8 @@
-# Product Vision — CABO Potential & Opportunity Engine
+# CABO Potential & Opportunity Engine — Module Vision
+
+> **Platform context:** This document describes CABO's **potential and opportunity module**, not the definition of the entire product. CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md); an LMS is only one of its components. Career and employer features here remain permission-controlled, age-sensitive and release-gated.
+
+
 
 ## Opportunity
 
