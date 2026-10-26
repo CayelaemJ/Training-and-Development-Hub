@@ -65,6 +65,12 @@ export function identifyCountryScopedSchoolRoute(
   path: string,
   queryOrgId: unknown,
 ): ScopedRoute {
+  // Transfer records can reveal a learner and their origin school. A recipient
+  // school's approval alone is not authority to expose origin-country data.
+  // Keep incoming queues and decisions closed until both schools' clearances,
+  // current transfer lawful basis and explicit source/recipient approval exist.
+  if (/^\/organizations\/[^/]+\/transfers(?:\/|$)/.test(path))
+    return {kind:"unscoped_sensitive"};
   const direct = /^\/organizations\/([^/]+)(?:\/|$)/.exec(path);
   if (direct) {
     // Only an institution's metadata may be configured without learner approval.
