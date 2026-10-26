@@ -6,12 +6,17 @@ export type SchoolDataClearanceSnapshot = {
   approvalCountry: string | null | undefined;
   approvalState: string | null | undefined;
   evidenceReference: string | null | undefined;
+  transferState: string | null | undefined;
+  transferAssessmentReference: string | null | undefined;
+  botswanaLocalCopyReference: string | null | undefined;
+  botswanaLocalCopyVerifiedAt: Date | null | undefined;
   approvedAt: Date | null | undefined;
   expiresAt: Date | null | undefined;
 };
 export type SchoolDataDecision = {allowed: boolean; reason:
   "approved"|"missing_country"|"not_submitted"|"missing_approval"|
-  "country_mismatch"|"expired"|"missing_evidence"|"not_approved"};
+  "country_mismatch"|"expired"|"missing_evidence"|"not_approved"|
+  "transfer_unreviewed"|"botswana_local_copy_missing"};
 
 /** Never use a client-supplied country or a UI flag for data release. */
 export function assessSchoolDataRelease(
@@ -28,6 +33,18 @@ export function assessSchoolDataRelease(
     return {allowed:false,reason:"not_approved"};
   if (!current.evidenceReference?.trim())
     return {allowed:false,reason:"missing_evidence"};
+  // Every school must have a documented determination of whether a transfer
+  // occurs. A no-transfer assertion is not a substitute for verifying vendors.
+  if (!current.transferAssessmentReference?.trim() ||
+      (current.transferState!=="no_transfer" &&
+       current.transferState!=="approved_transfer"))
+    return {allowed:false,reason:"transfer_unreviewed"};
+  if (current.countryCode==="BW" && current.transferState==="approved_transfer" &&
+      (!current.botswanaLocalCopyReference?.trim() ||
+       !(current.botswanaLocalCopyVerifiedAt instanceof Date) ||
+       Number.isNaN(current.botswanaLocalCopyVerifiedAt.getTime()) ||
+       current.botswanaLocalCopyVerifiedAt.getTime()>now.getTime()))
+    return {allowed:false,reason:"botswana_local_copy_missing"};
   if (!(current.approvedAt instanceof Date) || Number.isNaN(current.approvedAt.getTime()) ||
       !(current.expiresAt instanceof Date) || Number.isNaN(current.expiresAt.getTime()) ||
       current.approvedAt.getTime()>now.getTime() ||
