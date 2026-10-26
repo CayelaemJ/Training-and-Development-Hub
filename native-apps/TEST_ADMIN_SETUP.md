@@ -34,7 +34,7 @@ PR #71 added support for separately configured synthetic role principals through
 - Anonymous requests to the parent overview, guardian report, issued-report and report-integrity endpoints returned 401 after the latest deploy.
 - Regression cases for school approval, unrelated school, missing or revoked decisions, pending guardians and missing enrollment passed in CI; typecheck, build, CircleCI, Snyk and browser/mobile release checks also passed.
 
-The existing live parent fixture remains accepted but unverified. An authenticated Render exercise that grants access after a school approval and denies it after revocation is still required; policy unit tests do not replace that end-to-end check.
+The live parent fixture starts accepted and unverified. Run `scripts/smoke-native-parent-school-review.mjs` from a private runner with `CABO_TEST_BASE_URL`, `CABO_TEST_PASSWORD` and `CABO_TEST_PARENT_PASSWORD` set. It checks pre-approval redaction, school-approved name/report access, and revocation denial; it leaves the synthetic relationship revoked. Reseed the isolated Neon database before repeating. This authenticated smoke has not yet been run against the live preview.
 
 ## Safe operations
 
