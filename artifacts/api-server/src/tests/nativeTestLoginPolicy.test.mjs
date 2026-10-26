@@ -39,6 +39,15 @@ test("wrong names, bad passwords and invalid hashes never verify", () => {
   assert.equal(verifyNativeTestLogin("cabo_test", {}, good), false);
   assert.equal(verifyNativeTestLogin("cabo_test", examplePassword, { ...good, CABO_TEST_PASSWORD_HASH: "invalid" }), false);
 });
+test("native test login accepts only validated synthetic principals with their own hash", () => {
+  const fixture = { username: "cabo_parent_primary", hash: salt + ":" + hash };
+  assert.equal(verifyNativeTestLogin(fixture.username, examplePassword, good, fixture), true);
+  assert.equal(verifyNativeTestLogin(fixture.username, "wrong-test-password", good, fixture), false);
+  assert.equal(verifyNativeTestLogin("cabo_unknown", examplePassword, good, fixture), false);
+  assert.equal(verifyNativeTestLogin(fixture.username, examplePassword, good), false);
+  assert.equal(verifyNativeTestLogin(fixture.username, examplePassword,
+    { ...good, CABO_TEST_DATABASE_ISOLATED: "false" }, fixture), false);
+});
 test("test login is invisible in ordinary app builds", () => {
   const ios = readFileSync("native-apps/ios/Info.plist", "utf8");
   const android = readFileSync("native-apps/android/app/build.gradle.kts", "utf8");
@@ -53,4 +62,6 @@ test("native sign-out remains available for isolated test sessions", () => {
   assert.match(routes, /nativeTestLoginEnabled\(process\.env\)/);
   assert.match(routes, /req\.isAuthenticated\(\)/);
   assert.match(routes, /access_token: "cabo-native-session-v1"/);
+  assert.match(routes, /configuredPrincipals\(process\.env\.CABO_TEST_USERS_JSON\)/);
+  assert.match(routes, /fixture\.userId/);
 });
