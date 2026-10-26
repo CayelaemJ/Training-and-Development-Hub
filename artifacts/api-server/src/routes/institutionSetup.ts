@@ -33,30 +33,30 @@ router.put("/organizations/:orgId/setup",async(req,res)=>{
  const oid=id.safeParse(req.params.orgId),body=profile.safeParse(req.body);
  if(!oid.success||!body.success){res.status(400).json({error:"Invalid institution configuration"});return}
  if(!await manager(oid.data,req.user.id)){res.sendStatus(403);return}
- const actorId=req.user.id;
+ const actorId=req.user.id,orgId=oid.data,config=body.data;
  // Serialize a school's first country selection as well as later updates.
  // Locking the parent organization row prevents two concurrent first-time
  // setup requests from both seeing country=NULL and silently reclassifying it.
  const outcome=await db.transaction(async tx=>{
    const [org]=await tx.select({id:organizationsTable.id}).from(organizationsTable)
-     .where(eq(organizationsTable.id,oid.data)).for("update").limit(1);
+     .where(eq(organizationsTable.id,orgId)).for("update").limit(1);
    if(!org)return {error:"not_found"} as const;
    const [previous]=await tx.select({countryCode:institutionSetupTable.countryCode})
      .from(institutionSetupTable)
-     .where(eq(institutionSetupTable.organizationId,oid.data)).limit(1);
+     .where(eq(institutionSetupTable.organizationId,orgId)).limit(1);
    const previousCode=previous?.countryCode??null;
    if(previousCode!==null && previousCode!=="ZA" && previousCode!=="BW")
      return {error:"invalid_jurisdiction"} as const;
-   const countryCode=body.data.countryCode??previousCode;
+   const countryCode=config.countryCode??previousCode;
    if(countryChangeNeedsReview(previousCode,countryCode))
      return {error:"country_change_requires_review"} as const;
-   const decision=assessInstitutionProfileSubmission(countryCode,body.data.status,process.env);
+   const decision=assessInstitutionProfileSubmission(countryCode,config.status,process.env);
    if(!decision.allowed)
      return {error:"missing_country_review",requiredReviewItems:decision.missing} as const;
    const [result]=await tx.insert(institutionSetupTable)
-     .values({...body.data,countryCode,organizationId:oid.data,updatedBy:actorId})
+     .values({...config,countryCode,organizationId:orgId,updatedBy:actorId})
      .onConflictDoUpdate({target:institutionSetupTable.organizationId,
-       set:{...body.data,countryCode,updatedBy:actorId,updatedAt:new Date()}})
+       set:{...config,countryCode,updatedBy:actorId,updatedAt:new Date()}})
      .returning();
    return {result} as const;
  });
