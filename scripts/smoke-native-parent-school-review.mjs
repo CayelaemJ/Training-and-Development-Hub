@@ -63,6 +63,7 @@ function noIdentity(row) {
 
 let adminToken;
 let parentToken;
+let cleanupFixture;
 let stage = "sign-in";
 try {
   adminToken = await login("cabo_test", adminPassword);
@@ -96,6 +97,7 @@ try {
   assert(beforeRow?.status === "accepted" && noIdentity(beforeRow), "pre-approval redaction");
 
   stage = "approve at the fixture school";
+  cleanupFixture = fixture;
   const approved = await request(
     `/api/organizations/${fixture.organizationId}/guardian-reviews/${fixture.relation.id}`,
     { method: "POST", token: admin.token, body: { decision: "verified", evidenceReviewed: true } },
@@ -126,6 +128,7 @@ try {
     { method: "POST", token: admin.token, body: { decision: "revoked", evidenceReviewed: true } },
   );
   assert(revoked.status === 200, "school revocation");
+  cleanupFixture = undefined;
 
   stage = "check redaction and report denial after revocation";
   const afterRevocation = await json("/api/native/mobile/parent", parentToken);
@@ -144,12 +147,29 @@ try {
   assert(parentLogout.status === 204 && adminLogout.status === 204, "logout");
   const retry = await request("/api/native/mobile/parent", { token: parentToken });
   assert(retry.status === 401, "session revocation");
+  parentToken = undefined;
+  adminToken = undefined;
   console.log("PASS: accepted redaction, school approval disclosure, guardian report access, revocation denial, and logout.");
   console.log("NOTE: the synthetic relationship was left revoked; reseed the isolated database before repeating this smoke.");
 } catch {
   console.error(`FAIL: isolated guardian school-review smoke at stage: ${stage}`);
   process.exitCode = 1;
 } finally {
+  if (cleanupFixture && adminToken) {
+    try {
+      await request(
+        `/api/organizations/${cleanupFixture.organizationId}/guardian-reviews/${cleanupFixture.relation.id}`,
+        { method: "POST", token: adminToken, body: { decision: "revoked", evidenceReviewed: true } },
+      );
+    } catch {}
+  }
+  if (parentToken) {
+    try { await request("/api/native/logout", { method: "POST", token: parentToken, body: {} }); } catch {}
+  }
+  if (adminToken) {
+    try { await request("/api/native/logout", { method: "POST", token: adminToken, body: {} }); } catch {}
+  }
   adminToken = undefined;
   parentToken = undefined;
+  cleanupFixture = undefined;
 }
