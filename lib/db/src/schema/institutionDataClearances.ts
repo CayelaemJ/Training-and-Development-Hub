@@ -13,6 +13,11 @@ export const institutionDataClearancesTable = pgTable("institution_data_clearanc
   countryCode: varchar("country_code",{length:2}).notNull(),
   state: varchar("state",{length:16}).notNull().default("blocked"),
   evidenceReference: text("evidence_reference").notNull(),
+  // Transfer state is reviewed out-of-band for this exact school and supplier set.
+  transferState: varchar("transfer_state",{length:24}).notNull().default("unreviewed"),
+  transferAssessmentReference: text("transfer_assessment_reference").notNull(),
+  botswanaLocalCopyReference: text("botswana_local_copy_reference"),
+  botswanaLocalCopyVerifiedAt: timestamp("botswana_local_copy_verified_at",{withTimezone:true}),
   authorisedBy: varchar("authorised_by").notNull().references(()=>usersTable.id),
   approvedAt: timestamp("approved_at",{withTimezone:true}).notNull(),
   expiresAt: timestamp("expires_at",{withTimezone:true}).notNull(),
