@@ -17,7 +17,7 @@ test("school API validates explicit country, prevents reclassification and check
  assert.match(route,/countryCode:z\.enum\(\["ZA","BW"\]\)\.nullish\(\)/);
  assert.match(route,/countryChangeNeedsReview\(/);
  assert.match(route,/db\.transaction\(async tx=>/);
- assert.match(route,/\.where\(eq\(organizationsTable\.id,oid\.data\)\)\.for\("update"\)/);
+ assert.match(route,/\.where\(eq\(organizationsTable\.id,orgId\)\)\.for\("update"\)/);
  // Parent organisation is locked before reading or saving classification.
  assert.ok(route.indexOf('.for("update")') < route.indexOf('const [previous]=await tx.select'));
 
