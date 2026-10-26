@@ -70,7 +70,7 @@ export function identifyCountryScopedSchoolRoute(
   // /INSTITUTION-RECORDS/ME bypasses the privacy gate completely.
   let routePath: string;
   try {
-    routePath = decodeURIComponent(path).toLowerCase().replace(/\\/+$/, "") || "/";
+    routePath = decodeURIComponent(path).toLowerCase().replace(/\/+$/, "") || "/";
   } catch {
     return {kind:"invalid"};
   }
