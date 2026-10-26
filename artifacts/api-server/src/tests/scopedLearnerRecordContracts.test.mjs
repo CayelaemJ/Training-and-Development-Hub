@@ -45,3 +45,17 @@ test("browser institution-records screen requests one school at a time",()=>{
  assert.match(page,/disabled=\{true\} onClick=\{\(\)=>act\(\(\)=>api\("\/institution-records\/transfers"/);
  assert.match(page,/country-specific data-processing approval/);
 });
+
+test("guardian report approvals use latest school-specific review, not historical approval",()=>{
+ for(const relative of ["../routes/reportCards.ts","../routes/reportIssuance.ts"]){
+   const src=source(relative);
+   assert.match(src,/orderBy\(desc\(guardianVerificationEventsTable\.createdAt\),desc\(guardianVerificationEventsTable\.id\)\)/);
+   assert.match(src,/authority\?\.decision!=="verified"/);
+   assert.doesNotMatch(src,/eq\(guardianVerificationEventsTable\.decision,"verified"\)/);
+ }
+});
+test("guardian issued reports require scoped school clearance; direct integrity lookup cannot bypass",()=>{
+ assert.deepEqual(identifyCountryScopedSchoolRoute("/guardian/issued-reports/student","4"),{kind:"scoped",orgId:4});
+ assert.equal(identifyCountryScopedSchoolRoute("/guardian/issued-reports/student",undefined).kind,"invalid");
+ assert.equal(identifyCountryScopedSchoolRoute("/report-issuance/4/integrity",undefined).kind,"unscoped_sensitive");
+});
