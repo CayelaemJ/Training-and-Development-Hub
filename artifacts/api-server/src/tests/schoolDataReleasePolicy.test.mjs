@@ -62,3 +62,15 @@ test("bad org ids and self-report routes fail closed under strict gating",()=>{
  assert.deepEqual(identifyCountryScopedSchoolRoute("/guardian/issued-reports/learner","12"),{kind:"scoped",orgId:12});
  assert.equal(identifyCountryScopedSchoolRoute("/health",undefined).kind,"not_scoped");
 });
+
+test("cross-school transfer queues and decisions remain blocked pending dual-country review",()=>{
+ for (const route of [
+   "/organizations/5/transfers/incoming",
+   "/organizations/5/transfers/12/decision",
+   "/organizations/5/transfers",
+   "/organizations/not-a-school/transfers/incoming",
+ ]) assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"unscoped_sensitive",route);
+ // Independent, per-school learner/attendance data is still permitted when approved.
+ assert.deepEqual(identifyCountryScopedSchoolRoute("/organizations/5/attendance/me",undefined),
+   {kind:"scoped",orgId:5});
+});
