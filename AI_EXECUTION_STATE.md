@@ -1,5 +1,22 @@
 # CABO Learning Hub execution checkpoint
 
+## Current checkpoint — 26 October 2026
+
+This section supersedes the older audit snapshots below.
+
+**Main:** `4c45f992932f688404bd5fb4afe1ec7f1f319aff`.
+
+- Merged PR #89 hardens cookie-backed mutation origin checks and OIDC callback/return-path validation.
+- Merged PR #88 closes mixed-case/trailing-slash privacy-gate bypasses, blocks cross-jurisdiction transfer metadata under the country gate, and adds isolated synthetic QA evidence.
+- Merged PR #90 adds school-scoped native guardian overview/report routes; global guardian routes remain blocked when strict country enforcement is enabled.
+- Country-pilot enforcement and native OIDC remain off on production. No production database migration or deployment was performed for these merges.
+- PR #86 adds API 23 Android Compose UI tests and short-retention debug APK artifacts. Latest head is `0bae5dddaec3819926965363c32c155287d5fe85`. Typecheck, policy tests, build, secret scan, and Semgrep checks pass. The Android emulator job and CircleCI verification are still running. Earlier Android runs exposed a missing Compose test BOM and an unsupported Compose assertion; both were corrected, and the current run is the authority.
+- Render staging remains the dedicated `cabo-learning-native-isolated-preview` service at `https://cabo-learning-native-isolated-preview.onrender.com`, attached to `feat/real-native-cabo-apps`, with auto-deploy disabled. Its isolated test-login and synthetic-demo setup passed the authenticated API smoke check. No production service shares those settings.
+- The workspace has no local Ansight host, ADB, or emulator. The current Android validation path is the GitHub-hosted emulator; physical-device acceptance is still outstanding.
+
+**Remaining release gates:** the country approval/migration stack (#68, #72, #75) still needs isolated migration rehearsal and school/legal evidence; the lifelong passport (#44) is still draft; career application remains gated pending verified employers and child-protection controls; psychometric assessment requires licensed instrument and professional governance. Android/iOS/Windows signed releases and physical-device flows, independent penetration testing, privacy/legal sign-off, backups/restore, and production rollout remain incomplete. Do not claim national or store-release readiness.
+
+
 **Updated:** 2026-10-26  
 **Repository:** `CayelaemJ/Training-and-Development-Hub`  
 **Default branch at audit:** `main` at `7536d3b105200f759957326878d810392e927921`  
