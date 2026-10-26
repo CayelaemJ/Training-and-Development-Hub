@@ -32,7 +32,7 @@ test("new migrations create no approved school data records",()=>{
 test("role portal hides personal cross-school learner and guardian counts under strict country enforcement",()=>{
  const portal=source("../routes/rolePortals.ts");
  const guarded=portal.indexOf('if(process.env.CABO_COUNTRY_PILOT_ENFORCEMENT==="true")');
- const personal=portal.indexOf('learnerJourneysTable');
+ const personal=portal.indexOf('.from(learnerJourneysTable)');
  assert.ok(guarded>=0,"must gate portal response");
  assert.ok(personal>guarded,"personal count query must occur only after the strict-mode early return");
  assert.match(portal,/countryScopedRecordsRequired:true/);
