@@ -10,6 +10,9 @@ Country tagging in school setup does not prevent learner data from being process
 - For `no_transfer`, confirm no foreign access by cloud hosting, AI inference, backup, analytics, email, mobile SDKs or support vendors; storing a string `no_transfer` does not make the claim true.
 - This stricter internal rule applies for Botswana transfers where DPA 2024 s74 actually applies. Botswana counsel must classify any circumstances outside its legal scope. Do not defeat the gate by misclassifying overseas transfers as local.
 
+## Safe deployment flag
+The middleware is **disabled by default** and only mounted with `CABO_COUNTRY_PILOT_ENFORCEMENT=true`. This avoids unexpectedly breaking existing Render pilot routes when source code merges. No country-controlled real learner pilot is allowed with the flag off; enabling requires both staged migrations, signed evidence and full 2-country E2E regression testing. The flag **does not** constitute legal clearance.
+
 ## Integration and default behaviour
 - This PR depends on the country schema and `country_code` migration in **PR #62**.
 - **Hard fail-closed**, not a silently disabled flag: unknown countries, missing records, expired/revoked/mismatched clearances, malformed organisation IDs and database failures deny protected data routes.
