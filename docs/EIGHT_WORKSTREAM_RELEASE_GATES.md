@@ -40,7 +40,7 @@ An item is NOT complete merely because a UI page, schema, or API route exists. R
 **Pass:** delegated district and province test accounts cannot enumerate unauthorized schools or identify individual learners.
 
 ## 8. Production security and operations
-**Current:** scoped auth routes, test guards, PR checks and basic audit/telemetry, isolated Railway pilot.
+**Current:** scoped auth routes, test guards, PR checks and basic audit/telemetry, isolated Render pilot.
 **Not done:** independent penetration test, POPIA children-lawful-basis/retention assessments, DR rehearsal, verified backups/restore, migrations, uptime and incident on-call, hardening and real scaling.
 **Pass:** signed findings clearance, completed DPIA, simulated outage/restore, incident response and external privacy counsel approval.
 

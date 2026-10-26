@@ -29,4 +29,4 @@ Audit evidence rights, subcontractor obligations, security tests, breach coopera
 Data categories | Data subjects | Processing purposes | Retention | Storage location | Transfers | Responsible party | Operator | Security evidence | Contact.
 
 ## Schedule B
-Current subprocessors and written agreements (verified against Railway/hosting/AI/storage/auth/email/payment deployment), dates and change notifications.
+Current subprocessors and written agreements (verified against Render/hosting/AI/storage/auth/email/payment deployment), dates and change notifications.
