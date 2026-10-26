@@ -9,7 +9,7 @@ Roles:
 - `cabo_learner_*`: joins as learner; matching 2026 enrollment, published mock grades and attendance are created for learner's own report view.
 - `cabo_parent_*`: receives a pending guardian invitation. **Pending does not grant access** to child report cards or other sensitive records.
 
-Demo initialization is idempotent, synthetic and locked to Railway `testing` with `ENABLE_CABO_DEMO_SEED=true`. Run via authenticated superadmin `POST /api/platform/demo/seed`. The protected `GET /api/platform/demo/status` confirms three seeded schools and their record counts.
+Demo initialization is idempotent, synthetic and locked to Render `testing` with `ENABLE_CABO_DEMO_SEED=true`. Run via authenticated superadmin `POST /api/platform/demo/seed`. The protected `GET /api/platform/demo/status` confirms three seeded schools and their record counts.
 
 ## Presentation verification
 1. Load demo data as superadmin; verify seeded learner, marks, attendance and fictional university counts.

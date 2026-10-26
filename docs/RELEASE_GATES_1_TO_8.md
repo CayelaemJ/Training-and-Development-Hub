@@ -1,6 +1,6 @@
 # CABO School-to-Career Platform — Eight Release Gates
 
-This is the engineering acceptance matrix, **not** a certification statement. Code presence, green CI and successful Railway deployment do not independently prove a user journey.
+This is the engineering acceptance matrix, **not** a certification statement. Code presence, green CI and successful Render deployment do not independently prove a user journey.
 
 ## 1. Authenticated end-to-end demonstration
 Current pilot: test principals, role portals, school enrolments, report previews, guardian reviews and synthetic fixtures.
@@ -31,12 +31,12 @@ Current pilot: authorised per-institution rollups with minimum-cohort suppressio
 Sign-off requires proven district/circuit/provincial mappings, lawful DBE/EMIS/SA-SAMS/LURITS interfaces, scalable aggregation with differential disclosure checks, authorized data-source provenance, audit and independently validated reports.
 
 ## 8. Production security, legal and operations
-Current pilot: scoped authorization, audit entries, CI, Railway isolated test deployment and server-side configuration.
+Current pilot: scoped authorization, audit entries, CI, Render isolated test deployment and server-side configuration.
 Sign-off requires POPIA lawful-basis and child-processing legal assessments, independent penetration test, incident response, vendor/subprocessor contracts, encryption/key policies, secure migrations, immutable recovery-tested backups, monitoring/alerting, accessibility/performance verification and contractual agreements with real institutions.
 
 ## Repeatable technical checks
 - Run tests, TypeScript, build: `pnpm install --frozen-lockfile && pnpm run typecheck && pnpm run build`.
-- Isolated test accounts only: `CABO_TEST_URL=https://cabo-learner-hub-api-testing.up.railway.app CABO_TEST_USERNAME=<test-username> CABO_TEST_PASSWORD=<test-password> node scripts/verify-cabo-eight-workstreams.mjs`.
+- Isolated test accounts only: `CABO_TEST_URL=https://cabo-learning-native-isolated-preview.onrender.com CABO_TEST_USERNAME=<test-username> CABO_TEST_PASSWORD=<test-password> node scripts/verify-cabo-eight-workstreams.mjs`.
 - The script checks eight authenticated/public endpoint behaviours without printing secrets or records. It does **not** write data and cannot substitute for multi-user browser E2E.
 - Keep test credentials out of the command history where possible (environment secret provider); never hardcode them, put them in README examples with real values, or pass them in screenshots.
 

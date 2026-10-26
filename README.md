@@ -115,7 +115,7 @@ The **Governance** workspace supports tenant-scoped national, provincial, distri
 
 ## Role-based portals (testing)
 
-The home dashboard now adapts to CABO's institutional hierarchy, with distinct experiences for national/provincial/district leadership, headmasters, educators, learners, parents and an isolated Railway test superadmin. Academic grading and assessment review access is restricted to assigned courses or authorised administrators. See [Role-Based Portals](docs/ROLE_BASED_PORTALS.md).
+The home dashboard now adapts to CABO's institutional hierarchy, with distinct experiences for national/provincial/district leadership, headmasters, educators, learners, parents and an isolated Render test superadmin. Academic grading and assessment review access is restricted to assigned courses or authorised administrators. See [Role-Based Portals](docs/ROLE_BASED_PORTALS.md).
 
 ## Phases 1–4 implementation tracker
 
@@ -132,7 +132,7 @@ CABO's development branch includes new school attendance/notices, a candidate ap
 - Frontend: React, Vite, TypeScript and mobile PWA under `artifacts/training-platform`.
 - Backend: Express API under `artifacts/api-server`.
 - Data: PostgreSQL with Drizzle schemas under `lib/db/src/schema`.
-- Deployment: isolated Railway testing environment backed by its own PostgreSQL.
+- Deployment: isolated Render native-test preview backed by a separate Neon PostgreSQL project.
 - AI: OpenAI-compatible SDK, with Groq selected when `GROQ_API_KEY` is provided, otherwise `OPENAI_API_KEY`. Model IDs use `GROQ_EXAM_MODEL` and `OPENAI_EXAM_MODEL` for the existing development-plan endpoint.
 
 ### Education workflow modules
@@ -156,7 +156,7 @@ CABO's development branch includes new school attendance/notices, a candidate ap
 - `GET /api/platform/mlops` — isolated-test superadmin only, seven-day model usage and latency metrics.
 
 ### AI reliability and MLOps
-1. Configure provider credentials **only in Railway/server environment**; never add keys to GitHub or `VITE_*` variables.
+1. Configure provider credentials **only in Render/server environment**; never add keys to GitHub or `VITE_*` variables.
 2. `POST /api/development-plans/draft` validates input, rate-limits calls, requests structured JSON and validates the model response. All AI recommendations are drafts subject to educator/guardian review.
 3. The server records model provider, model ID, operation, duration and success/failure into `ai_inference_metrics`, deliberately excluding learner prompts, answers and personal profiles.
 4. The superadmin can inspect aggregate errors/latency at `GET /api/platform/mlops`. A configured API key is **not** proof of successful inference; use an authenticated test call with synthetic data and verify the metrics.
@@ -169,7 +169,7 @@ pnpm run typecheck
 pnpm run build
 node --test artifacts/api-server/src/tests/hubPolicy.test.mjs artifacts/api-server/src/tests/hubWorkflow.test.mjs artifacts/api-server/src/tests/schoolStagePolicy.test.mjs
 ```
-Do not run `drizzle-kit push` against an institutional production database. Use versioned reviewed migrations and backups, and validate independent role accounts before promotion. Railway testing uses controlled synthetic fixtures only.
+Do not run `drizzle-kit push` against an institutional production database. Use versioned reviewed migrations and backups, and validate independent role accounts before promotion. The isolated Render testing environment uses controlled synthetic fixtures only.
 
 ### Current gaps (not yet complete)
 Verified national institution directory and government interoperability; production identity and parental verification; class scheduling collision resolution; real-time notifications, offline sync and outbox delivery; approved academic credentials; full university registrar workflows; external SIS integration; signed professional assessment governance; comprehensive audit and monitoring. See [national architecture](docs/NATIONAL_EDUCATION_ARCHITECTURE.md) and [connected hub sprint register](docs/CONNECTED_HUB_SPRINTS.md).
@@ -210,7 +210,7 @@ From the isolated testing superadmin screen:
 
 ### Presentation-ready synthetic school showcase
 
-The isolated Railway `testing` deployment can populate its database with **explicitly fictional** institutions and student records. Sign in as the designated test superadmin, open **Platform administration**, then click **Load synthetic school showcase**. The loader is accessible only in the isolated testing environment when `ENABLE_CABO_DEMO_SEED=true`; repeat requests are idempotent and do not intentionally overwrite live records.
+The isolated Render `testing` deployment can populate its database with **explicitly fictional** institutions and student records. Sign in as the designated test superadmin, open **Platform administration**, then click **Load synthetic school showcase**. The loader is accessible only in the isolated testing environment when `ENABLE_CABO_DEMO_SEED=true`; repeat requests are idempotent and do not intentionally overwrite live records.
 
 Demo entities:
 - **CABO DEMO | Early Learning Centre** — Grade R, pre-primary development and early learning.
@@ -262,7 +262,7 @@ See [eight-workstream release and evidence register](docs/EIGHT_WORKSTREAM_RELEA
 Candidates may download a minimal JSON university application evidence packet from `GET /api/admissions/applications/:applicationId/evidence-export` only for their own applications after recording readiness/permission for an official handoff. Contents are limited to the selected programme/institution name and summaries of *issued*, non-revoked reports (subject names, percentages, grade/year and SHA-256 fingerprints). Guardianship, attendance notes and childhood development records are excluded. `Content-Disposition: attachment` and `Cache-Control: private, no-store` are set; withdrawal or non-disclosure disallows download. This endpoint is candidate-only and does **not** provide a real university partner API, send an application, verify a signature or validate official qualifications. Real university access requires partnership credentials, purpose-limited permission records, receipts and revocation enforcement.
 
 ### Credentialed browser origin hardening
-The API no longer reflects arbitrary credentialed CORS origins. Allowed origins are the Railway deployment's `https://$RAILWAY_PUBLIC_DOMAIN` and exact HTTPS origins in optional `CABO_ALLOWED_ORIGINS` (comma-separated). Local Vite HTTP origins are permitted **only outside production**. Mutating browser requests from untrusted `Origin` headers receive HTTP 403. Basic anti-content-type sniffing, referrer and frame-deny headers are emitted. These protections are defense-in-depth; session management, CSRF threat modelling, reverse-proxy host validation, MFA, independent penetration testing and privacy compliance must still be verified.
+The API no longer reflects arbitrary credentialed CORS origins. Allowed origins include Render's exact `RENDER_EXTERNAL_URL` and HTTPS origins in optional `CABO_ALLOWED_ORIGINS` (comma-separated). A legacy Railway origin is recognized only when that provider variable is present. Local Vite HTTP origins are permitted **only outside production**. Mutating browser requests from untrusted `Origin` headers receive HTTP 403. Basic anti-content-type sniffing, referrer and frame-deny headers are emitted. These protections are defense-in-depth; session management, CSRF threat modelling, reverse-proxy host validation, MFA, independent penetration testing and privacy compliance must still be verified.
 
 ### Offline attendance, substitution and AI resilience (October 2026)
 School Operations now provides an **opt-in** browser attendance queue using IndexedDB for temporary interruptions. Entries are associated with the signed-in staff account, and may be retried against the institutional `/attendance/sync` endpoint. The server deduplicates matching entries and returns explicit manual-review conflicts without overwriting recorded attendance. Use the **Erase local drafts** action after using a shared device. Local IndexedDB data is **not encrypted** and must not be used on unmanaged/shared devices with real learner information until an approved secure offline storage solution is in place.
