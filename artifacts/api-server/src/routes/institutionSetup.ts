@@ -33,6 +33,7 @@ router.put("/organizations/:orgId/setup",async(req,res)=>{
  const oid=id.safeParse(req.params.orgId),body=profile.safeParse(req.body);
  if(!oid.success||!body.success){res.status(400).json({error:"Invalid institution configuration"});return}
  if(!await manager(oid.data,req.user.id)){res.sendStatus(403);return}
+ const actorId=req.user.id;
  // Serialize a school's first country selection as well as later updates.
  // Locking the parent organization row prevents two concurrent first-time
  // setup requests from both seeing country=NULL and silently reclassifying it.
@@ -53,9 +54,9 @@ router.put("/organizations/:orgId/setup",async(req,res)=>{
    if(!decision.allowed)
      return {error:"missing_country_review",requiredReviewItems:decision.missing} as const;
    const [result]=await tx.insert(institutionSetupTable)
-     .values({...body.data,countryCode,organizationId:oid.data,updatedBy:req.user.id})
+     .values({...body.data,countryCode,organizationId:oid.data,updatedBy:actorId})
      .onConflictDoUpdate({target:institutionSetupTable.organizationId,
-       set:{...body.data,countryCode,updatedBy:req.user.id,updatedAt:new Date()}})
+       set:{...body.data,countryCode,updatedBy:actorId,updatedAt:new Date()}})
      .returning();
    return {result} as const;
  });
