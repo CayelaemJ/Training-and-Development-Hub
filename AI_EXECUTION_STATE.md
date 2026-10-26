@@ -18,9 +18,9 @@ The existing native clients are not browser wrappers. The native-apps README rec
 | Platform | Verified repository evidence | Remaining release work |
 |---|---|---|
 | Web | React/TypeScript app and merged PR #40 install page, manifest, icons, allowlisted public asset cache and offline reconnect page. PR #40 records hosted CI and live Render pilot checks. | Stable production origin, production cutover/data continuity and full web release gates remain separate from native distribution. |
-| Android | Kotlin/Jetpack Compose app exists; README describes phone/tablet layouts, PKCE sign-in, Keystore storage and learner/educator/guardian flows. Android debug CI workflow exists. | Real device/emulator and authentication integration checks, upload picker, offline drafts and signed AAB. No signed release artifact was verified in this audit. |
-| iOS | SwiftUI app and XcodeGen project definition exist; README describes role layouts, Keychain, sign-in, reports and quiz work. iOS verification workflow exists. | Quiz implementation is marked uncompiled in the README; physical-device/auth/submission checks, signed IPA and TestFlight/App Store readiness remain. A successful simulator build is not an IPA. |
-| Windows | C#/WinUI 3 client exists; README describes PKCE sign-in and DPAPI storage. | Compile/live-login verification, interactive learner/teacher/guardian workflows, MSIX packaging and install/upgrade/uninstall validation. |
+| Android | Kotlin/Jetpack Compose app exists; README describes phone/tablet layouts, PKCE sign-in, Keystore storage and learner/educator/guardian flows. GitHub Actions compiled the debug APK on PR #66 commit `0cdf30ecf33ca84f286f58761f1f7fdf0d734f47`. Artifact `CABO-native-Android-DEBUG-test-only` (16 MB; artifact ID `12642527483`) expires 2026-10-29 10:20:59 UTC. | Real device/emulator and authentication integration checks, upload picker, offline drafts and signed AAB. This debug APK is not a release build. |
+| iOS | SwiftUI app and XcodeGen project definition exist; README describes role layouts, Keychain, sign-in, reports and quiz work. GitHub Actions compiled the iOS Simulator app on PR #66 commit `0cdf30ecf33ca84f286f58761f1f7fdf0d734f47`. Artifact `CABO-iOS-Simulator-DEBUG-test-only` (1.1 MB; artifact ID `12643186034`) expires 2026-10-28 10:18:59 UTC. | Physical-device/auth/submission checks, signed IPA and TestFlight/App Store readiness remain. The unsigned simulator bundle is not an IPA. |
+| Windows | C#/WinUI 3 client exists; README describes PKCE sign-in and DPAPI storage. GitHub Actions compiled the debug package on PR #66 commit `0cdf30ecf33ca84f286f58761f1f7fdf0d734f47`. Artifact `CABO-Windows-DEBUG-no-test-login` (34 MB; artifact ID `12643170791`) expires 2026-10-28 10:19:32 UTC. | Live-login verification, interactive learner/teacher/guardian workflows, MSIX packaging and install/upgrade/uninstall validation. The debug directory is not an installer. |
 | Flutter | No Flutter workspace or Dart client identified. | Decide whether a migration is still intended. If yes, define a small vertical slice with parity and release criteria before duplicating the full native feature set. |
 
 Device floors documented in the repository are proposed and explicitly not hardware verified. Do not claim compatibility with every device without physical-device evidence.
@@ -37,14 +37,14 @@ Two other open draft security fixes are:
 
 Both showed successful CircleCI verify, Snyk security and Snyk license statuses at audit time. Review their documented staging gates before release.
 
-PR #49 (native internal test bundles) has been merged. Its iOS and Windows CI builds passed, but the short-retention artifacts have expired; the fresh-build workflow guides and builds are being exercised in PR #66. PR #51 (CircleCI security scan suite) remains open: CircleCI `verify` and Snyk checks passed, while `security_suite` failed on build #301. The CircleCI log interface is not available in this workspace, so the failing scan and remediation are not yet verified. PR #44 (lifelong learning passport) and Dependabot updates #53–#57 also remain open. CI success on a commit is not evidence of app-store signing, physical-device behavior, or production privacy verification.
+PR #49 (native internal test bundles) and PR #66 (artifact guides and accurate platform build status) are merged. PR #66's matching commit passed Android, iOS Simulator, Windows, repository verification, code safety, CircleCI verify, Snyk security and Snyk license checks. Its three exact-commit test artifacts are listed in the platform matrix above. PR #51 (CircleCI security scan suite) remains open: CircleCI `verify` and Snyk checks passed, while `security_suite` failed on build #301. The CircleCI log interface is not available in this workspace, so the failing scan and remediation are not yet verified. PR #44 (lifelong learning passport) and Dependabot updates #53–#57 also remain open. CI success on a commit is not evidence of app-store signing, physical-device behavior, or production privacy verification.
 
 
 ## Current isolated-test environment check
 
 Railway project `CABO Learner Hub - Isolated Test`, environment `testing`, is accessible. The API service points at repository branch `main`. Its latest deployment, from 2026-10-16, is **FAILED** at `PRE_DEPLOY_COMMAND`: the pre-deploy command timed out after 300 seconds. The build itself completed. The configured pre-deploy command runs `pnpm --filter @workspace/db run push` and then `create-test-readonly-role.mjs`; the logs do not identify which command stalled. The service has no live instance, so authenticated synthetic staging checks cannot run now.
 
-Railway's environment inventory showed one API service and a 5 GB volume not mounted on a service; it did not show a PostgreSQL service. The repository's `docs/RAILWAY_TESTING.md` says PostgreSQL is provisioned inside that Railway project. Since the resolved `DATABASE_URL` was not inspected, its target is unknown; confirm the actual test database target and correct the documentation/configuration drift before deploying. Do not re-run schema push or change the service source until the timeout cause and database target are understood.
+Railway's environment inventory showed one API service and a 5 GB volume not mounted on a service; it did not show a PostgreSQL service. The repository's `docs/RAILWAY_TESTING.md` says PostgreSQL is provisioned inside that Railway project. The Railway variables connector returned `valuesRedacted: true`, so the `DATABASE_URL` target could not be safely confirmed from this session. Confirm the actual test database target and correct the documentation/configuration drift before deploying. Do not re-run schema push or change the service source until the timeout cause and database target are understood.
 
 The next staging work is now: inspect the failed pre-deploy execution and safe test database target; repair the isolated environment without touching production or deleting existing test data; deploy the PR #60 branch only after verifying the deployment will use the isolated synthetic-data database; then run and record the guardian authorization scenarios. If account-level credentials or a database-target confirmation are unavailable, keep the environment blocked and continue independent static review and native CI work.
 
@@ -59,14 +59,14 @@ The next staging work is now: inspect the failed pre-deploy execution and safe t
 - No production data changes were made. PR #49's CI workflow-only change was merged after its CircleCI, Snyk, iOS and Windows checks passed; no deployment or release signing was performed.
 - Tests/builds: not run; this audit used read-only GitHub repository data.
 - Branch: `docs/native-platform-audit-checkpoint-20261026`.
-- Next: diagnose the failed Railway pre-deploy timeout without re-running schema push; then restore isolated synthetic staging and verify PR #60. Review PR #58 and #59 release gates. PR #66 is currently building fresh platform test artifacts; PR #51's security scan failure still needs CircleCI logs. Resume signed Android/iOS/Windows release work after privacy/auth blockers are verified.
+- Next: diagnose the failed Railway pre-deploy timeout without re-running schema push; then restore isolated synthetic staging and verify PR #60. Review PR #58 and #59 release gates. PR #66's fresh platform builds and all repository checks passed; the short-retention artifacts expire on 2026-10-28/29. PR #51's security scan failure still needs CircleCI logs. Resume signed Android/iOS/Windows release work after privacy/auth blockers are verified.
 
 ## Additional activity after the initial audit
 
-- Merged PR #49 after checking CircleCI verify, Snyk, iOS simulator build and Windows build statuses. Artifacts were no longer downloadable at the time of follow-up.
+- Merged PR #49 after checking CircleCI verify, Snyk, iOS simulator build and Windows build statuses. Its artifacts later expired.
 - Inspected isolated Railway test deployment status and failure logs. The prior build succeeded but its database pre-deploy command exceeded the 300-second timeout; the test API is not running.
 - Static-read PR #60 patch and PR #58/#59 diffs; no staging or physical-device claims were made.
-- Opened PR #66 with platform test-artifact guides to trigger fresh Android, iOS simulator and Windows CI builds. Those runs are queued or in progress.
+- Opened PR #66 with platform test-artifact guides to trigger fresh Android, iOS simulator and Windows CI builds. All three builds passed on commit `0cdf30ecf33ca84f286f58761f1f7fdf0d734f47`; Android, iOS Simulator and Windows test artifacts were generated with short retention.
 
 ## Resume instructions
 
@@ -75,3 +75,10 @@ The next staging work is now: inspect the failed pre-deploy execution and safe t
 3. Complete and document the PR #60 staging scenarios before marking it ready.
 4. Continue from the platform matrix above; do not infer native builds or installs from web/PWA checks.
 5. If a Flutter migration is explicitly selected, inventory API parity and existing native feature parity first, then build and verify a small end-to-end role workflow on all target platforms before expanding scope.
+
+
+## Latest follow-up evidence (2026-10-26)
+
+- PR #66 merged as `d61c821a424a0322ce3c8201a3d0e7e312f819fe` after all checks passed; its source head was `0cdf30ecf33ca84f286f58761f1f7fdf0d734f47`.
+- Railway diagnosis still gives only `PRE_DEPLOY_COMMAND: Pre-deploy command timed out after 300 seconds`; no diagnosis detail or command-level logs were returned. The variable listing confirmed `DATABASE_URL` is configured, but values were redacted and its target is not verified. No deployment or DB command was run.
+- PR #58/#59/#60 remain draft pending isolated staging and identity/configuration checks. PR #51 remains blocked by the unexplained CircleCI `security_suite` failure on build #301.
