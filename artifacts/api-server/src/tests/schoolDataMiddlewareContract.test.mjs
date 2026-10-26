@@ -6,6 +6,7 @@ function source(relative) {return readFileSync(new URL(relative,import.meta.url)
 
 test("country release middleware executes before route handlers",()=>{
  const app=source("../app.ts");
+ assert.match(app,/CABO_COUNTRY_PILOT_ENFORCEMENT === "true"/);
  assert.match(app,/app\.use\("\/api", schoolDataReleaseMiddleware\);/);
  assert.ok(app.indexOf('app.use("/api", schoolDataReleaseMiddleware);')<
    app.indexOf('app.use("/api", router);'));
