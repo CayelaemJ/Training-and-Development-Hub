@@ -43,8 +43,8 @@ class NativeAndroidQuizTest {
             id = 27,
             title = "Fractions",
             questions = listOf(
-                QuizQuestion("Which fraction is one half?", listOf("1/2", "1/3")),
-                QuizQuestion("Which fraction is one quarter?", listOf("1/4", "1/2"))
+                QuizQuestion("Which fraction is one half?", listOf("Option A: one half", "Option B: one third")),
+                QuizQuestion("Which fraction is one quarter?", listOf("Option C: one quarter", "Option D: three quarters"))
             )
         )
         compose.setContent {
@@ -69,8 +69,8 @@ class NativeAndroidQuizTest {
         }
 
         compose.onNodeWithText("Submit answers").assertIsNotEnabled()
-        compose.onNodeWithText("1/2").performClick()
-        compose.onNodeWithText("1/4").performClick()
+        compose.onNodeWithText("Option A: one half").performClick()
+        compose.onNodeWithText("Option C: one quarter").performClick()
         compose.onNodeWithText("Submit answers").assertIsEnabled().performClick()
         compose.waitForIdle()
 
