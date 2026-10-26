@@ -17,47 +17,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK platform, emulator and API 23 image
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          manager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)
-          avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
-          test -x "$manager"
-          test -x "$avdmanager"
-          yes | "$manager" --licenses > /dev/null || true
-          "$manager" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-23;default;x86_64"
-          echo "$sdkroot/platform-tools" >> "$GITHUB_PATH"
-          echo "$sdkroot/emulator" >> "$GITHUB_PATH"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
           cache-read-only: true
-      - name: Start minimum-supported Android emulator
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          export PATH="$sdkroot/platform-tools:$sdkroot/emulator:$PATH"
-          avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
-          "$avdmanager" create avd --force --name cabo-api-23 --package "system-images;android-23;default;x86_64" --device pixel
-          "$sdkroot/emulator/emulator" -avd cabo-api-23 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect > /tmp/cabo-emulator.log 2>&1 &
-          if ! timeout 300 adb wait-for-device; then
-            cat /tmp/cabo-emulator.log
-            exit 1
-          fi
-          if ! timeout 300 bash -c 'until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == "1" ]]; do sleep 2; done'; then
-            cat /tmp/cabo-emulator.log
-            adb devices -l || true
-            exit 1
-          fi
-          adb shell settings put global window_animation_scale 0
-          adb shell settings put global transition_animation_scale 0
-          adb shell settings put global animator_duration_scale 0
-      - name: Run Android app and quiz interaction tests
-        working-directory: native-apps/android
-        run: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+      - name: Run UI tests on minimum-supported Android emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 23
+          target: default
+          arch: x86_64
+          profile: Nexus 5X
+          emulator-boot-timeout: 600
+          working-directory: native-apps/android
+          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Build standard unsigned-for-release debug APK
         working-directory: native-apps/android
         run: |
