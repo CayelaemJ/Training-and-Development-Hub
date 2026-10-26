@@ -4,7 +4,7 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import {configuredPrincipals} from '../lib/testPrincipals';
-import { oidcRequestOrigin, safeReturnPath } from '../lib/oidcRedirectPolicy';
+import { oidcRequestOrigin, safeReturnPath } from '../lib/originPolicy';
 
 import {
   clearSession,
