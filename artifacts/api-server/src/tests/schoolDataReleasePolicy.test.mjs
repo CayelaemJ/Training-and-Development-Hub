@@ -82,3 +82,18 @@ test("global learner growth aggregates require school provenance in country pilo
  for(const route of ["/ai/capabilities","/hub/modules"])
    assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"not_scoped",route);
 });
+
+test("case-insensitive and trailing-slash Express routes cannot bypass country privacy checks",()=>{
+ for(const path of [
+  "/INSTITUTION-RECORDS/ME","/INSTITUTION-RECORDS/ME/",
+  "/Development-Plans/Draft/","/DEVELOPMENT/OVERVIEW/",
+  "/DASHBOARD/","/%69nstitution-records/me",
+  "/ORGANIZATIONS/5/TRANSFERS/INCOMING/",
+  "/ORGANIZATIONS/5/TRANSFERS/9/DECISION/",
+ ]) assert.equal(identifyCountryScopedSchoolRoute(path,undefined).kind,"unscoped_sensitive",path);
+ for(const path of ["/ORGANIZATIONS/5/ATTENDANCE/ME/","/organizations/5/attendance/me/"])
+  assert.deepEqual(identifyCountryScopedSchoolRoute(path,undefined),{kind:"scoped",orgId:5});
+ assert.equal(identifyCountryScopedSchoolRoute("/ORGANIZATIONS/5/SETUP/").kind,"not_scoped");
+ for(const path of ["/%ZZ/institution-records/me","/institution%252drecords/me"])
+   assert.equal(identifyCountryScopedSchoolRoute(path,undefined).kind,"invalid");
+});
