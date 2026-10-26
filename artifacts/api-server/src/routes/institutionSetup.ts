@@ -3,8 +3,10 @@ import {and,eq} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,institutionSetupTable,organizationMembersTable,organizationsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
+import {assessInstitutionProfileSubmission,countryChangeNeedsReview} from "../lib/countryCompliancePolicy";
 const router:IRouter=Router(),id=z.coerce.number().int().positive();
 const profile=z.object({
+ countryCode:z.enum(["ZA","BW"]).optional(),
  institutionType:z.enum(["preprimary","primary","highschool","combined","special","independent","tvet","university","training"]),
  province:z.string().trim().min(2).max(60),
  district:z.string().trim().min(2).max(120),circuit:z.string().trim().max(120).default(""),
@@ -33,7 +35,28 @@ router.put("/organizations/:orgId/setup",async(req,res)=>{
  if(!await manager(oid.data,req.user.id)){res.sendStatus(403);return}
  const [org]=await db.select({id:organizationsTable.id}).from(organizationsTable).where(eq(organizationsTable.id,oid.data)).limit(1);
  if(!org){res.sendStatus(404);return}
- const [result]=await db.insert(institutionSetupTable).values({...body.data,organizationId:oid.data,updatedBy:req.user.id}).onConflictDoUpdate({target:institutionSetupTable.organizationId,set:{...body.data,updatedBy:req.user.id,updatedAt:new Date()}}).returning();
- res.json({organizationId:result.organizationId,status:result.status,readyForOfficialVerification:false,details:{institutionType:result.institutionType,province:result.province,district:result.district,circuit:result.circuit,curriculum:result.curriculum,academicYear:result.academicYear}});
+ const [previous]=await db.select({countryCode:institutionSetupTable.countryCode})
+   .from(institutionSetupTable).where(eq(institutionSetupTable.organizationId,oid.data)).limit(1);
+ const countryCode=body.data.countryCode??previous?.countryCode??null;
+ // Country changes can affect data-transfer jurisdiction, institutional
+ // authority and lawful bases; never silently reclassify an existing school.
+ if(countryChangeNeedsReview((previous?.countryCode??null) as "ZA"|"BW"|null,countryCode)){
+   res.status(409).json({error:"Changing an institution's country requires a documented, authorised data-governance migration"});return;
+ }
+ const decision=assessInstitutionProfileSubmission(countryCode,body.data.status,process.env);
+ if(!decision.allowed){
+   res.status(409).json({error:"Country-specific institution review prerequisites have not been met",requiredReviewItems:decision.missing});return;
+ }
+ const [result]=await db.insert(institutionSetupTable)
+   .values({...body.data,countryCode,organizationId:oid.data,updatedBy:req.user.id})
+   .onConflictDoUpdate({target:institutionSetupTable.organizationId,
+     set:{...body.data,countryCode,updatedBy:req.user.id,updatedAt:new Date()}})
+   .returning();
+ res.setHeader("Cache-Control","private, no-store");
+ res.json({organizationId:result.organizationId,status:result.status,countryCode:result.countryCode,
+   readyForOfficialVerification:false,legalCertification:false,
+   details:{institutionType:result.institutionType,province:result.province,
+     district:result.district,circuit:result.circuit,curriculum:result.curriculum,
+     academicYear:result.academicYear}});
 });
 export default router;
