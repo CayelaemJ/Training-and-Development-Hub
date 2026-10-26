@@ -4,17 +4,17 @@
 
 This section supersedes the older audit snapshots below.
 
-**Main:** `276e019daa7b3e2cfc9ea8d618a3713579f59f80`.
+**Main:** `8288001b838ac2931a8f4d10e4b305b016e69fcd`.
 
-- Merged PR #89 hardens cookie-backed mutation origin checks and OIDC callback/return-path validation.
-- Merged PR #88 closes mixed-case/trailing-slash privacy-gate bypasses, blocks cross-jurisdiction transfer metadata under the country gate, and adds isolated synthetic QA evidence.
-- Merged PR #90 adds school-scoped native guardian overview/report routes; global guardian routes remain blocked when strict country enforcement is enabled.
-- Country-pilot enforcement and native OIDC remain off on production. No production database migration or deployment was performed for these merges.
-- PR #86 is merged as `276e019daa7b3e2cfc9ea8d618a3713579f59f80`. Its latest head `0bae5dddaec3819926965363c32c155287d5fe85` passed three API 23 emulator instrumentation tests (3/3; zero skipped or failed), standard and isolated debug APK builds, repository browser/mobile checks, CircleCI, Snyk, Semgrep, secret scan, typecheck and build. Short-retention artifacts from [workflow run 40330332713](https://github.com/CayelaemJ/Training-and-Development-Hub/actions/runs/40330332713): standard APK artifact `12654439008` and isolated Render test-login APK artifact `12655715550`; both expire 29 October 2026. Earlier Android runs exposed a missing Compose test BOM and an unsupported Compose assertion; both were corrected.
-- Render staging remains the dedicated `cabo-learning-native-isolated-preview` service at `https://cabo-learning-native-isolated-preview.onrender.com`, attached to `feat/real-native-cabo-apps`, with auto-deploy disabled. Its isolated test-login and synthetic-demo setup passed the authenticated API smoke check. No production service shares those settings.
-- The workspace has no local Ansight host, ADB, or emulator. The current Android validation path is the GitHub-hosted emulator; physical-device acceptance is still outstanding.
+- PR #91 refreshed this checkpoint and merged after CircleCI, Snyk and license checks passed.
+- PR #89 hardens cookie-backed mutation origin checks and OIDC callback/return-path validation. PR #88 closes mixed-case/trailing-slash privacy-gate bypasses and cross-jurisdiction transfer metadata bypasses. PR #90 adds school-scoped native guardian overview/report routes.
+- PR #86 is merged. Its latest head `0bae5dddaec3819926965363c32c155287d5fe85` passed three API 23 emulator instrumentation tests (3/3; zero skipped or failed), standard and isolated debug APK builds, browser/mobile checks, CircleCI, Snyk, Semgrep, secret scan, typecheck and build. Artifacts from [workflow run 40330332713](https://github.com/CayelaemJ/Training-and-Development-Hub/actions/runs/40330332713) expire 29 October 2026.
+- Render staging remains `cabo-learning-native-isolated-preview` at `https://cabo-learning-native-isolated-preview.onrender.com`, attached to `feat/real-native-cabo-apps`, auto-deploy disabled. Its isolated test-login and synthetic-demo setup passed the authenticated API smoke check. No production service or database was changed.
+- The original passport PR #44 was replaced by draft PR #92, rebased onto this main. GitHub Actions, CircleCI, Snyk and license checks pass, including passport HTTP/PGlite integration, typecheck, build, and browser/mobile checks. No migration or deployment was performed. The existing Neon validation branch contains the tables, but has no migration-journal rows for the two versioned Passport migrations; checksum-runner and staged API validation remain outstanding.
+- PRs #68, #72 and #75 were closed as superseded: their fail-closed school release middleware/policy, scoped learner/report routes, attendance route, tests and docs are already present on main. The country pilot remains off; school, counsel, residency, backup/restore and end-to-end evidence are still required.
+- The current Android path is the GitHub-hosted emulator. No local ADB/Ansight device is available, so physical-device acceptance remains outstanding.
 
-**Remaining release gates:** the country approval/migration stack (#68, #72, #75) still needs isolated migration rehearsal and school/legal evidence; the lifelong passport (#44) is still draft; career application remains gated pending verified employers and child-protection controls; psychometric assessment requires licensed instrument and professional governance. Android/iOS/Windows signed releases and physical-device flows, independent penetration testing, privacy/legal sign-off, backups/restore, and production rollout remain incomplete. Do not claim national or store-release readiness.
+**Remaining release gates:** PR #92 still needs isolated staged migration and authenticated API validation, backup/restore rehearsal, and consent/accessibility review before its code phase can be merged. Career applications remain gated pending employer verification and child-protection controls. Psychometric assessment requires a licensed instrument and professional governance. Android/iOS/Windows signed releases, physical-device flows, independent penetration testing, privacy/legal sign-off and production rollout remain incomplete. Do not claim national or store-release readiness.
 
 
 **Updated:** 2026-10-26  
