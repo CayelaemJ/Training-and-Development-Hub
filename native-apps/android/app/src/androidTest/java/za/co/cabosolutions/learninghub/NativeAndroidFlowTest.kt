@@ -2,13 +2,13 @@ package za.co.cabosolutions.learninghub
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -25,7 +25,7 @@ class NativeAndroidHomeTest {
     fun defaultBuildShowsSecureSignInAndHidesTestCredentials() {
         compose.onNodeWithText("CABO").assertIsDisplayed()
         compose.onNodeWithText("Sign in securely").assertIsDisplayed()
-        compose.onNodeWithText("Isolated test account").assertDoesNotExist()
+        assertEquals(0, compose.onAllNodesWithText("Isolated test account").fetchSemanticsNodes().size)
     }
 }
 
@@ -75,8 +75,8 @@ class NativeAndroidQuizTest {
         compose.waitForIdle()
 
         assertEquals(1, submitCount)
-        compose.onNodeWithText("Submit answers").assertDoesNotExist()
-        compose.onNodeWithText("Your results").assertDoesNotExist()
+        assertEquals(0, compose.onAllNodesWithText("Submit answers").fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodesWithText("Your results").fetchSemanticsNodes().size)
         compose.onNodeWithText("Practice results come from CABO, not this device.").assertIsDisplayed()
     }
 
