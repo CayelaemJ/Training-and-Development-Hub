@@ -26,7 +26,7 @@ for(const [key,value] of Object.entries(cfg)){
   }else if(!Number.isSafeInteger(value)||value<=0)throw Error("Missing synthetic school id "+key);
 }
 const userA="qa-synthetic-learner-a-20261026";
-const endpoint = path => new URL("api"+path,base).href;
+const endpoint = path => new URL(path.startsWith("/API/")?path.slice(1):"api"+path,base).href;
 async function get(user,path){
  const response=await fetch(endpoint(path),{
    method:"GET",headers:{Authorization:"Bearer "+cfg[user],Accept:"application/json"},
@@ -91,6 +91,11 @@ test("Botswana revoked school blocked, unscoped AI, uploads and transfers denied
    `/organizations/${cfg.zaOne}/transfers/incoming`,
    `/organizations/${cfg.zaOne}/transfers/12/decision`]){
    assert.equal((await get("A",url)).status,409,url);
+ }
+ for(const path of ["/INSTITUTION-RECORDS/ME","/INSTITUTION-RECORDS/ME/",
+   "/API/INSTITUTION-RECORDS/ME","/DASHBOARD/",
+   "/DEVELOPMENT/OVERVIEW/"]){
+   assert.equal((await get("A",path)).status,409,"Case or slash country-gate bypass: "+path);
  }
  assert.equal((await get("A","/organizations/invalid/attendance/me")).status,400);
 });
