@@ -38,6 +38,9 @@ import assessmentPapersRouter from "./assessmentPapers";
 import educationCommandRouter from "./educationCommand";
 import admissionEvidenceRouter from "./admissionEvidence";
 
+import lifelongPassportRouter from "./lifelongPassport";
+import passportTrustRouter from "./passportTrustRoutes";
+
 const router: IRouter = Router();
 
 router.use(healthRouter);
@@ -78,5 +81,7 @@ router.use(assessmentQuestionBankRouter);
 router.use(assessmentPapersRouter);
 router.use(educationCommandRouter);
 router.use(admissionEvidenceRouter);
+router.use(lifelongPassportRouter);
+router.use(passportTrustRouter);
 
 export default router;

@@ -53,3 +53,6 @@ export * from "./educationFrameworks";
 export * from "./nativeAuth";
 
 export * from "./institutionDataClearances";
+
+export * from "./lifelongPassport";
+export * from "./passportTrustLayers";
