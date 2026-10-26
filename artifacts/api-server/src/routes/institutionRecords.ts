@@ -19,6 +19,37 @@ async function canRecord(org:number,user:string){
  if(isPlatformSuperadmin(user)){await auditSuperadmin(user,"institution_admin_access",org);return true;}
  const m=await membership(org,user);return !!m&&["owner","admin"].includes(m.role);
 }
+/**
+ * School-scoped self records for the two-country rollout.
+ * The shared country release middleware verifies this exact organisation
+ * before the router runs. The query also binds records to the signed-in user.
+ * Never return global transfers or guardian identities through this endpoint.
+ */
+router.get("/organizations/:orgId/institution-records/me",async(req,res)=>{
+ const user=current(req,res);if(!user)return;
+ const org=id.safeParse(req.params.orgId);
+ if(!org.success){res.sendStatus(400);return}
+ const rows=await db.select({
+   id:verifiedEnrollmentsTable.id,
+   organizationId:verifiedEnrollmentsTable.organizationId,
+   organization:organizationsTable.name,
+   stage:verifiedEnrollmentsTable.stage,
+   academicYear:verifiedEnrollmentsTable.academicYear,
+   status:verifiedEnrollmentsTable.status,
+   createdAt:verifiedEnrollmentsTable.createdAt
+ }).from(verifiedEnrollmentsTable)
+   .innerJoin(organizationsTable,eq(organizationsTable.id,verifiedEnrollmentsTable.organizationId))
+   .where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),
+              eq(verifiedEnrollmentsTable.learnerId,user)))
+   .orderBy(desc(verifiedEnrollmentsTable.academicYear))
+   .limit(100);
+ res.setHeader("Cache-Control","private, no-store");
+ res.setHeader("Referrer-Policy","no-referrer");
+ res.json({organizationId:org.data,enrollments:rows,
+   transfers:[],guardians:[],
+   note:"Cross-institution transfers and guardian invitations require their own jurisdiction-safe workflows."});
+});
+
 router.get("/institution-records/me",async(req,res)=>{
  const user=current(req,res);if(!user)return;
  const [enrollments,transfers,guardians]=await Promise.all([
