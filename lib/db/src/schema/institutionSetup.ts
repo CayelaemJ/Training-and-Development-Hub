@@ -5,6 +5,8 @@ import {usersTable} from "./auth";
 export const institutionSetupTable=pgTable("institution_setup",{
  organizationId:integer("organization_id").primaryKey().references(()=>organizationsTable.id,{onDelete:"cascade"}),
  institutionType:varchar("institution_type",{length:30}).notNull(),
+ // Nullable for legacy records: never guess the country of existing schools.
+ countryCode:varchar("country_code",{length:2}),
  province:varchar("province",{length:60}).notNull(),
  district:varchar("district",{length:120}).notNull(),
  circuit:varchar("circuit",{length:120}).notNull().default(""),
