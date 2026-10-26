@@ -83,7 +83,7 @@ export function identifyCountryScopedSchoolRoute(
   // current transfer lawful basis and explicit source/recipient approval exist.
   if (/^\/organizations\/[^/]+\/transfers(?:\/|$)/.test(routePath))
     return {kind:"unscoped_sensitive"};
-  if (path === "/dashboard" || path === "/development/overview")
+  if (routePath === "/dashboard" || routePath === "/development/overview")
     return {kind:"unscoped_sensitive"};
   const direct = /^\/organizations\/([^/]+)(?:\/|$)/.exec(routePath);
   if (direct) {
