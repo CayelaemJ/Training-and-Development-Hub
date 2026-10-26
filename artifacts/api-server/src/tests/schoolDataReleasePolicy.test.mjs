@@ -74,3 +74,11 @@ test("cross-school transfer queues and decisions remain blocked pending dual-cou
  assert.deepEqual(identifyCountryScopedSchoolRoute("/organizations/5/attendance/me",undefined),
    {kind:"scoped",orgId:5});
 });
+
+test("global learner growth aggregates require school provenance in country pilot",()=>{
+ for(const route of ["/dashboard","/development/overview"])
+   assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"unscoped_sensitive",route);
+ // Provider capability and module descriptions are not individual learner records.
+ for(const route of ["/ai/capabilities","/hub/modules"])
+   assert.equal(identifyCountryScopedSchoolRoute(route,undefined).kind,"not_scoped",route);
+});
