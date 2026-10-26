@@ -14,7 +14,7 @@ test("institution DB marker preserves unknown legacy countries",()=>{
 });
 test("school API validates explicit country, prevents reclassification and checks attestations",()=>{
  const route=read("../routes/institutionSetup.ts");
- assert.match(route,/countryCode:z\.enum\(\["ZA","BW"\]\)/);
+ assert.match(route,/countryCode:z\.enum\(\["ZA","BW"\]\)\.nullish\(\)/);
  assert.match(route,/countryChangeNeedsReview\(/);
  assert.match(route,/assessInstitutionProfileSubmission\(/);
  assert.match(route,/status\(409\)/);
