@@ -1,4 +1,4 @@
-name: CABO native Android debug APK (manual)
+name: CABO native Android emulator tests and debug APK
 on:
   pull_request:
     paths:
@@ -10,37 +10,71 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      # GitHub's Ubuntu runner already contains Android command-line tools.
-      # setup-android@v3 currently tries to install removed SDK package "tools".
-      - name: Install Android SDK platform and build tools
+      - name: Install Android SDK platform, emulator and API 23 image
         shell: bash
         run: |
           set -euo pipefail
           sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           manager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)
+          avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
           test -x "$manager"
+          test -x "$avdmanager"
           yes | "$manager" --licenses > /dev/null || true
-          "$manager" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          "$manager" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-23;default;x86_64"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
           cache-read-only: true
-      - name: Compile native Android Kotlin app
+      - name: Start minimum-supported Android emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
+          echo "no" | "$avdmanager" create avd --force --name cabo-api-23 --package "system-images;android-23;default;x86_64"
+          "$sdkroot/emulator/emulator" -avd cabo-api-23 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect > /tmp/cabo-emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 240 bash -c 'until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == "1" ]]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+      - name: Run Android app and quiz interaction tests
         working-directory: native-apps/android
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - name: Upload TEST-ONLY unsigned-for-release APK
+        run: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+      - name: Build standard unsigned-for-release debug APK
+        working-directory: native-apps/android
+        run: |
+          gradle :app:assembleDebug --no-daemon --stacktrace
+          mkdir -p app/build/ci-artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-debug.apk
+      - name: Build isolated Render test-login APK
+        working-directory: native-apps/android
+        run: |
+          gradle :app:assembleDebug --no-daemon --stacktrace \
+            -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
+            -PcaboEnableTestLogin=true
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-isolated-test-debug.apk
+      - name: Upload standard Android debug APK
         uses: actions/upload-artifact@v4
         with:
           name: CABO-native-Android-DEBUG-test-only
-          path: native-apps/android/app/build/outputs/apk/debug/app-debug.apk
+          path: native-apps/android/app/build/ci-artifacts/cabo-native-android-debug.apk
           retention-days: 3
           if-no-files-found: error
-# Debug APK is signed with Android's generated DEBUG key, not CABO's Play Store
-# release signing identity. Never redistribute it as a production school app.
+      - name: Upload isolated test-login APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CABO-native-Android-ISOLATED-test-login-DEBUG
+          path: native-apps/android/app/build/ci-artifacts/cabo-native-android-isolated-test-debug.apk
+          retention-days: 3
+          if-no-files-found: error
+# Both APKs use a generated DEBUG signing key and are internal test builds.
+# The isolated APK embeds only the isolated Render origin and test-login toggle,
+# never a username, password or server-side secret. Never redistribute it as a school or production app.
