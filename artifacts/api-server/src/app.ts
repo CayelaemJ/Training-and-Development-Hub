@@ -7,7 +7,7 @@ import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import {permittedBrowserOrigin} from "./lib/originPolicy";
+import {permittedBrowserOrigin,permittedMutationOrigin} from "./lib/originPolicy";
 import { apiRateLimit } from "./middlewares/rateLimit";
 
 const app: Express = express();
@@ -34,7 +34,7 @@ app.use(
 );
 app.use((req,res,next)=>{res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("X-Frame-Options","DENY");next()});
 app.use(cors({credentials:true,origin:(origin,callback)=>callback(null,origin&&permittedBrowserOrigin(origin,process.env)?origin:false)}));
-app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedBrowserOrigin(req.headers.origin,process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
+app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedMutationOrigin({origin:req.headers.origin,referer:req.headers.referer,cookie:req.headers.cookie},process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
