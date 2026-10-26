@@ -1,6 +1,7 @@
 import { scryptSync, timingSafeEqual } from "node:crypto";
 
 type TestEnvironment = Record<string, string | undefined>;
+type TestPrincipal = { username: string; hash: string };
 
 /** Extra opt-in guard: a public deployment is never automatically a test tenant. */
 export function nativeTestLoginEnabled(env: TestEnvironment): boolean {
@@ -11,11 +12,18 @@ export function nativeTestLoginEnabled(env: TestEnvironment): boolean {
     env.CABO_TEST_LOGIN_USERNAME === "cabo_test";
 }
 
-/** Match a pinned test username and a salted scrypt hash; never embed passwords. */
-export function verifyNativeTestLogin(username: unknown, password: unknown, env: TestEnvironment): boolean {
-  if (!nativeTestLoginEnabled(env) || username !== "cabo_test" ||
+/** Match the pinned superadmin or a validated synthetic principal to a salted hash. */
+export function verifyNativeTestLogin(
+  username: unknown,
+  password: unknown,
+  env: TestEnvironment,
+  fixture?: TestPrincipal,
+): boolean {
+  if (!nativeTestLoginEnabled(env) || typeof username !== "string" ||
       typeof password !== "string" || password.length < 12 || password.length > 200) return false;
-  const [salt, hash] = (env.CABO_TEST_PASSWORD_HASH ?? "").split(":");
+  const isPinnedAdmin = username === "cabo_test" && !fixture;
+  if (!isPinnedAdmin && (!fixture || fixture.username !== username)) return false;
+  const [salt, hash] = (fixture?.hash ?? env.CABO_TEST_PASSWORD_HASH ?? "").split(":");
   if (!/^[a-f0-9]{32}$/.test(salt ?? "") || !/^[a-f0-9]{128}$/.test(hash ?? "")) return false;
   const actual = scryptSync(password, Buffer.from(salt, "hex"), 64);
   return timingSafeEqual(actual, Buffer.from(hash, "hex"));
