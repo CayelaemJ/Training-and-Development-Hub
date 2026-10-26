@@ -36,7 +36,11 @@ test("bad org ids and self-report routes fail closed under strict gating",()=>{
  assert.equal(identifyCountryScopedSchoolRoute("/reports/me",undefined).kind,"invalid");
  assert.equal(identifyCountryScopedSchoolRoute("/reports/me",["1","2"]).kind,"invalid");
  for(const sensitive of ["/institution-records/me","/institution-records/transfers",
- "/guardian-relationships","/learner-journey/me","/native/mobile/parent/reports"])
+ "/guardian-relationships","/learner-journey/me","/native/mobile/parent/reports",
+ "/my-assignments","/learner-passport/me","/school/attendance/me",
+ "/school-stages/me","/report-issuance/me","/guardian/issued-reports/learner",
+ "/materials","/quizzes/1/attempts","/written-exams","/assignments/4/exam",
+ "/storage/uploads/request-url","/admissions/applications/me"])
    assert.equal(identifyCountryScopedSchoolRoute(sensitive,null).kind,"unscoped_sensitive");
  assert.equal(identifyCountryScopedSchoolRoute("/health",undefined).kind,"not_scoped");
 });
