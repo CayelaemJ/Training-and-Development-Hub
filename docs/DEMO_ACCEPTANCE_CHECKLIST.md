@@ -1,9 +1,9 @@
 # CABO Demo — Role-Based Acceptance and Presentation Checklist
 
-Run only on the isolated Railway **testing** service. The synthetic demo data is explicitly fictitious. Do not use real children's identities or grades.
+Run only on the isolated Render **testing** service. The synthetic demo data is explicitly fictitious. Do not use real children's identities or grades.
 
 ## Preflight
-- Latest Railway deployment commit matches PR #19 and reports **SUCCESS**.
+- Latest Render deployment uses the current native-test preview commit and reports **live**.
 - CI type checks and tests pass.
 - Superadmin opens `/platform-admin`, selects **Load synthetic school showcase**, then checks readiness metrics show three schools with learner records, published marks, attendance, and two fictitious university programmes.
 - Superadmin opens `/education-reports`, selects **CABO DEMO | Tshwane Primary**, year 2026 and learner ID `cabo-demo-child-5a`. The report must show subjects, mark percentages, attendance and prominent **Draft preview / Not official** labelling.
@@ -25,7 +25,7 @@ Run only on the isolated Railway **testing** service. The synthetic demo data is
 - Can create CABO Apply draft, but never falsely assert an official university acceptance.
 
 **Guardian**
-- Independent test login with **pending** guardian relationship.
+- Independent synthetic parent test login with an **accepted but unverified** guardian relationship.
 - Must NOT see the child's report, grades, attendance, psychometrics or credentials merely because a request exists.
 - Guardian identity/authority verification and explicitly scoped release remain additional implementation work.
 
@@ -45,4 +45,4 @@ Run only on the isolated Railway **testing** service. The synthetic demo data is
 Superadmin command centre → choose synthetic primary school → published mark report → attendance & development → sports and family interaction → secondary stage & Grade 11 → CABO Apply fictional programme → candidate-controlled talent vision. Every external/unbuilt integration should be called out as a roadmap item.
 
 ## Remaining implementation (not signed off)
-Real independent test-account E2E browser evidence, official report issuance, QR attendance, offline sync, automated timetables, educational notifications, guardian-authority verification, moderation and signing, registrar/API partner integrations, school data migration and DBE approvals. CI success and Railway SUCCESS alone do not prove these user journeys.
+Real independent test-account E2E browser evidence, official report issuance, QR attendance, offline sync, automated timetables, educational notifications, guardian-authority verification, moderation and signing, registrar/API partner integrations, school data migration and DBE approvals. CI success and Render live status alone do not prove these user journeys. The accepted-but-unverified parent redaction flow has been smoke-checked; verified, revoked, cross-school and unenrolled cases remain open.
