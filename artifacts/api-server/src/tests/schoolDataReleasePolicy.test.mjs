@@ -5,6 +5,8 @@ const now = new Date("2026-10-26T10:00:00.000Z");
 const snapshot = {
  countryCode:"ZA",setupStatus:"submitted",approvalCountry:"ZA",approvalState:"approved",
  evidenceReference:"legal-file-reviewed-123",
+ transferState:"no_transfer",transferAssessmentReference:"vendor-flow-review-2026",
+ botswanaLocalCopyReference:null,botswanaLocalCopyVerifiedAt:null,
  approvedAt:new Date("2026-10-24T12:00:00.000Z"),
  expiresAt:new Date("2026-12-24T12:00:00.000Z"),
 };
@@ -21,6 +23,20 @@ test("only time-bounded same-country signed review state can release school data
 test("Botswana approval cannot be reused for South African school",()=>{
  assert.equal(assessSchoolDataRelease({...snapshot,countryCode:"BW",approvalCountry:"ZA"},now).allowed,false);
  assert.equal(assessSchoolDataRelease({...snapshot,countryCode:"BW",approvalCountry:"BW"},now).allowed,true);
+});
+test("foreign transfer to Botswana requires local copy evidence under internal gate",()=>{
+ const transferred={...snapshot,countryCode:"BW",approvalCountry:"BW",
+   transferState:"approved_transfer"};
+ assert.deepEqual(assessSchoolDataRelease(transferred,now),
+   {allowed:false,reason:"botswana_local_copy_missing"});
+ assert.equal(assessSchoolDataRelease({...transferred,botswanaLocalCopyReference:"bw-copy-2026",
+  botswanaLocalCopyVerifiedAt:new Date("2026-10-25T00:00:00Z")},now).allowed,true);
+ assert.equal(assessSchoolDataRelease({...transferred,botswanaLocalCopyReference:"bw-copy-2026",
+  botswanaLocalCopyVerifiedAt:new Date("2026-10-27T00:00:00Z")},now).allowed,false);
+});
+test("country approvals require an explicit transfer assessment",()=>{
+ assert.equal(assessSchoolDataRelease({...snapshot,transferState:"unreviewed"},now).reason,"transfer_unreviewed");
+ assert.equal(assessSchoolDataRelease({...snapshot,transferAssessmentReference:""},now).allowed,false);
 });
 test("organisation scoped learner routes require reviewed institution id",()=>{
  assert.deepEqual(identifyCountryScopedSchoolRoute("/organizations/12/academic",undefined),{kind:"scoped",orgId:12});
