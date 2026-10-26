@@ -28,6 +28,8 @@ jobs:
           test -x "$avdmanager"
           yes | "$manager" --licenses > /dev/null || true
           "$manager" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-23;default;x86_64"
+          echo "$sdkroot/platform-tools" >> "$GITHUB_PATH"
+          echo "$sdkroot/emulator" >> "$GITHUB_PATH"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
@@ -37,6 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export PATH="$sdkroot/platform-tools:$sdkroot/emulator:$PATH"
           avdmanager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)
           echo "no" | "$avdmanager" create avd --force --name cabo-api-23 --package "system-images;android-23;default;x86_64"
           "$sdkroot/emulator/emulator" -avd cabo-api-23 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect > /tmp/cabo-emulator.log 2>&1 &
