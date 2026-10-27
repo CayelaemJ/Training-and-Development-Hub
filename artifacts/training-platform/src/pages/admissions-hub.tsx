@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowRight, BookOpenCheck, Building2, CheckCircle2, ClipboardCheck,
-  FileShield2, GraduationCap, Landmark, LockKeyhole, ShieldCheck, UsersRound,
+  GraduationCap, Landmark, LockKeyhole, ShieldCheck, UsersRound,
   Waypoints,
 } from "lucide-react";
 
@@ -146,7 +146,7 @@ export default function AdmissionsHubPage() {
       role === "unavailable" ? <p role="alert" className="rounded-xl border p-4 text-sm">Your role could not be confirmed. Sign in again to access the appropriate admission tools.</p> :
       <JourneyPanel kind={selected} role={role} applicationCount={applicationCount}/>}
     <aside className="grid gap-3 rounded-xl border p-5 sm:grid-cols-[auto_1fr]">
-      <FileShield2 size={23} aria-hidden="true" className="text-primary"/>
+      <ShieldCheck size={23} aria-hidden="true" className="text-primary"/>
       <div><h2 className="text-sm font-semibold">Document verification and official applications</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">The secure upload vault, government or issuing-body result checks, payment processing, student cards, module registrations and official transcript exchange are not available yet. Do not upload birth certificates, bank documents, IDs or other sensitive evidence to a general CABO study-material tool.</p></div>
     </aside>
     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
