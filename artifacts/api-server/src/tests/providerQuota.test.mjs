@@ -27,3 +27,12 @@ test('31 questions cover a large document in small sequential batches',async()=>
  const result=await questionBatches(source,31,async(text,count)=>{active++;peak=Math.max(peak,active);sections.push(text);await Promise.resolve();active--;return Array(count).fill('q');});
  assert.equal(result.length,31);assert.equal(peak,1);assert.ok(sections.every(s=>s.length<6400));assert.ok(sections[0].startsWith('START'));assert.ok(sections.at(-1).endsWith('END'));
 });
+
+test('routed upstream 429 fails over without a repeated request',async()=>{
+ let calls=0, clock=0;
+ const schedule=createProviderScheduler(()=>clock,async ms=>{clock+=ms;},{fastFailOnQuota:true});
+ await assert.rejects(schedule(async()=>{calls++;throw limited(60);},clock+180000),e=>e instanceof ProviderQuotaError&&e.retryAfterSeconds===60);
+ assert.equal(calls,1);
+ await assert.rejects(schedule(async()=>{calls++;return "no";},clock+180000),ProviderQuotaError);
+ assert.equal(calls,1);
+});
