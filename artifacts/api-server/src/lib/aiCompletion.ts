@@ -138,7 +138,7 @@ export async function completeAIJson<T>(args: {
             ],
             ...(jsonMode ? { response_format: { type: "json_object" as const } } : {}),
             ...(provider.name === "groq" && model.startsWith("openai/gpt-oss-") ? { reasoning_effort: "low" as const } : {}),
-            max_completion_tokens: args.maxCompletionTokens ?? 3500,
+            ...(provider.name === "huggingface" ? { max_tokens: args.maxCompletionTokens ?? 3500 } : { max_completion_tokens: args.maxCompletionTokens ?? 3500 }),
           }, { timeout: Math.min(25_000, Math.max(1, deadline - Date.now())), signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) }), deadline);
           const body = response.choices[0]?.message?.content;
           if (!body) throw new Error("Empty completion");
