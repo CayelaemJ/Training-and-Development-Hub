@@ -1,5 +1,5 @@
 import {db,aiInferenceMetricsTable} from "@workspace/db";
-export type AiOperation="development_plan"|"written_exam"|"quiz"|"grading";
+export type AiOperation="development_plan"|"written_exam"|"quiz"|"grading"|"smoke_test";
 export async function recordAiMetric(operation:AiOperation,provider:string,model:string,outcome:"success"|"failure",started:number){
  try{await db.insert(aiInferenceMetricsTable).values({operation,provider,model,outcome,durationMs:Math.max(0,Math.min(120000,Date.now()-started))})}
  catch{console.error("AI telemetry write failed")}
