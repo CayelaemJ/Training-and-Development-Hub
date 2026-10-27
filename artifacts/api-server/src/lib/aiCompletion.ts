@@ -48,6 +48,8 @@ async function groqModels(client: OpenAI): Promise<string[] | null> {
     groqModelCache.expires = Date.now() + 5 * 60_000;
     return models;
   } catch (error) {
+    groqModelCache.models = null;
+    groqModelCache.expires = Date.now() + 60_000;
     const code = error as { status?: number; code?: string };
     logger.warn({ provider: "groq", status: code.status ?? null, code: code.code ?? null }, "Groq model discovery unavailable");
     return null;
