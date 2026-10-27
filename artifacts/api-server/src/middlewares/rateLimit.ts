@@ -40,8 +40,11 @@ export function apiRateLimit(req: Request, res: Response, next: NextFunction): v
   if (/\/(?:storage|upload|material)(?:s|\/|-|$)/.test(path)) {
     limits.push(["uploads", 24, 10 * 60_000]);
   }
-  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\/|-|$)/.test(path)) {
+  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper|development-plan)(?:s|\/|-|$)/.test(path)) {
     limits.push(["generation", 30, 10 * 60_000]);
+  }
+  if (path === "/api/platform/mlops/smoke-test" && req.method === "POST") {
+    limits.push(["ai-smoke-test", 5, 10 * 60_000]);
   }
   if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
     limits.push(["mutations", 90, 60_000]);
