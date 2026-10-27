@@ -50,10 +50,10 @@ router.post("/platform/mlops/smoke-test",async(req,res)=>{
     return {status:"READY" as const};
    },
   });
-  await recordAiMetric("development_plan",completed.provider,completed.modelId,"success",start);
+  await recordAiMetric("smoke_test",completed.provider,completed.modelId,"success",start);
   res.json({ok:true,provider:completed.provider,model:completed.modelId,latencyMs:Date.now()-start});
  }catch(e){
-  await recordAiMetric("development_plan",requested || "router","none","failure",start);
+  await recordAiMetric("smoke_test",requested || "router","none","failure",start);
   console.warn("AI connection check failed",{provider:requested || "router",errorType:e instanceof Error?e.name:"unknown"});
   res.status(502).json({ok:false,error:"The selected AI provider could not complete the synthetic connectivity test. Check credentials, inference access, model and quota in Render."});
  }
