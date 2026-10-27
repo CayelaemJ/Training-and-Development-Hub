@@ -23,3 +23,10 @@ test("health endpoint is explicitly exempt but API routes are not",()=>{
  assert.match(source,/path === "\/api\/health"/);
  assert.match(source,/\["all", 240, 60_000\]/);
 });
+
+test("provider smoke tests and development plan drafts receive explicit abuse limits",()=>{
+ const source=readFileSync(new URL("../middlewares/rateLimit.ts",import.meta.url),"utf8");
+ assert.match(source,/development-plan/);
+ assert.match(source,/path === "\/api\/platform\/mlops\/smoke-test"/);
+ assert.match(source,/\["ai-smoke-test", 5, 10 \* 60_000\]/);
+});
