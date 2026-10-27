@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Select installed Xcode
         run: xcodebuild -version
       - name: Install XcodeGen
@@ -40,7 +40,7 @@ jobs:
           test -d "$app"
           ditto -c -k --keepParent "$app" "$RUNNER_TEMP/CABO-iOS-Simulator-DEBUG.zip"
       - name: Upload iOS Simulator build (not an IPA)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: CABO-iOS-Simulator-DEBUG-test-only
           path: ${{ runner.temp }}/CABO-iOS-Simulator-DEBUG.zip

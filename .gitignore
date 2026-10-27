@@ -52,3 +52,6 @@ Thumbs.db
 artifacts/training-platform/public/icons/
 artifacts/api-server/src/tests/integration/generated.mjs
 artifacts/api-server/src/tests/integration/uploads-generated.mjs
+
+# Local and CI security scan outputs
+security-reports/
