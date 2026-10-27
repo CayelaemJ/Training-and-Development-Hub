@@ -126,12 +126,68 @@ if (hasKey.groq && hasKey.huggingface) {
     }));
   }
 }
+// A short end-to-end demo rehearsal through the exact production completion
+// pipeline. Never uses real learner information and never writes a database.
+let classroomWorkflowStatus = "not_checked";
+if (hasKey.groq) {
+  const start = Date.now();
+  const sourceText = "Plants convert sunlight into chemical energy through photosynthesis. They absorb carbon dioxide and water to make glucose and release oxygen.";
+  try {
+    const exam = await completeAIJson({
+      provider: "groq", task: "exam_generation", maxCompletionTokens: 800,
+      system: 'Write one easy school science question grounded only in the supplied source. Return JSON with exactly: {"title":"...","questions":[{"prompt":"...","type":"short_answer","maxMarks":2,"rubric":"...","referenceAnswer":"...","sourceExcerpt":"..."}]}. The excerpt must be a verbatim quotation from the supplied text.',
+      payload: { synthetic: true, sourceText },
+      validate(value) {
+        if (typeof value?.title !== "string" ||
+            !Array.isArray(value.questions) || value.questions.length !== 1) throw Error("Exam shape invalid");
+        const q = value.questions[0];
+        if (q?.type !== "short_answer" || q?.maxMarks !== 2 ||
+            typeof q.prompt !== "string" || typeof q.rubric !== "string" ||
+            typeof q.referenceAnswer !== "string" ||
+            typeof q.sourceExcerpt !== "string" ||
+            !sourceText.includes(q.sourceExcerpt)) throw Error("Exam not grounded");
+        return q;
+      },
+    });
+    const grade = await completeAIJson({
+      provider: "groq", task: "grading", maxCompletionTokens: 500,
+      system: 'Grade the synthetic answer against this science question. Return JSON exactly as {"marks":[{"questionIndex":0,"awardedMarks":2,"feedback":"...","evidence":"...","needsReview":false}]}. Awarded marks must reflect accuracy, 0 through 2.',
+      payload: {
+        synthetic: true, question: exam.value,
+        answer: "Photosynthesis lets plants use sunlight, carbon dioxide, and water to make glucose and release oxygen.",
+      },
+      validate(value) {
+        if (!Array.isArray(value?.marks) || value.marks.length !== 1) throw Error("Marks invalid");
+        const mark = value.marks[0];
+        if (mark?.questionIndex !== 0 || typeof mark.awardedMarks !== "number" ||
+            mark.awardedMarks < 0 || mark.awardedMarks > 2 ||
+            typeof mark.feedback !== "string" || !mark.feedback.trim() ||
+            typeof mark.evidence !== "string" ||
+            typeof mark.needsReview !== "boolean") throw Error("Grading invalid");
+        return mark;
+      },
+    });
+    classroomWorkflowStatus = "passed";
+    console.info(JSON.stringify({
+      event: "cabo_ai_classroom_workflow", status: "passed",
+      examModel: exam.modelId, gradingModel: grade.modelId,
+      latencyMs: Date.now() - start,
+    }));
+  } catch (error) {
+    classroomWorkflowStatus = "failed";
+    console.warn(JSON.stringify({
+      event: "cabo_ai_classroom_workflow", status: "failed",
+      errorType: error instanceof Error ? error.name : "unknown",
+      latencyMs: Date.now() - start,
+    }));
+  }
+}
 complete = true;
 console.info(JSON.stringify({
   event: "cabo_ai_live_probe_summary",
   ready: checked.groq.status === "passed" && checked.huggingface.status === "passed",
   groq: checked.groq.status, huggingface: checked.huggingface.status,
-  fallback: fallbackStatus,
+  fallback: fallbackStatus, classroomWorkflow: classroomWorkflowStatus,
 }));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
