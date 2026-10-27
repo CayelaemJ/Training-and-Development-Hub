@@ -1,8 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { build } from "esbuild";
+import { mkdtemp, rm } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 test("a real Groq SDK 429 fails over to mocked Hugging Face without extra calls", async () => {
   const originalFetch = globalThis.fetch;
+  const directory=await mkdtemp(path.join(fileURLToPath(new URL(".",import.meta.url)),".synthetic-ai-test-"));
+  const outfile=path.join(directory,"aiCompletion.mjs");
+  await build({entryPoints:[fileURLToPath(new URL("../lib/aiCompletion.ts",import.meta.url))],bundle:true,platform:"node",format:"esm",packages:"external",outfile,logLevel:"silent"});
+  const savedNodeEnv=process.env.NODE_ENV;
+  process.env.NODE_ENV="production";
   const saved = Object.fromEntries(["GROQ_API_KEY","HF_TOKEN","HUGGINGFACE_API_KEY","OPENAI_API_KEY"].map(k => [k,process.env[k]]));
   let groqCalls = 0, hfCalls = 0, groqModelCalls = 0;
   process.env.GROQ_API_KEY = "synthetic-groq-test-key";
@@ -31,7 +40,7 @@ test("a real Groq SDK 429 fails over to mocked Hugging Face without extra calls"
     throw new Error("Unexpected outbound request in mock test: " + url);
   };
   try {
-    const { completeAIJson } = await import("../lib/aiCompletion.ts");
+    const { completeAIJson } = await import(pathToFileURL(outfile).href);
     const generate = () => completeAIJson({
       task:"grading", system:"Return synthetic status.", payload:{synthetic:true},
       maxCompletionTokens:128,
@@ -50,6 +59,8 @@ test("a real Groq SDK 429 fails over to mocked Hugging Face without extra calls"
     assert.ok(groqModelCalls>=1);
   } finally {
     globalThis.fetch = originalFetch;
+    if(savedNodeEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=savedNodeEnv;
+    await rm(directory,{recursive:true,force:true});
     for (const [key,val] of Object.entries(saved)) {
       if (val===undefined) delete process.env[key];
       else process.env[key]=val;
