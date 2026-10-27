@@ -77,12 +77,12 @@ function JourneyPanel({ kind, role, applicationCount }: { kind: Journey; role: s
       <h2 className="font-display text-2xl sm:text-3xl" id="admissions-journey-title">{item.title}</h2>
       <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{item.copy}</p>
       <div className="flex flex-wrap items-center gap-2 pt-2">
-        {kind === "school" && <Link href="/guardian-connect" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2">Guardian Connect <ArrowRight size={16}/></Link>}
-        {kind === "tertiary" && <>
+        {kind === "school" && ["parent","headmaster","administrator","superadmin"].includes(role) && <Link href="/guardian-connect" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2">Guardian Connect <ArrowRight size={16}/></Link>}
+        {kind === "tertiary" && ["learner","superadmin"].includes(role) && <>
           <Link href="/cabo-apply" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2">Explore university programmes <ArrowRight size={16}/></Link>
           {applicationCount !== null && <span role="status" className="text-sm text-muted-foreground">{applicationCount} CABO application {applicationCount === 1 ? "draft/record" : "drafts/records"} on your account</span>}
         </>}
-        {kind === "transfer" && <Link href="/institution-records" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2">View my institution records <ArrowRight size={16}/></Link>}
+        {kind === "transfer" && ["learner","parent","headmaster","deputy_headmaster","superadmin"].includes(role) && <Link href="/institution-records" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2">View my institution records <ArrowRight size={16}/></Link>}
         {kind === "institution" && canManage && <Link href="/organizations" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2">Institution workspace <ArrowRight size={16}/></Link>}
         {kind === "institution" && !canManage && <p className="text-sm text-muted-foreground">Administrative access requires an authorised institution role.</p>}
       </div>
@@ -150,9 +150,9 @@ export default function AdmissionsHubPage() {
       <div><h2 className="text-sm font-semibold">Document verification and official applications</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">The secure upload vault, government or issuing-body result checks, payment processing, student cards, module registrations and official transcript exchange are not available yet. Do not upload birth certificates, bank documents, IDs or other sensitive evidence to a general CABO study-material tool.</p></div>
     </aside>
     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-      <Link href="/learner-journey" className="inline-flex items-center gap-1 underline underline-offset-4">My learner journey <BookOpenCheck size={15}/></Link>
-      <Link href="/institution-records" className="inline-flex items-center gap-1 underline underline-offset-4">My institution records <Landmark size={15}/></Link>
-      <Link href="/guardian-connect" className="inline-flex items-center gap-1 underline underline-offset-4">Family & guardian support <CheckCircle2 size={15}/></Link>
+      {role === "learner" && <Link href="/learner-journey" className="inline-flex items-center gap-1 underline underline-offset-4">My learner journey <BookOpenCheck size={15}/></Link>}
+      {["learner","parent","headmaster","deputy_headmaster","superadmin"].includes(role ?? "") && <Link href="/institution-records" className="inline-flex items-center gap-1 underline underline-offset-4">My institution records <Landmark size={15}/></Link>}
+      {["parent","headmaster","administrator","superadmin"].includes(role ?? "") && <Link href="/guardian-connect" className="inline-flex items-center gap-1 underline underline-offset-4">Family & guardian support <CheckCircle2 size={15}/></Link>}
     </div>
   </section>;
 }
