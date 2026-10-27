@@ -38,7 +38,9 @@ export function createAiProviderOrderer(weights: Record<PrimaryProviderName, num
   return (available: AiProviderName[], task: AiTask = "generic"): AiProviderName[] => {
     const active = (["groq", "huggingface"] as const).filter(name => available.includes(name));
     const enabled = active.filter(name => weights[name] > 0);
-    const eligible = enabled.length ? enabled : active;
+    // Start each task on its preferred provider instead of the fixed alphabetic order.
+    const eligible = (enabled.length ? enabled : active).sort((a,b) =>
+      weights[b] * taskWeights[task][b] - weights[a] * taskWeights[task][a]);
     const total = eligible.reduce((sum, name) => sum + weights[name] * taskWeights[task][name], 0);
     let primary: PrimaryProviderName | undefined;
     if (total > 0) {
