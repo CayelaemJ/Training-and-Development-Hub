@@ -2,19 +2,19 @@
 
 ## Current checkpoint — 26 October 2026
 
-This section supersedes the older audit snapshots below.
+This section supersedes the historical audit snapshots below.
 
-**Main:** `8288001b838ac2931a8f4d10e4b305b016e69fcd`.
+**Main baseline:** `1a596f55548aeb11b380238628ff683d714c22a7` (Passport PR #92 merged).
 
-- PR #91 refreshed this checkpoint and merged after CircleCI, Snyk and license checks passed.
-- PR #89 hardens cookie-backed mutation origin checks and OIDC callback/return-path validation. PR #88 closes mixed-case/trailing-slash privacy-gate bypasses and cross-jurisdiction transfer metadata bypasses. PR #90 adds school-scoped native guardian overview/report routes.
-- PR #86 is merged. Its latest head `0bae5dddaec3819926965363c32c155287d5fe85` passed three API 23 emulator instrumentation tests (3/3; zero skipped or failed), standard and isolated debug APK builds, browser/mobile checks, CircleCI, Snyk, Semgrep, secret scan, typecheck and build. Artifacts from [workflow run 40330332713](https://github.com/CayelaemJ/Training-and-Development-Hub/actions/runs/40330332713) expire 29 October 2026.
-- Render staging remains `cabo-learning-native-isolated-preview` at `https://cabo-learning-native-isolated-preview.onrender.com`, attached to `feat/real-native-cabo-apps`, auto-deploy disabled. Its isolated test-login and synthetic-demo setup passed the authenticated API smoke check. No production service or database was changed.
-- The original passport PR #44 was replaced by draft PR #92, rebased onto this main. GitHub Actions, CircleCI, Snyk and license checks pass, including passport HTTP/PGlite integration, typecheck, build, and browser/mobile checks. No migration or deployment was performed. The existing Neon validation branch contains the tables, but has no migration-journal rows for the two versioned Passport migrations; checksum-runner and staged API validation remain outstanding.
-- PRs #68, #72 and #75 were closed as superseded: their fail-closed school release middleware/policy, scoped learner/report routes, attendance route, tests and docs are already present on main. The country pilot remains off; school, counsel, residency, backup/restore and end-to-end evidence are still required.
-- The current Android path is the GitHub-hosted emulator. No local ADB/Ansight device is available, so physical-device acceptance remains outstanding.
+- Passport code merged after isolated Render API checks and the checksum migration runner completed both passport migrations on a dedicated Neon branch. Anonymous access returned 401; authenticated profile/preferences and evidence/competency create-read-delete flows passed. Human review remains disabled and returned 503. A Neon branch-copy recovery rehearsal retained the migration journal and passport tables; this was not an independent snapshot restore.
+- Native Android PR #86 passed three API 23 emulator tests and produced internal debug APKs. This does not establish physical-device, signing or store-release acceptance.
+- PRs #88–#90 added country/privacy gate hardening, cookie-origin/OIDC checks, and school-scoped native guardian access. Live country pilots and native production OIDC remain off.
+- Security PR #51 is being refreshed on the current main baseline: scanner installation, dependency fixes, immutable workflow references, dependency download safeguards, and documented narrow static-analysis exceptions. Required CI is pending until the new head is pushed and checked.
+- The previous temporary workspace was lost before these security changes were pushed. The current branch reconstructs them and must pass fresh checks; earlier local scan results are not evidence for this reconstructed head.
 
-**Remaining release gates:** PR #92 still needs isolated staged migration and authenticated API validation, backup/restore rehearsal, and consent/accessibility review before its code phase can be merged. Career applications remain gated pending employer verification and child-protection controls. Psychometric assessment requires a licensed instrument and professional governance. Android/iOS/Windows signed releases, physical-device flows, independent penetration testing, privacy/legal sign-off and production rollout remain incomplete. Do not claim national or store-release readiness.
+**Remaining release gates:** signed Android/iOS/Windows distributions and device acceptance; production identity configuration; independent penetration testing; privacy/legal approval and institution agreements; approved child/guardian and employer verification; licensed psychometric instruments and professional governance. These require external evidence and must not be marked complete from code or CI alone. Keep career applications, human verification, employer disclosure and country pilots disabled until their specific gates pass.
+
+**Next engineering work:** complete and merge the security phase after checks pass; reconcile the old CircleCI PR #20; review the Render-isolated admissions simulation PR #36 and MLOps foundation PR #17 against current main and their release criteria.
 
 
 **Updated:** 2026-10-26  

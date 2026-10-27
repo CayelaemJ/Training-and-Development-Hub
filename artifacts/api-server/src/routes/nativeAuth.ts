@@ -77,7 +77,8 @@ router.get("/native/authorize", async (req, res) => {
   if (!req.isAuthenticated()) {
     const returnTo = req.originalUrl;
     // Existing login route has a strict same-origin returnTo policy.
-    res.redirect(302, "/api/login?returnTo=" + encodeURIComponent(returnTo));
+    // The target is always the local login route; returnTo is encoded as one query parameter.
+    res.redirect(302, "/api/login?returnTo=" + encodeURIComponent(returnTo)); // nosemgrep: javascript.express.security.audit.possible-user-input-redirect.unknown-value-in-redirect
     return;
   }
   const code = randomNativeCode();
@@ -88,7 +89,8 @@ router.get("/native/authorize", async (req, res) => {
   });
   // Redirect URI comes solely from the allowlist; the query never contains
   // a bearer access token, password, OAuth refresh token or learner record.
-  res.redirect(302, redirect + "?code=" + encodeURIComponent(code) + "&state=" + encodeURIComponent(state));
+  // nativeRedirect only returns fixed callback targets; query values cannot change their origin.
+  res.redirect(302, redirect + "?code=" + encodeURIComponent(code) + "&state=" + encodeURIComponent(state)); // nosemgrep: javascript.express.security.audit.possible-user-input-redirect.unknown-value-in-redirect
 });
 
 // Device phase: an authorization code can be exchanged exactly once with the
