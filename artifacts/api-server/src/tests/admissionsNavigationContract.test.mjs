@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const file = relative => readFileSync(new URL(relative, import.meta.url), "utf8");
-const app = file("../../../../training-platform/src/App.tsx");
-const hub = file("../../../../training-platform/src/pages/admissions-hub.tsx");
+const app = file("../../../training-platform/src/App.tsx");
+const hub = file("../../../training-platform/src/pages/admissions-hub.tsx");
 const portal = file("../routes/rolePortals.ts");
 
 test("admissions hub is a real navigable route with a visible sidebar link", () => {
