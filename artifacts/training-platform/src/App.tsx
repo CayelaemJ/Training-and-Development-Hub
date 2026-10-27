@@ -73,7 +73,6 @@ const navItems = [
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
   { href: '/admissions', label: 'Admissions & transfers', icon: GraduationCap },
-  { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
   { href: '/education-reports', label: 'Reports & statistics', icon: BookOpen },
   { href: '/report-issuance', label: 'Issue report cards', icon: FileText },
   { href: '/school-intelligence', label: 'School progress', icon: BookOpen },
