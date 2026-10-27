@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { logger } from "./logger";
 import { createProviderScheduler, ProviderQuotaError } from "./providerQuota";
 import { aiFailureAction } from "./aiRetryPolicy";
-import { aiRoutingWeights, createAiProviderOrderer, type AiProviderName } from "./aiRouting";
+import { aiRoutingWeights, createAiProviderOrderer, type AiProviderName, type AiTask } from "./aiRouting";
 
 type Provider = { name: AiProviderName; client: OpenAI; models: string[] };
 const providerSchedulers: Record<AiProviderName, ReturnType<typeof createProviderScheduler>> = {
@@ -111,11 +111,12 @@ export async function completeAIJson<T>(args: {
   validate: (value: unknown) => T;
   maxCompletionTokens?: number;
   provider?: AiProviderName;
+  task?: AiTask;
 }): Promise<{ value: T; modelId: string; provider: AiProviderName }> {
   const deadline = Date.now() + 180_000;
   let quotaError: ProviderQuotaError | undefined;
   const configured = await configuredProviders();
-  const order = args.provider ? [args.provider] : orderProviders(configured.map(item => item.name));
+  const order = args.provider ? [args.provider] : orderProviders(configured.map(item => item.name), args.task);
   const providers = order.flatMap(name => configured.filter(candidate => candidate.name === name));
   if (!providers.length) throw new AiUnavailableError();
   providers: for (const provider of providers) {
