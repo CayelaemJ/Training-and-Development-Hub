@@ -32,6 +32,7 @@ export function createProviderScheduler(
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
         const wait = Math.max(0, blockedUntil - now());
+        if (wait > 0 && options.fastFailOnQuota) throw new ProviderQuotaError(wait / 1000);
         if (now() + wait + 1000 >= deadline) throw new ProviderQuotaError(Math.max(wait / 1000, 1));
         if (wait) await sleep(wait);
         try { return await operation(); }
