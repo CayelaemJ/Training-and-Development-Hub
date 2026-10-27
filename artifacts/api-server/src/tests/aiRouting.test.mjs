@@ -13,6 +13,13 @@ test("task-specific routing shares traffic without requiring both providers", ()
   assert.equal(plans.filter(x=>x==="huggingface").length,6);
 });
 
+test("initial requests choose the task-preferred provider",()=>{
+ const select=createAiProviderOrderer({groq:1,huggingface:1});
+ assert.equal(select(["groq","huggingface"],"exam_generation")[0],"huggingface");
+ assert.equal(select(["groq","huggingface"],"development_plan")[0],"huggingface");
+ assert.equal(select(["groq","huggingface"],"grading")[0],"groq");
+});
+
 test("fallback order is deterministic and legacy OpenAI is last",()=>{
   const choose=createAiProviderOrderer({groq:1,huggingface:1});
   assert.deepEqual(choose(["groq","huggingface","openai"],"grading"),["groq","huggingface","openai"]);
