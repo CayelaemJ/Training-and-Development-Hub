@@ -4,17 +4,17 @@
 
 This section supersedes the historical audit snapshots below.
 
-**Main baseline:** `1a596f55548aeb11b380238628ff683d714c22a7` (Passport PR #92 merged).
+**Main baseline:** `b2e0f9afa233e46d1e4cee9095ffe8ae2fadcf6a` (security PR #51 merged after all checks passed).
 
 - Passport code merged after isolated Render API checks and the checksum migration runner completed both passport migrations on a dedicated Neon branch. Anonymous access returned 401; authenticated profile/preferences and evidence/competency create-read-delete flows passed. Human review remains disabled and returned 503. A Neon branch-copy recovery rehearsal retained the migration journal and passport tables; this was not an independent snapshot restore.
 - Native Android PR #86 passed three API 23 emulator tests and produced internal debug APKs. This does not establish physical-device, signing or store-release acceptance.
 - PRs #88–#90 added country/privacy gate hardening, cookie-origin/OIDC checks, and school-scoped native guardian access. Live country pilots and native production OIDC remain off.
-- Security PR #51 is being refreshed on the current main baseline: scanner installation, dependency fixes, immutable workflow references, dependency download safeguards, and documented narrow static-analysis exceptions. Required CI is pending until the new head is pushed and checked.
+- Security PR #51 merged on 27 October after CircleCI verify/security_suite, Snyk, code safety, migration rehearsal and Android/iOS/Windows workflows all passed on head `38f4ecda099c7fa5e22e313e8b22e4482e45e89f`. The obsolete CircleCI PR #20 was closed as superseded.
 - The previous temporary workspace was lost before these security changes were pushed. The current branch reconstructs them and must pass fresh checks; earlier local scan results are not evidence for this reconstructed head.
 
 **Remaining release gates:** signed Android/iOS/Windows distributions and device acceptance; production identity configuration; independent penetration testing; privacy/legal approval and institution agreements; approved child/guardian and employer verification; licensed psychometric instruments and professional governance. These require external evidence and must not be marked complete from code or CI alone. Keep career applications, human verification, employer disclosure and country pilots disabled until their specific gates pass.
 
-**Next engineering work:** complete and merge the security phase after checks pass; reconcile the old CircleCI PR #20; review the Render-isolated admissions simulation PR #36 and MLOps foundation PR #17 against current main and their release criteria.
+**Next engineering work:** the admissions simulation from PR #36 has been reconstructed with a default-off Render test gate, strict synthetic-only input and HTTP/PGlite negative tests. Publish and check this head before merging. MLOps foundation PR #17 still needs its remaining engineering and migration review.
 
 
 **Updated:** 2026-10-26  

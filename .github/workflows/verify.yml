@@ -18,6 +18,7 @@ jobs:
       - run: node scripts/test-learner-support.mjs
       - run: node scripts/test-uploads.mjs
       - run: node scripts/test-passport.mjs
+      - run: node scripts/test-demo-admissions.mjs
       - name: Verify isolated native demo scripts
         run: |
           bash -n scripts/render-native-test-start.sh

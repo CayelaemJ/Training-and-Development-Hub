@@ -22,6 +22,7 @@ jobs:
             node scripts/test-learner-support.mjs
             node scripts/test-uploads.mjs
             node scripts/test-passport.mjs
+            node scripts/test-demo-admissions.mjs
       - run:
           name: Typecheck and build all workspaces
           command: pnpm run build
