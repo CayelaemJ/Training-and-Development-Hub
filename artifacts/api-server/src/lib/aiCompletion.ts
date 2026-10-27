@@ -158,7 +158,7 @@ export async function completeAIJson<T>(args: {
           const action = aiFailureAction(err, jsonMode);
           if (action === "next-provider") {
             // Circuit breaker avoids repeatedly selecting an unhealthy provider.
-            postponeProvider(provider.name, err.status === 401 || err.status === 403 ? 300_000 : err.status === 429 ? 60_000 : 30_000);
+            postponeProvider(provider.name, err.status === 402 ? 30 * 60_000 : err.status === 401 || err.status === 403 ? 300_000 : err.status === 429 ? 60_000 : 30_000);
             continue providers;
           }
           if (action === "next-model") break;
