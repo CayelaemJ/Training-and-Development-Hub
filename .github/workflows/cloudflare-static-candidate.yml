@@ -25,6 +25,7 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.28.2 --activate
           pnpm install --frozen-lockfile
+          node --test scripts/cloudflare/oidc-origin.test.mjs
           pnpm run typecheck:libs
           pnpm --filter @workspace/training-platform run typecheck
           PORT=10000 BASE_PATH=/ pnpm --filter @workspace/training-platform run build
