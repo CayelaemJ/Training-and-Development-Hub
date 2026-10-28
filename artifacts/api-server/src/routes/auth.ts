@@ -4,7 +4,7 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import {configuredPrincipals} from '../lib/testPrincipals';
-import {trustedOidcRequestOrigin} from '../lib/originPolicy';
+import {safeOidcReturnPath, trustedOidcRequestOrigin} from '../lib/originPolicy';
 
 import {
   clearSession,
@@ -45,14 +45,7 @@ function setOidcCookie(res: Response, name: string, value: string) {
 }
 
 function getSafeReturnTo(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !value.startsWith('/') ||
-    value.startsWith('//')
-  ) {
-    return '/';
-  }
-  return value;
+  return safeOidcReturnPath(value);
 }
 
 async function upsertUser(claims: Record<string, unknown>) {
