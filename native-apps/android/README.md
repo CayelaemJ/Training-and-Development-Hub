@@ -41,6 +41,10 @@ Enter test credentials in the app when prompted. Do not add credentials to Gradl
 
 The CI APK combines offline demo mode with the isolated test-login control, so the demo can be explored even when the preview backend is unavailable. See [TEST_BUILDS.md](TEST_BUILDS.md) for artifact and test-scope details.
 
+## Authenticated material upload
+
+After secure sign-in, learner accounts can add a supported document from the Android system file picker in **Learn → Add material from this device**. The upload accepts PDF, DOCX, PPTX, XLSX, TXT, Markdown, CSV, PNG, JPEG and WebP files up to 30 MB. CABO validates the file contents on the server before extracting text. AI reading is explicitly left off by the native client. This authenticated flow is not available in the offline demo, whose sample learning data stays local.
+
 ## Build and emulator tests
 
 ```sh
@@ -48,4 +52,4 @@ The CI APK combines offline demo mode with the isolated test-login control, so t
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, and guidance review. Physical-device checks, signed store releases, full teacher parity, learner support creation, uploads, offline drafts, and production authentication remain separate work.
+The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, guidance review, and the material upload form. Live object-storage uploads, physical-device checks, signed store releases, full teacher parity, offline drafts, and production authentication remain separate work.

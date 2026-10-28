@@ -1,10 +1,16 @@
+Warning: truncated output (original token count: 14544)
+Total output lines: 1106
+
 package za.co.cabosolutions.learninghub
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -49,6 +55,11 @@ class MainActivity : ComponentActivity() {
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
+    private var selectedUploadUri by mutableStateOf<Uri?>(null)
+    private var selectedUploadFileName by mutableStateOf("")
+    private var selectedUploadTitle by mutableStateOf("")
+    private var materialUploadBusy by mutableStateOf(false)
+    private var materialUploadMessage by mutableStateOf<String?>(null)
     private var activeQuiz by mutableStateOf<PracticeQuiz?>(null)
     private var answers by mutableStateOf<List<Int?>>(emptyList())
     private var attempt by mutableStateOf<QuizAttempt?>(null)
@@ -63,6 +74,30 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val materialPicker = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri != null && !materialUploadBusy) {
+                    selectedUploadUri = uri
+                    selectedUploadFileName = "Selected document"
+                    selectedUploadTitle = ""
+                    materialUploadMessage = null
+                    lifecycleScope.launch {
+                        try {
+                            val name = api.materialFileName(uri)
+                            if (selectedUploadUri == uri) {
+                                selectedUploadFileName = name
+                                selectedUploadTitle = name.substringBeforeLast('.', name)
+                                    .replace(Regex("[_-]+"), " ").trim().take(200)
+                            }
+                        } catch (_: Exception) {
+                            if (selectedUploadUri == uri) {
+                                materialUploadMessage = "Could not read this file name. Choose the document again."
+                            }
+                        }
+                    }
+                }
+            }
             val caboColors = lightColorScheme(
                 primary = Color(0xFF14635D), onPrimary = Color.White,
                 secondary = Color(0xFFC66B43), onSecondary = Color.White,
@@ -71,14 +106,24 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF53625F), outline = Color(0xFFD0D9D5)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
                     when {
+                        selectedUploadUri != null -> closeMaterialUpload()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
                         else -> closeStudy()
                     }
                 }
                 when {
+                    selectedUploadUri != null -> NativeMaterialUploadScreen(
+                        fileName = selectedUploadFileName,
+                        title = selectedUploadTitle,
+                        busy = materialUploadBusy,
+                        message = materialUploadMessage,
+                        onTitle = { selectedUploadTitle = it },
+                        upload = { uploadSelectedMaterial() },
+                        close = { closeMaterialUpload() }
+                    )
                     creatingSupportRequest -> NativeDemoSupportRequestScreen(
                         busy = false, message = null,
                         submit = { concept, question, attempted -> createDemoSupportRequest(concept, question, attempted) },
@@ -135,7 +180,8 @@ class MainActivity : ComponentActivity() {
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
-                        openMaterial = { openMaterial(it) }
+                        openMaterial = { openMaterial(it) },
+                        pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) }
                     )
                 }
             }
@@ -178,6 +224,35 @@ class MainActivity : ComponentActivity() {
         demoRole = "learner"
         screen = NativeDemoData.learner()
         status = "DEMO MODE · sample data only · no account connected"
+    }
+
+    private fun closeMaterialUpload() {
+        if (materialUploadBusy) return
+        selectedUploadUri = null
+        selectedUploadFileName = ""
+        selectedUploadTitle = ""
+        materialUploadMessage = null
+    }
+
+    private fun uploadSelectedMaterial() {
+        val uri = selectedUploadUri ?: return
+        if (demoActive || materialUploadBusy || busy) return
+        materialUploadBusy = true
+        materialUploadMessage = null
+        lifecycleScope.launch {
+            try {
+                val saved = api.uploadMaterial(uri, selectedUploadTitle)
+                selectedUploadUri = null
+                selectedUploadFileName = ""
+                selectedUploadTitle = ""
+                status = "${saved.title} was added to your private study library."
+                loadDashboard()
+            } catch (_: Exception) {
+                materialUploadMessage = "Could not add this file. Check that it is supported, under 30 MB, and try again online."
+            } finally {
+                materialUploadBusy = false
+            }
+        }
     }
 
     private fun switchDemoRole(role: String) {
@@ -463,209 +538,7 @@ class MainActivity : ComponentActivity() {
         if (demoActive) {
             supportGuidance = SupportGuidanceDraft(
                 explanation = "To add fractions with different denominators, rewrite them as equivalent fractions with the same denominator. For thirds and fourths, twelfths work because 12 is a multiple of both 3 and 4.",
-                questions = listOf("How many twelfths are equal to one third?", "How many twelfths are equal to one quarter?"),
-                practice = listOf("Rewrite 1/3 and 1/4 in twelfths.", "Add the numerators and keep the denominator."),
-                source = "non_ai_template"
-            )
-            supportMessage = "Synthetic guidance draft ready. Review it before adding it to your reply."
-            return
-        }
-        supportBusy = true
-        supportMessage = null
-        lifecycleScope.launch {
-            try {
-                supportGuidance = api.requestSupportGuidance(summary)
-                supportMessage = "Draft ready. Review and edit it before adding it to your reply."
-            } catch (_: Exception) {
-                supportMessage = "A guidance draft is unavailable right now. You can still write a reply."
-            } finally { supportBusy = false }
-        }
-    }
-
-    private fun sendSupportReply() {
-        val summary = supportTicket?.summary ?: return
-        if (supportBusy || supportReply.trim().length !in 2..4000) return
-        if (demoActive) {
-            val current = NativeDemoSession.reply(summary, supportReply.trim())
-            supportTicket = current
-            updateSupportSummary(current.summary)
-            selectedSupportTicket = current.summary
-            supportReply = ""
-            supportGuidance = null
-            supportMessage = "Demo reply added locally. Nothing was sent to a real learner."
-            return
-        }
-        supportBusy = true
-        supportMessage = null
-        lifecycleScope.launch {
-            try {
-                val updated = api.replyToSupportTicket(summary, supportReply)
-                updateSupportSummary(updated)
-                supportTicket = api.fetchSupportTicket(updated)
-                selectedSupportTicket = supportTicket?.summary
-                supportReply = ""
-                supportGuidance = null
-                supportMessage = "Reply sent to the learner."
-            } catch (_: Exception) {
-                supportMessage = "Reply was not confirmed. Refresh the request before trying again."
-            } finally { supportBusy = false }
-        }
-    }
-
-    private fun triageSupportTicket() {
-        val summary = supportTicket?.summary ?: return
-        if (supportBusy || summary.status != "open" || supportTriageReason.trim().length !in 3..1000) return
-        if (demoActive) {
-            val current = NativeDemoSession.triage(summary, supportTriageReason.trim())
-            supportTicket = current
-            updateSupportSummary(current.summary)
-            selectedSupportTicket = current.summary
-            supportMessage = "Demo request marked as triaged locally."
-            return
-        }
-        supportBusy = true
-        supportMessage = null
-        lifecycleScope.launch {
-            try {
-                val updated = api.triageSupportTicket(summary, supportTriageReason)
-                updateSupportSummary(updated)
-                supportTicket = api.fetchSupportTicket(updated)
-                selectedSupportTicket = supportTicket?.summary
-                supportMessage = "Request marked as triaged."
-            } catch (_: Exception) {
-                supportMessage = "The request changed or could not be triaged. Refresh it before trying again."
-            } finally { supportBusy = false }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun NativeHome(
-    status: String,
-    busy: Boolean,
-    data: NativeLearning?,
-    signIn: () -> Unit,
-    refresh: () -> Unit,
-    demoEnabled: Boolean,
-    demoActive: Boolean,
-    demoRole: String,
-    startDemo: () -> Unit,
-    setDemoRole: (String) -> Unit,
-    createSupportRequest: () -> Unit,
-    testLoginAvailable: Boolean,
-    testUsername: String,
-    testPassword: String,
-    onTestUsername: (String) -> Unit,
-    onTestPassword: (String) -> Unit,
-    signInTest: () -> Unit,
-    signOut: () -> Unit,
-    respondToInvite: (Int, Boolean) -> Unit,
-    openSupportTicket: (SupportTicketSummary) -> Unit,
-    openQuiz: (QuizSummary) -> Unit,
-    openMaterial: (MaterialSummary) -> Unit
-) {
-    var section by remember(demoRole) { mutableStateOf("home") }
-    val sections = listOf(
-        Triple("home", "Home", Icons.Default.Home),
-        Triple("learn", "Learn", Icons.Default.School),
-        Triple("progress", "Progress", Icons.Default.Assessment),
-        Triple("support", "Support", Icons.Default.Forum)
-    )
-    Scaffold(
-        containerColor = Color(0xFFF4F5F1),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("CABO", color = Color(0xFFBFE5D6), fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Text("Learning Hub", color = Color.White,
-                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    }
-                },
-                navigationIcon = {
-                    Surface(
-                        color = Color(0xFF2A746D), shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.padding(start = 16.dp).size(40.dp)
-                    ) {
-                        Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-                            Text("C", color = Color.White, fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge)
-                        }
-                    }
-                },
-                actions = {
-                    if (data != null) {
-                        IconButton(onClick = refresh, enabled = !busy) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh dashboard", tint = Color.White)
-                        }
-                        IconButton(onClick = signOut, enabled = !busy) {
-                            Icon(Icons.Default.Logout, contentDescription = if (demoActive) "Exit demo" else "Sign out", tint = Color.White)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF153B38))
-            )
-        },
-        bottomBar = {
-            if (data != null) {
-                NavigationBar(containerColor = Color(0xFFFFFEFA)) {
-                    sections.forEach { (key, label, icon) ->
-                        NavigationBarItem(
-                            selected = section == key,
-                            onClick = { section = key },
-                            icon = { Icon(icon, contentDescription = null) },
-                            label = { Text(label) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF14635D),
-                                selectedTextColor = Color(0xFF14635D),
-                                indicatorColor = Color(0xFFD9ECE4)
-                            )
-                        )
-                    }
-                }
-            }
-        }
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            if (data == null) {
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Learning that moves with you", style = MaterialTheme.typography.headlineMedium,
-                        color = Color(0xFF153B38), fontWeight = FontWeight.Bold)
-                    Text("A secure space for learners, families and educators to stay connected to progress.",
-                        style = MaterialTheme.typography.bodyLarge, color = Color(0xFF53625F))
-                    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
-                        containerColor = Color(0xFFFFFEFA))) {
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(status, color = if (busy) MaterialTheme.colorScheme.primary else Color(0xFF53625F))
-                            SessionButtons(data, busy, signIn, refresh, signOut, isDemo = false)
-                            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                            if (testLoginAvailable) TestLoginControls(testUsername, testPassword, busy,
-                                onTestUsername, onTestPassword, signInTest)
-                        }
-                    }
-                    if (demoEnabled) {
-                        OutlinedButton(onClick = startDemo, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
-                            Text("Explore the interactive demo", fontWeight = FontWeight.SemiBold)
-                        }
-                        Text("Fictional sample records · works without an account or network · no data is sent",
-                            style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
-                    }
-                    Text("LEARNER · FAMILY · EDUCATOR", style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF14635D), letterSpacing = 1.2.sp)
-                    NativeCard("Your learning space", "Study resources, practice and progress in one place.")
-                    NativeCard("Family connection", "Guardian access follows school verification and enrolment rules.")
-                    NativeCard("Educator workspace", "Assigned subjects and learner support stay scoped to your school.")
-                }
-            } else {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(when(section) {
+                questions = listOf("How man…2544 tokens truncated…             Text(when(section) {
                                 "learn" -> "Your learning space"
                                 "progress" -> "Progress & outcomes"
                                 "support" -> "Support & connection"
@@ -713,7 +586,8 @@ internal fun NativeHome(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
-                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial
+                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
+                                pickMaterial = pickMaterial
                             )
                         }
                     } else {
@@ -721,7 +595,7 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive, respondToInvite = respondToInvite,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                            openQuiz = openQuiz, openMaterial = openMaterial
+                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial
                         )
                     }
                 }
@@ -787,7 +661,8 @@ private fun RoleContent(
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
-    openMaterial: (MaterialSummary) -> Unit
+    openMaterial: (MaterialSummary) -> Unit,
+    pickMaterial: () -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp),
@@ -864,6 +739,14 @@ private fun RoleContent(
                 }
                 else -> {
                     item { Text("Study materials", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    if (role == "learner" && !demoActive) {
+                        item {
+                            OutlinedButton(onClick = pickMaterial, enabled = !busy,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text("Add material from this device")
+                            }
+                        }
+                    }
                     if (data.materialEntries.isEmpty()) item { NativeCard("No materials yet", "Your school has not shared study materials with this account.") }
                     items(data.materialEntries, key = { "material:${it.id}" }) { material ->
                         ElevatedCard(onClick = { openMaterial(material) }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {

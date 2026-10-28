@@ -17,7 +17,7 @@ A person's phone, tablet brand, purchase price, age of device or network quality
 ## Role and form-factor experience
 
 - **Teacher with tablet**: large two-pane native classroom workspace at 600dp+ on Android or regular horizontal size class on iPad, with assigned course names and permitted support summary. On smaller devices the same authorized user uses a one-pane view. Editing lesson content, marking and interventions remain separate development work and must go through CABO's existing scoped APIs.
-- **Learner with tablet or phone**: progress summary, study materials and practice-test listings. No force-installed parental control based on hardware, no private cache of school records. Native quiz submission and upload UI require further work.
+- **Learner with tablet or phone**: progress summary, study materials and practice-test listings, plus an authenticated picker for supported study documents. No force-installed parental control based on hardware or private cache of school records. Live storage/device acceptance and offline learning remain further work.
 - **Parent with phone or tablet**: large, clearly labeled native Accept/Decline buttons, invitation status, verification guidance. An invitation alone does not authorize child reports. Name is returned **only** for an institution-verified guardian link with an active enrollment.
 - **Any role**: no account is blocked or changed simply because a screen is small, wide, older, or inexpensive. User's server-resolved role is the source of truth, independent of device detection.
 

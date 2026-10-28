@@ -3,13 +3,28 @@ package za.co.cabosolutions.learninghub
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import java.security.SecureRandom
 import android.util.Base64
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+
+private const val MAX_MATERIAL_BYTES = 30L * 1024 * 1024
+private val materialContentTypes = mapOf(
+    "txt" to "text/plain", "md" to "text/markdown", "csv" to "text/csv",
+    "pdf" to "application/pdf",
+    "docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "webp" to "image/webp"
+)
 
 internal data class MaterialSummary(val id: Int, val title: String)
 internal data class QuizSummary(val id: Int, val title: String, val questionCount: Int, val latestScore: Double?)
@@ -98,6 +113,108 @@ internal class NativeApi(private val context: Context) {
         return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
     fun testLoginAvailable(): Boolean = BuildConfig.ENABLE_TEST_LOGIN
+
+    suspend fun materialFileName(uri: Uri): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val displayName = context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            (displayName ?: uri.lastPathSegment ?: "study-material")
+                .replace('\\', '/')
+                .substringAfterLast('/')
+                .filterNot { it.isISOControl() }
+                .take(240)
+                .ifBlank { "study-material" }
+        }
+
+    suspend fun uploadMaterial(uri: Uri, title: String): MaterialSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val safeTitle = title.trim()
+            require(safeTitle.isNotEmpty() && safeTitle.length <= 200) {
+                "Enter a title of 1 to 200 characters."
+            }
+            val fileName = materialFileName(uri)
+            val extension = fileName.substringAfterLast('.', "").lowercase()
+            val contentType = materialContentTypes[extension]
+                ?: throw IllegalArgumentException("Choose a supported PDF, Office, text, CSV, PNG, JPEG or WebP file.")
+            val staged = File.createTempFile("cabo-material-", ".upload", context.cacheDir)
+            try {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IllegalArgumentException("Could not open the selected document.")
+                var total = 0L
+                input.use { source -> FileOutputStream(staged).use { target ->
+                    val buffer = ByteArray(16 * 1024)
+                    while (true) {
+                        val count = source.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= MAX_MATERIAL_BYTES) { "Files must be 30 MB or smaller." }
+                        target.write(buffer, 0, count)
+                    }
+                } }
+                require(total > 0) { "The selected document is empty." }
+
+                val intent = request("/api/storage/uploads/request-url", JSONObject()
+                    .put("name", fileName)
+                    .put("size", total)
+                    .put("contentType", contentType)
+                    .put("allowAiReading", false), auth = true)
+                val targetUrl = URL(intent.getString("uploadURL"))
+                val targetUri = URI(targetUrl.toExternalForm())
+                val apiUrl = URL(origin)
+                require(targetUrl.protocol == "https" && targetUri.userInfo == null) {
+                    "CABO returned an invalid secure upload destination."
+                }
+                val sameApiHost = targetUrl.host.equals(apiUrl.host, ignoreCase = true)
+                val sameApiAuthority = sameApiHost &&
+                    (targetUrl.port.takeIf { it >= 0 } ?: targetUrl.defaultPort) ==
+                    (apiUrl.port.takeIf { it >= 0 } ?: apiUrl.defaultPort)
+                val nativeTestPath = sameApiAuthority &&
+                    targetUrl.path.matches(Regex("/api/storage/uploads/railway/[a-f0-9-]{36}"))
+                if (sameApiHost && !nativeTestPath) {
+                    throw IllegalStateException("CABO returned an unexpected upload destination.")
+                }
+                val upload = targetUrl.openConnection() as HttpURLConnection
+                upload.connectTimeout = 15_000
+                upload.readTimeout = 30_000
+                upload.instanceFollowRedirects = false
+                upload.requestMethod = "PUT"
+                upload.doOutput = true
+                upload.useCaches = false
+                upload.setRequestProperty("Content-Type", contentType)
+                // The isolated Render test fallback is an authenticated API route.
+                // Never send the CABO bearer token to external signed storage URLs.
+                if (nativeTestPath) {
+                    val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
+                    upload.setRequestProperty("Authorization", "Bearer $token")
+                }
+                upload.setFixedLengthStreamingMode(total)
+                try {
+                    FileInputStream(staged).use { source -> upload.outputStream.use { target ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val count = source.read(buffer)
+                            if (count < 0) break
+                            target.write(buffer, 0, count)
+                        }
+                    } }
+                    val status = upload.responseCode
+                    require(status in 200..299) { "The file upload was not accepted. Please retry." }
+                } finally {
+                    upload.disconnect()
+                }
+
+                val saved = request("/api/materials", JSONObject()
+                    .put("title", safeTitle)
+                    .put("objectPath", intent.getString("objectPath")), auth = true)
+                val id = saved.getInt("id")
+                val savedTitle = saved.getString("title")
+                require(id > 0 && savedTitle.isNotBlank()) { "CABO returned an invalid material record." }
+                MaterialSummary(id, savedTitle)
+            } finally {
+                staged.delete()
+            }
+        }
 
     // Explicitly enabled in private, disposable test builds only. The
     // password stays in memory for this single HTTPS request, not on disk.
