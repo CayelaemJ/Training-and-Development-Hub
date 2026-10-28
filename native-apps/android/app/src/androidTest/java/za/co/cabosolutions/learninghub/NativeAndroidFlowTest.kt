@@ -287,3 +287,36 @@ class NativeAndroidMaterialUploadTest {
         assertEquals(1, uploads)
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidSupportDraftTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun learnerCanSaveAndSendAnEnrolledSubjectSupportRequest() {
+        var saved: NativeSupportDraft? = null
+        var sent: NativeSupportDraft? = null
+        compose.setContent {
+            MaterialTheme {
+                NativeSupportDraftScreen(
+                    courses = listOf(SupportCourseOption(3, 8, "Mathematics")),
+                    initial = null, busy = false, message = null,
+                    save = { saved = it }, submit = { sent = it }, close = {}
+                )
+            }
+        }
+        compose.onNodeWithText("Save securely on this device").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Topic").performTextInput("Fractions")
+        compose.onNodeWithText("What do you need help with?").performScrollTo()
+            .performTextInput("How do I add unlike fractions?")
+        compose.onNodeWithText("What have you tried?").performScrollTo()
+            .performTextInput("I added the denominators.")
+        compose.onNodeWithText("Save securely on this device").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText("Send to my educator").performScrollTo().performClick()
+        assertEquals(3, saved?.organizationId)
+        assertEquals(8, sent?.courseId)
+        assertEquals(saved?.requestKey, sent?.requestKey)
+        assertEquals("How do I add unlike fractions?", sent?.question)
+    }
+}
