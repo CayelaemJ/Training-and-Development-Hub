@@ -27,13 +27,17 @@ Both Upstash settings are required together. When neither is supplied, the bound
 
 ## Phase 3: Search / local-first / telemetry (not yet provisioned)
 
-- **pgvector** should be evaluated within existing Neon Postgres before adding a second vector DB. Require embedding dimension/model migration policy, tenant/consent filters in SQL, sensitive content minimisation and vector deletion when consent expires.
+- **pgvector** extension v0.8.6 is now enabled on the existing `cabo-learning-hub` Neon database (28 October 2026), but **no embeddings, RAG tables, search API or vector indexes were created**. A documented tenant/consent-aware search implementation must still be reviewed before storing learner-related embeddings. Require embedding dimension/model migration policy, tenant/consent filters in SQL, sensitive content minimisation and vector deletion when consent expires.
 - **Qdrant** only if isolation/search-scale benchmarks justify another store. Do not copy learner PII into an unmanaged cluster.
 - **Turso** may support offline-first non-sensitive content sync, but device-side encrypted caches and authoritative conflict resolution come first. Postgres remains canonical.
 - **MongoDB Atlas or Catalyst NoSQL**: use only for genuinely document-heavy low-risk workloads that Postgres JSONB cannot serve as well; do not replicate entire user profiles across stores.
 - **PostHog**: consent-aware, pseudonymous, low-cardinality events and feature flags. No student grades, identifiers or health data in analytics.
 - **OpenTelemetry/Grafana**: measure API p95/p99 latency, database saturation, cache hit ratio, queue depth and failure rates; redact credentials, learner IDs, emails and document text.
 - **Zoho Catalyst**: an optional development-only pilot for Functions, Stratus and Data Store/NoSQL. Confirm Catalyst free-tier and charging conditions before resource creation.
+
+### Verified database extensions (28 October 2026)
+
+On the existing CABO Learning Hub Neon database only, `vector` 0.8.6 and `pg_stat_statements` 1.12 were enabled and independently verified with a read-only `pg_extension` query. Extension installation itself does not provide full-text/vector RAG or observability dashboards, and it does not change the Neon account's **Launch** billing plan. Do not copy production learner data to a secondary vector store without permission, retention and deletion controls.
 
 ## Release gating
 
