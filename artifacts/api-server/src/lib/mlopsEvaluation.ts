@@ -34,7 +34,8 @@ export function evaluateAiMarking(
   for (const s of samples) {
     if (![s.aiMarks, s.educatorMarks, s.maximumMarks].every(Number.isFinite) ||
         s.maximumMarks <= 0 || s.aiMarks < 0 || s.educatorMarks < 0 ||
-        s.aiMarks > s.maximumMarks || s.educatorMarks > s.maximumMarks) {
+        s.aiMarks > s.maximumMarks || s.educatorMarks > s.maximumMarks ||
+        (s.flaggedForReview !== undefined && typeof s.flaggedForReview !== "boolean")) {
       throw new Error("Invalid assessment marks or maximum mark");
     }
   }
