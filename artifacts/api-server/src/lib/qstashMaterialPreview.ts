@@ -86,7 +86,7 @@ export async function publishPreviewJob(
       Authorization: "Bearer " + env.QSTASH_TOKEN!.trim(),
       "Content-Type": "application/json",
       "Upstash-Retries": "2",
-      "Upstash-Deduplication-Id": "cabo-preview-" + payload.materialId,
+      "Upstash-Deduplication-Id": "cabo-preview-" + createHash("sha256").update(target).digest("hex").slice(0, 12) + "-" + payload.materialId,
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(2500),
