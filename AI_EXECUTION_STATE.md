@@ -1,23 +1,23 @@
 # CABO Learning Hub execution checkpoint
 
-## Current checkpoint — 26 October 2026
+## Current checkpoint — 28 October 2026
 
 This section supersedes the historical audit snapshots below.
 
-**Main baseline:** `b2e0f9afa233e46d1e4cee9095ffe8ae2fadcf6a` (security PR #51 merged after all checks passed).
+**Main baseline:** `92ea0ee1282600c8ee6b0e64f04881ce3ddc4a97` (Android Studio readiness PR #99 merged after all required checks passed).
 
-- Passport code merged after isolated Render API checks and the checksum migration runner completed both passport migrations on a dedicated Neon branch. Anonymous access returned 401; authenticated profile/preferences and evidence/competency create-read-delete flows passed. Human review remains disabled and returned 503. A Neon branch-copy recovery rehearsal retained the migration journal and passport tables; this was not an independent snapshot restore.
-- Native Android PR #86 passed three API 23 emulator tests and produced internal debug APKs. This does not establish physical-device, signing or store-release acceptance.
-- PRs #88–#90 added country/privacy gate hardening, cookie-origin/OIDC checks, and school-scoped native guardian access. Live country pilots and native production OIDC remain off.
-- Security PR #51 merged on 27 October after CircleCI verify/security_suite, Snyk, code safety, migration rehearsal and Android/iOS/Windows workflows all passed on head `38f4ecda099c7fa5e22e313e8b22e4482e45e89f`. The obsolete CircleCI PR #20 was closed as superseded.
-- The previous temporary workspace was lost before these security changes were pushed. The current branch reconstructs them and must pass fresh checks; earlier local scan results are not evidence for this reconstructed head.
+- Admissions inbox PR #36 merged as `37194edb701af3d5c730f10f628b5b69d3792087` after browser tests, security scans, CircleCI and Snyk passed. It remains a synthetic-only, default-off Render test feature.
+- Android Studio readiness PR #99 merged as `92ea0ee1282600c8ee6b0e64f04881ce3ddc4a97`. Its head passed API 23 emulator UI tests, standard and isolated Render test APK builds, browser/mobile/build checks, Semgrep, secret scan, CircleCI and Snyk. The isolated APK is short-retention and for internal testing only; no physical-device or signed release claim is made.
+- The dedicated Render native-demo preview is separate from the pilot service. It is currently live on its isolated branch; do not send it the supplied database connection or enable its guarded bootstrap without a separate explicit staging authorization.
+- MLOps PR #17 is being refreshed on top of current `main`. Its feature flag defaults off; telemetry stores bounded, tenant-scoped aggregate fields and omits learner IDs, answers, prompts and arbitrary metadata. Local API tests, TypeScript typecheck and API bundle build passed. A reviewed additive migration was applied and verified on a temporary branch of the isolated Neon demo project; do not apply it to the parent branch until separately authorized.
+- Admissions & Transfers PR #96 remains draft while its stated institution, child-data, jurisdiction and staged end-to-end gates are unresolved. Groq/Hugging Face routing PR #95 remains blocked on successful Hugging Face billing/credit and rotated credentials.
 
 **Remaining release gates:** signed Android/iOS/Windows distributions and device acceptance; production identity configuration; independent penetration testing; privacy/legal approval and institution agreements; approved child/guardian and employer verification; licensed psychometric instruments and professional governance. These require external evidence and must not be marked complete from code or CI alone. Keep career applications, human verification, employer disclosure and country pilots disabled until their specific gates pass.
 
-**Next engineering work:** the admissions simulation from PR #36 has been reconstructed with a default-off Render test gate, strict synthetic-only input and HTTP/PGlite negative tests. Publish and check this head before merging. MLOps foundation PR #17 still needs its remaining engineering and migration review.
+**Next engineering work:** complete the MLOps PR #17 CI review and keep its feature flag off until the migration and tenant-scoped synthetic flow are approved. Continue only the admissions and AI-provider work that can pass its external release gates; do not bypass blocked institution, child-data, billing or credential requirements.
 
 
-**Updated:** 2026-10-26  
+**Updated:** 2026-10-28
 **Repository:** `CayelaemJ/Training-and-Development-Hub`  
 **Default branch at audit:** `main` at `7536d3b105200f759957326878d810392e927921`  
 **Status:** IN_PROGRESS — platform releases and privacy verification remain incomplete.
