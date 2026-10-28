@@ -2,7 +2,6 @@ package za.co.cabosolutions.learninghub
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -240,16 +239,51 @@ class NativeAndroidSupportTest {
                     testLoginAvailable = false, testUsername = "", testPassword = "",
                     onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
                     respondToInvite = { _, _ -> },
-                    openSupportTicket = { openedTicket = it }, openQuiz = {}, openMaterial = {}
+                    openSupportTicket = { openedTicket = it }, openQuiz = {}, openMaterial = {}, pickMaterial = {}
                 )
             }
         }
 
         compose.onNodeWithText("DEMO MODE · synthetic records only").assertIsDisplayed()
+        compose.onNodeWithText("Learn").performClick()
+        assertEquals(0, compose.onAllNodesWithText("Add material from this device").fetchSemanticsNodes().size)
         compose.onNodeWithText("Educator").performClick()
         compose.onNodeWithText("Support").performClick()
         compose.onNodeWithText("Learner support queue").assertIsDisplayed()
         compose.onNodeWithText("Adding unlike fractions").performScrollTo().performClick()
         assertEquals(73031, openedTicket?.id)
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidMaterialUploadTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun uploadRequiresATitleAndKeepsOptionalAiReadingOff() {
+        val title = mutableStateOf("")
+        var uploads = 0
+        compose.setContent {
+            MaterialTheme {
+                NativeMaterialUploadScreen(
+                    fileName = "cell-biology.pdf",
+                    title = title.value,
+                    busy = false,
+                    message = null,
+                    onTitle = { title.value = it },
+                    upload = { uploads++ },
+                    close = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("cell-biology.pdf").assertIsDisplayed()
+        compose.onNodeWithText("AI reading stays off. CABO checks the file format before extracting study text.")
+            .assertIsDisplayed()
+        compose.onNodeWithText("Add to my library").assertIsNotEnabled()
+        compose.onNodeWithText("Material title").performTextInput("Cell biology")
+        compose.onNodeWithText("Add to my library").assertIsEnabled().performClick()
+        assertEquals(1, uploads)
     }
 }

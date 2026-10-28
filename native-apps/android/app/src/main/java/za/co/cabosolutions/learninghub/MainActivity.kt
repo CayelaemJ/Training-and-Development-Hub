@@ -1,10 +1,13 @@
 package za.co.cabosolutions.learninghub
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -49,6 +52,11 @@ class MainActivity : ComponentActivity() {
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
+    private var selectedUploadUri by mutableStateOf<Uri?>(null)
+    private var selectedUploadFileName by mutableStateOf("")
+    private var selectedUploadTitle by mutableStateOf("")
+    private var materialUploadBusy by mutableStateOf(false)
+    private var materialUploadMessage by mutableStateOf<String?>(null)
     private var activeQuiz by mutableStateOf<PracticeQuiz?>(null)
     private var answers by mutableStateOf<List<Int?>>(emptyList())
     private var attempt by mutableStateOf<QuizAttempt?>(null)
@@ -63,6 +71,30 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            val materialPicker = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri != null && !materialUploadBusy) {
+                    selectedUploadUri = uri
+                    selectedUploadFileName = "Selected document"
+                    selectedUploadTitle = ""
+                    materialUploadMessage = null
+                    lifecycleScope.launch {
+                        try {
+                            val name = api.materialFileName(uri)
+                            if (selectedUploadUri == uri) {
+                                selectedUploadFileName = name
+                                selectedUploadTitle = name.substringBeforeLast('.', name)
+                                    .replace(Regex("[_-]+"), " ").trim().take(200)
+                            }
+                        } catch (_: Exception) {
+                            if (selectedUploadUri == uri) {
+                                materialUploadMessage = "Could not read this file name. Choose the document again."
+                            }
+                        }
+                    }
+                }
+            }
             val caboColors = lightColorScheme(
                 primary = Color(0xFF14635D), onPrimary = Color.White,
                 secondary = Color(0xFFC66B43), onSecondary = Color.White,
@@ -71,14 +103,24 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF53625F), outline = Color(0xFFD0D9D5)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
                     when {
+                        selectedUploadUri != null -> closeMaterialUpload()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
                         else -> closeStudy()
                     }
                 }
                 when {
+                    selectedUploadUri != null -> NativeMaterialUploadScreen(
+                        fileName = selectedUploadFileName,
+                        title = selectedUploadTitle,
+                        busy = materialUploadBusy,
+                        message = materialUploadMessage,
+                        onTitle = { selectedUploadTitle = it },
+                        upload = { uploadSelectedMaterial() },
+                        close = { closeMaterialUpload() }
+                    )
                     creatingSupportRequest -> NativeDemoSupportRequestScreen(
                         busy = false, message = null,
                         submit = { concept, question, attempted -> createDemoSupportRequest(concept, question, attempted) },
@@ -135,7 +177,8 @@ class MainActivity : ComponentActivity() {
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
-                        openMaterial = { openMaterial(it) }
+                        openMaterial = { openMaterial(it) },
+                        pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) }
                     )
                 }
             }
@@ -178,6 +221,35 @@ class MainActivity : ComponentActivity() {
         demoRole = "learner"
         screen = NativeDemoData.learner()
         status = "DEMO MODE · sample data only · no account connected"
+    }
+
+    private fun closeMaterialUpload() {
+        if (materialUploadBusy) return
+        selectedUploadUri = null
+        selectedUploadFileName = ""
+        selectedUploadTitle = ""
+        materialUploadMessage = null
+    }
+
+    private fun uploadSelectedMaterial() {
+        val uri = selectedUploadUri ?: return
+        if (demoActive || materialUploadBusy || busy) return
+        materialUploadBusy = true
+        materialUploadMessage = null
+        lifecycleScope.launch {
+            try {
+                val saved = api.uploadMaterial(uri, selectedUploadTitle)
+                selectedUploadUri = null
+                selectedUploadFileName = ""
+                selectedUploadTitle = ""
+                status = "${saved.title} was added to your private study library."
+                loadDashboard()
+            } catch (_: Exception) {
+                materialUploadMessage = "Could not add this file. Check that it is supported, under 30 MB, and try again online."
+            } finally {
+                materialUploadBusy = false
+            }
+        }
     }
 
     private fun switchDemoRole(role: String) {
@@ -563,7 +635,8 @@ internal fun NativeHome(
     respondToInvite: (Int, Boolean) -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
-    openMaterial: (MaterialSummary) -> Unit
+    openMaterial: (MaterialSummary) -> Unit,
+    pickMaterial: () -> Unit
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -713,7 +786,8 @@ internal fun NativeHome(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
-                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial
+                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
+                                pickMaterial = pickMaterial
                             )
                         }
                     } else {
@@ -721,7 +795,7 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive, respondToInvite = respondToInvite,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                            openQuiz = openQuiz, openMaterial = openMaterial
+                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial
                         )
                     }
                 }
@@ -787,7 +861,8 @@ private fun RoleContent(
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
-    openMaterial: (MaterialSummary) -> Unit
+    openMaterial: (MaterialSummary) -> Unit,
+    pickMaterial: () -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp),
@@ -864,6 +939,14 @@ private fun RoleContent(
                 }
                 else -> {
                     item { Text("Study materials", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    if (role == "learner" && !demoActive) {
+                        item {
+                            OutlinedButton(onClick = pickMaterial, enabled = !busy,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text("Add material from this device")
+                            }
+                        }
+                    }
                     if (data.materialEntries.isEmpty()) item { NativeCard("No materials yet", "Your school has not shared study materials with this account.") }
                     items(data.materialEntries, key = { "material:${it.id}" }) { material ->
                         ElevatedCard(onClick = { openMaterial(material) }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
