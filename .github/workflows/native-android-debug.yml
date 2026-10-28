@@ -21,6 +21,8 @@ jobs:
         with:
           gradle-version: "8.11.1"
           cache-read-only: true
+      - name: Verify official Gradle wrapper JAR
+        run: echo "2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046  native-apps/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum --check --status
       - name: Run UI tests on minimum-supported Android emulator
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -30,17 +32,17 @@ jobs:
           profile: Nexus 5X
           emulator-boot-timeout: 600
           working-directory: native-apps/android
-          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Build standard unsigned-for-release debug APK
         working-directory: native-apps/android
         run: |
-          gradle :app:assembleDebug --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
           mkdir -p app/build/ci-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-debug.apk
       - name: Build isolated Render test-login APK
         working-directory: native-apps/android
         run: |
-          gradle :app:assembleDebug --no-daemon --stacktrace \
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace \
             -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
             -PcaboEnableTestLogin=true
           cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-isolated-test-debug.apk
