@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
                     else -> NativeHome(
                         status = status, busy = busy, data = screen,
                         signIn = { startSignIn() },
-                        refresh = { if (demoActive) setDemoRole(demoRole) else loadDashboard() },
+                        refresh = { if (demoActive) switchDemoRole(demoRole) else loadDashboard() },
                         demoEnabled = BuildConfig.ENABLE_DEMO_MODE,
                         demoActive = demoActive,
                         demoRole = demoRole,
