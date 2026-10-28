@@ -68,10 +68,10 @@ router.post("/internal/qstash/material-preview", async (req: Request, res) => {
   const decoded = callbackBodySchema.safeParse(req.body);
   if (!decoded.success) { res.sendStatus(400); return; }
   const materialId = decoded.data.materialId;
-  let connection: Awaited<ReturnType<typeof pool.connect>> | undefined;
-  let locked = false;
   try {
-    connection = await pool.connect();
+    const connection = await pool.connect();
+    let locked = false;
+    try {
     const claim = await connection.query<{ acquired:boolean }>(
       "SELECT pg_try_advisory_lock($1::integer,$2::integer) AS acquired",
       [367911,materialId],
@@ -114,6 +114,11 @@ router.post("/internal/qstash/material-preview", async (req: Request, res) => {
         WHERE id=${material.id} AND user_id=${material.userId} AND allow_ai_reading=TRUE`);
     }
     res.sendStatus(204);
+    } finally {
+      if (locked) await connection.query("SELECT pg_advisory_unlock($1::integer,$2::integer)",[367911,materialId])
+        .catch(() => undefined);
+      connection.release();
+    }
   } catch (error) {
     if (error instanceof MaterialReadError) {
       // Scanned/unsupported content requires a separately approved OCR flow.
@@ -121,12 +126,6 @@ router.post("/internal/qstash/material-preview", async (req: Request, res) => {
     }
     req.log?.warn({materialId,errorType:error instanceof Error?error.name:"Unknown"},"Background preview retry requested");
     res.status(503).json({error:"Preview retry required"});
-  } finally {
-    if (connection) {
-      if (locked) await connection.query("SELECT pg_advisory_unlock($1::integer,$2::integer)",[367911,materialId])
-        .catch(() => undefined);
-      connection.release();
-    }
   }
 });
 export default router;
