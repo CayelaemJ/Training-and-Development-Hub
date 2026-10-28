@@ -692,12 +692,39 @@ private fun NativeHome(
                         }
                     }
                 }
-                RoleContent(
-                    modifier = Modifier.weight(1f), data = data, section = section, busy = busy,
-                    demoActive = demoActive, respondToInvite = respondToInvite,
-                    createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                    openQuiz = openQuiz, openMaterial = openMaterial
-                )
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                    val tablet = maxWidth >= 600.dp
+                    if (tablet) {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.width(224.dp).padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("YOUR SPACE", color = Color(0xFF14635D),
+                                    style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
+                                Text(data.portal.role.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.headlineSmall, color = Color(0xFF153B38),
+                                    fontWeight = FontWeight.Bold)
+                                data.portal.summary.take(3).forEach { metric ->
+                                    NativeCard(metric, "Current account summary")
+                                }
+                                Text("Use the sections below to move between learning, progress and support.",
+                                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+                            }
+                            RoleContent(
+                                modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
+                                section = section, busy = busy, demoActive = demoActive,
+                                respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
+                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial
+                            )
+                        }
+                    } else {
+                        RoleContent(
+                            modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
+                            demoActive = demoActive, respondToInvite = respondToInvite,
+                            createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
+                            openQuiz = openQuiz, openMaterial = openMaterial
+                        )
+                    }
+                }
             }
         }
     }
@@ -777,17 +804,17 @@ private fun RoleContent(
                 ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
                     containerColor = Color(0xFF153B38))) {
                     Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(when(role) {
-                            "teacher", "assessor" -> "Make every next step count"
-                            "parent" -> "Stay close to their progress"
-                            "superadmin" -> "Platform overview"
+                        Text(when {
+                            role == "teacher" || role == "assessor" -> "Make every next step count"
+                            role == "parent" -> "Stay close to their progress"
+                            role == "superadmin" -> "Platform overview"
                             else -> "Small steps. Real progress."
                         }, style = MaterialTheme.typography.headlineSmall,
                             color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(when(role) {
-                            "teacher", "assessor" -> "Your assigned classes and support requests, together."
-                            "parent" -> "School-verified information, clearly separated from draft records."
-                            "superadmin" -> "Governance tools are read-only and never expose learner records."
+                        Text(when {
+                            role == "teacher" || role == "assessor" -> "Your assigned classes and support requests, together."
+                            role == "parent" -> "School-verified information, clearly separated from draft records."
+                            role == "superadmin" -> "Governance tools are read-only and never expose learner records."
                             else -> "Pick up your learning with resources, practice and progress in one space."
                         }, style = MaterialTheme.typography.bodyLarge, color = Color(0xFFD8E9E3))
                         Surface(color = Color(0xFF2B615A), shape = MaterialTheme.shapes.large) {
