@@ -6,11 +6,30 @@ This is the native Kotlin and Jetpack Compose app. Open this folder as the proje
 2. Let Gradle sync finish. If prompted, use JDK 17 and install Android SDK Platform 35.
 3. In **Device Manager**, create or start an Android emulator (API 23 or newer), then select the `app` run configuration and press **Run**.
 
-The first launch opens the secure sign-in screen. The normal build points to the CABO pilot service and uses the system browser for its configured OIDC sign-in. The isolated test-login control is compiled out of this build.
+The normal build opens secure browser-based sign-in and points to the configured CABO API. Demo mode and test-login controls are compiled out of this build.
+
+## Interactive demo
+
+The internal demo build includes synthetic learner, educator and guardian accounts. It runs without a login or backend and supports these walkthroughs:
+
+- Learner: open study material, complete a sample practice quiz, see a clearly labelled local score, and review synthetic progress.
+- Educator: open a sample support request, mark it triaged, generate a non-AI guidance draft, edit it, and add a reply locally.
+- Guardian: review a synthetic school-verified progress preview and accept or decline a sample invitation locally.
+- Switch roles from the demo banner to follow the same sample request across learner and educator screens.
+
+Every record is fictional. Demo actions stay on the device and never write to CABO. The demo is enabled only when a non-pilot API origin is explicitly supplied at build time:
+
+```sh
+./gradlew :app:assembleDebug \
+  -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
+  -PcaboEnableDemoMode=true
+```
+
+The default build never exposes demo mode.
 
 ## Run the isolated test build
 
-Use only synthetic test accounts and the isolated Render preview. From this folder:
+To build the separate credential-based test login, use only synthetic test accounts and the isolated Render preview. From this folder:
 
 ```sh
 ./gradlew :app:assembleDebug \
@@ -20,7 +39,7 @@ Use only synthetic test accounts and the isolated Render preview. From this fold
 
 Enter test credentials in the app when prompted. Do not add credentials to Gradle files, source code, screenshots, or commits. The resulting debug APK is for testing only and is not signed for a store release.
 
-The equivalent isolated APK is also available as a short-retention artifact from the **CABO native Android emulator tests and debug APK** GitHub Actions run. See [TEST_BUILDS.md](TEST_BUILDS.md) for artifact and test-scope details.
+The CI APK combines offline demo mode with the isolated test-login control, so the demo can be explored even when the preview backend is unavailable. See [TEST_BUILDS.md](TEST_BUILDS.md) for artifact and test-scope details.
 
 ## Build and emulator tests
 
@@ -29,4 +48,4 @@ The equivalent isolated APK is also available as a short-retention artifact from
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. The instrumentation suite runs on the minimum supported API 23 emulator in CI and covers the secure sign-in screen and core quiz interactions. Physical-device checks, signed store releases, and production authentication still require their separate release gates.
+The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, and guidance review. Physical-device checks, signed store releases, full teacher parity, learner support creation, uploads, offline drafts, and production authentication remain separate work.

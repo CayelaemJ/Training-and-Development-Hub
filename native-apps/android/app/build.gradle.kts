@@ -21,8 +21,11 @@ android {
         }
         val pilot = providers.gradleProperty("caboEnableTestLogin").orNull == "true" &&
             origin != publicOrigin
+        val demo = providers.gradleProperty("caboEnableDemoMode").orNull == "true" &&
+            origin != publicOrigin
         buildConfigField("String", "API_ORIGIN", "\"$origin\"")
         buildConfigField("boolean", "ENABLE_TEST_LOGIN", pilot.toString())
+        buildConfigField("boolean", "ENABLE_DEMO_MODE", demo.toString())
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

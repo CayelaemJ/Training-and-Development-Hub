@@ -41,7 +41,28 @@ internal data class LearnerAcademicReport(
 ) { val id: String get() = "$organizationId:$year" }
 internal data class StaffWorkspace(
     val organizationId: Int, val courses: List<String>, val supportSummary: List<String>,
-    val tickets: List<String>, val notice: String?
+    val tickets: List<SupportTicketSummary>, val notice: String?
+)
+internal data class SupportTicketSummary(
+    val organizationId: Int,
+    val id: Int,
+    val concept: String,
+    val status: String,
+    val version: Int,
+    val updatedAt: String
+)
+internal data class SupportTicket(
+    val summary: SupportTicketSummary,
+    val question: String,
+    val attempted: String,
+    val history: List<SupportTicketEvent>
+)
+internal data class SupportTicketEvent(val kind: String, val body: String, val createdAt: String)
+internal data class SupportGuidanceDraft(
+    val explanation: String,
+    val questions: List<String>,
+    val practice: List<String>,
+    val source: String
 )
 internal data class NativeLearning(
     val portal: NativePortal,
@@ -275,21 +296,28 @@ internal class NativeApi(private val context: Context) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    val ticketNames = try {
+                    val supportTickets = try {
                         val response = request("/api/organizations/$orgId/support", auth = true)
                         val tickets = response.optJSONArray("items") ?: JSONArray()
                         (0 until minOf(tickets.length(), 20)).mapNotNull { index ->
                             tickets.optJSONObject(index)?.let { row ->
-                                val topic = row.optString("concept").take(80)
-                                val state = row.optString("status").take(32)
-                                if (topic.isBlank()) null else "$topic · $state"
+                                val ticketId = row.optInt("id")
+                                val topic = row.optString("concept").take(160)
+                                if (ticketId <= 0 || topic.isBlank()) null else SupportTicketSummary(
+                                    organizationId = orgId,
+                                    id = ticketId,
+                                    concept = topic,
+                                    status = row.optString("status", "open").take(32),
+                                    version = row.optInt("version", 1).coerceAtLeast(1),
+                                    updatedAt = row.optString("updatedAt")
+                                )
                             }
                         }
                     } catch (error: Exception) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    StaffWorkspace(orgId, courseNames, stats, ticketNames, null)
+                    StaffWorkspace(orgId, courseNames, stats, supportTickets, null)
                 } catch (error: Exception) {
                     if (!hasSession()) throw error
                     StaffWorkspace(orgId, emptyList(), emptyList(), emptyList(),
@@ -386,6 +414,94 @@ internal class NativeApi(private val context: Context) {
             materialEntries = materialEntries, quizEntries = quizEntries,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
     }
+
+    suspend fun fetchSupportTicket(summary: SupportTicketSummary): SupportTicket =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(summary.organizationId > 0 && summary.id > 0)
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}", auth = true
+            )
+            val ticket = json.getJSONObject("ticket")
+            require(ticket.optInt("id") == summary.id &&
+                ticket.optInt("organizationId") == summary.organizationId)
+            val canonical = summary.copy(
+                status = ticket.optString("status", summary.status).take(32),
+                version = ticket.optInt("version", summary.version).coerceAtLeast(1),
+                updatedAt = ticket.optString("updatedAt", summary.updatedAt)
+            )
+            val events = json.optJSONArray("history") ?: JSONArray()
+            val history = (0 until minOf(events.length(), 500)).mapNotNull { index ->
+                events.optJSONObject(index)?.let { event ->
+                    val body = event.optString("body").take(4000)
+                    if (body.isBlank()) null else SupportTicketEvent(
+                        kind = event.optString("kind", "update").take(32),
+                        body = body,
+                        createdAt = event.optString("createdAt").take(40)
+                    )
+                }
+            }
+            SupportTicket(
+                summary = canonical,
+                question = ticket.optString("question").take(4000),
+                attempted = ticket.optString("attempted").take(2000),
+                history = history
+            )
+        }
+
+    suspend fun requestSupportGuidance(summary: SupportTicketSummary): SupportGuidanceDraft =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}/guidance-draft",
+                JSONObject(), auth = true
+            )
+            fun strings(key: String): List<String> {
+                val values = json.optJSONArray(key) ?: JSONArray()
+                return (0 until values.length()).mapNotNull { i ->
+                    values.optString(i).takeIf { it.isNotBlank() }?.take(300)
+                }.take(4)
+            }
+            SupportGuidanceDraft(
+                explanation = json.optString("explanation").take(2000),
+                questions = strings("questions"),
+                practice = strings("practice"),
+                source = json.optString("source", "non_ai_template").take(32)
+            )
+        }
+
+    suspend fun replyToSupportTicket(summary: SupportTicketSummary, body: String): SupportTicketSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(body.trim().length in 2..4000)
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}/actions",
+                JSONObject().put("version", summary.version).put(
+                    "action", JSONObject().put("kind", "reply").put("body", body.trim())
+                ), auth = true
+            )
+            require(json.optInt("id") == summary.id)
+            summary.copy(
+                status = json.optString("status", summary.status).take(32),
+                version = json.optInt("version", summary.version + 1).coerceAtLeast(1),
+                updatedAt = json.optString("updatedAt", summary.updatedAt)
+            )
+        }
+
+    suspend fun triageSupportTicket(summary: SupportTicketSummary, reason: String): SupportTicketSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(reason.trim().length in 3..1000)
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}/actions",
+                JSONObject().put("version", summary.version).put(
+                    "action", JSONObject().put("kind", "transition")
+                        .put("status", "triaged").put("reason", reason.trim())
+                ), auth = true
+            )
+            require(json.optInt("id") == summary.id)
+            summary.copy(
+                status = json.optString("status", "triaged").take(32),
+                version = json.optInt("version", summary.version + 1).coerceAtLeast(1),
+                updatedAt = json.optString("updatedAt", summary.updatedAt)
+            )
+        }
 
     suspend fun fetchQuiz(id: Int): PracticeQuiz =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
