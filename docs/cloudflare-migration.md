@@ -9,6 +9,8 @@ The static build pipeline produces `artifacts/training-platform/dist/public` usi
 corepack enable
 corepack prepare pnpm@10.28.2 --activate
 pnpm install --frozen-lockfile
+pnpm run typecheck:libs
+node --test scripts/cloudflare/oidc-origin.test.mjs
 pnpm --filter @workspace/training-platform run typecheck
 PORT=10000 BASE_PATH=/ pnpm --filter @workspace/training-platform run build
 test -s artifacts/training-platform/dist/public/index.html
@@ -30,4 +32,26 @@ Use a fixed and controlled API upstream if transitional. Never put credentials o
 - Database, storage, OAuth, email and payments stay in their currently functioning services.
 - Do not claim a full migration from a static frontend build alone.
 - Do not merge or change DNS until CI, synthetic demo flows, unauthorized access and release checks pass.
-- **NewChanges is out of scope and stays on Render.**
+- **NewChanges is separately scoped for Cloudflare migration:** a read-only public preview now exists, but its active Render service must remain untouched. This Learning Hub branch must never change NewChanges infrastructure.
+
+## OAuth / Cloudflare origin boundary (2026-10-28)
+This branch introduces `trustedOidcRequestOrigin` and corresponding negative
+tests to prevent arbitrary request `Host` or `X-Forwarded-Host` values
+from determining OAuth login/callback/logout redirect URLs.
+
+Only exact trusted origins from `CABO_ALLOWED_ORIGINS`,
+`RENDER_EXTERNAL_URL` and other existing explicit trusted environment
+settings are accepted. Proxy headers are considered only when
+`TRUST_PROXY_HOPS=1` is set. Invalid/multi-valued headers fail closed.
+
+Before using Cloudflare for real authenticated sessions:
+- Set the actual Cloudflare hostname in `CABO_ALLOWED_ORIGINS` on an
+  **isolated staging backend**, not the production Render service.
+- Register the matching exact callback and logout URLs at the OIDC provider.
+- Verify configured trusted proxies cannot pass attacker-controlled forwarded
+  host/protocol headers from arbitrary browser requests.
+- Revalidate login, logout, same-site cookies, CSRF, tenant isolation, transfer
+  flows, synthetic learner data and protected endpoints.
+- The frontend-only Cloudflare build remains **unpublished** until these pass.
+
+Do not reuse production credentials to validate these test flows.
