@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 import { pool, db, studyMaterialsTable, materialUploadBlobsTable } from "@workspace/db";
 import { cachedMaterial, materialReadingEnabled } from "../lib/materialCache";
 import { readObjectBuffer, extractMaterialText } from "../lib/materialText";
-import { MaterialReadError } from "../lib/uploadPolicy";
+import { MaterialReadError, validateMaterialSignature } from "../lib/uploadPolicy";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { publishPreviewJob, qstashConfigured, verifyQstashCallback } from "../lib/qstashMaterialPreview";
 
@@ -101,6 +101,7 @@ router.post("/internal/qstash/material-preview", async (req: Request, res) => {
     if (bytes.length !== material.sizeBytes) {
       res.status(503).json({error:"Document bytes do not match expected size"}); return;
     }
+    validateMaterialSignature(material.fileName,bytes);
     // No AI/OCR is invoked from the callback; no external model receives the document.
     const text = await extractMaterialText(material.fileName,bytes,{allowAiReading:false});
     if (text.length < 30) { res.sendStatus(204); return; }
