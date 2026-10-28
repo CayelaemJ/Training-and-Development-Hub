@@ -14,7 +14,7 @@ Use only synthetic test accounts and the isolated Render preview. From this fold
 
 ```sh
 ./gradlew :app:assembleDebug \
-  -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \\
+  -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
   -PcaboEnableTestLogin=true
 ```
 
