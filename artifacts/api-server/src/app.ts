@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
+import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
 import { logger } from "./lib/logger";
 import {permittedBrowserOrigin, permittedMutationOrigin} from "./lib/originPolicy";
 import { apiRateLimit } from "./middlewares/rateLimit";
@@ -40,7 +41,14 @@ app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)
 // The limiter keys on req.originalUrl and req.ip, neither requires body or auth.
 app.use("/api", apiRateLimit);
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({
+  verify(req, _res, body) {
+    // Keep QStash's original bytes for JWT body-integrity validation.
+    if (req.originalUrl.split("?", 1)[0] === "/api/internal/qstash/material-preview") {
+      (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 // Explicit rollout flag. Remains off on established Render services until
@@ -49,6 +57,7 @@ app.use(authMiddleware);
 if (process.env.CABO_COUNTRY_PILOT_ENFORCEMENT === "true") {
   app.use("/api", schoolDataReleaseMiddleware);
 }
+app.use("/api", qstashMaterialPreviewRouter);
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
