@@ -4,6 +4,7 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import {configuredPrincipals} from '../lib/testPrincipals';
+import {trustedOidcRequestOrigin} from '../lib/originPolicy';
 
 import {
   clearSession,
@@ -19,11 +20,8 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
-function getOrigin(req: Request): string {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host =
-    req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-  return `${proto}://${host}`;
+function getOrigin(req: Request): string | null {
+  return trustedOidcRequestOrigin(req.headers,process.env);
 }
 
 function setSessionCookie(res: Response, sid: string) {
@@ -119,8 +117,10 @@ router.get('/auth/user', (req: Request, res: Response) => {
 });
 
 router.get('/login', async (req: Request, res: Response) => {
+  const origin = getOrigin(req);
+  if (!origin) { res.status(400).json({error:'Untrusted OAuth callback origin'}); return; }
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const callbackUrl = `${origin}/api/callback`;
 
   const returnTo = getSafeReturnTo(req.query.returnTo);
 
@@ -150,8 +150,10 @@ router.get('/login', async (req: Request, res: Response) => {
 // Query params are not validated because the OIDC provider may include
 // parameters not expressed in the schema.
 router.get('/callback', async (req: Request, res: Response) => {
+  const origin = getOrigin(req);
+  if (!origin) { res.status(400).json({error:'Untrusted OAuth callback origin'}); return; }
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const callbackUrl = `${origin}/api/callback`;
 
   const codeVerifier = req.cookies?.code_verifier;
   const nonce = req.cookies?.nonce;
@@ -214,8 +216,9 @@ router.get('/callback', async (req: Request, res: Response) => {
 });
 
 router.get('/logout', async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
   const origin = getOrigin(req);
+  if (!origin) { res.status(400).json({error:'Untrusted OAuth callback origin'}); return; }
+  const config = await getOidcConfig();
   const returnTo = getSafeReturnTo(req.query.returnTo);
   const postLogoutRedirectUrl = new URL(returnTo, `${origin}/`).href;
 
