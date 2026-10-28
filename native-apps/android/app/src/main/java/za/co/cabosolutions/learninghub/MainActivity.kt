@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 14544)
-Total output lines: 1106
-
 package za.co.cabosolutions.learninghub
 
 import android.content.Intent
@@ -538,7 +535,210 @@ class MainActivity : ComponentActivity() {
         if (demoActive) {
             supportGuidance = SupportGuidanceDraft(
                 explanation = "To add fractions with different denominators, rewrite them as equivalent fractions with the same denominator. For thirds and fourths, twelfths work because 12 is a multiple of both 3 and 4.",
-                questions = listOf("How man…2544 tokens truncated…             Text(when(section) {
+                questions = listOf("How many twelfths are equal to one third?", "How many twelfths are equal to one quarter?"),
+                practice = listOf("Rewrite 1/3 and 1/4 in twelfths.", "Add the numerators and keep the denominator."),
+                source = "non_ai_template"
+            )
+            supportMessage = "Synthetic guidance draft ready. Review it before adding it to your reply."
+            return
+        }
+        supportBusy = true
+        supportMessage = null
+        lifecycleScope.launch {
+            try {
+                supportGuidance = api.requestSupportGuidance(summary)
+                supportMessage = "Draft ready. Review and edit it before adding it to your reply."
+            } catch (_: Exception) {
+                supportMessage = "A guidance draft is unavailable right now. You can still write a reply."
+            } finally { supportBusy = false }
+        }
+    }
+
+    private fun sendSupportReply() {
+        val summary = supportTicket?.summary ?: return
+        if (supportBusy || supportReply.trim().length !in 2..4000) return
+        if (demoActive) {
+            val current = NativeDemoSession.reply(summary, supportReply.trim())
+            supportTicket = current
+            updateSupportSummary(current.summary)
+            selectedSupportTicket = current.summary
+            supportReply = ""
+            supportGuidance = null
+            supportMessage = "Demo reply added locally. Nothing was sent to a real learner."
+            return
+        }
+        supportBusy = true
+        supportMessage = null
+        lifecycleScope.launch {
+            try {
+                val updated = api.replyToSupportTicket(summary, supportReply)
+                updateSupportSummary(updated)
+                supportTicket = api.fetchSupportTicket(updated)
+                selectedSupportTicket = supportTicket?.summary
+                supportReply = ""
+                supportGuidance = null
+                supportMessage = "Reply sent to the learner."
+            } catch (_: Exception) {
+                supportMessage = "Reply was not confirmed. Refresh the request before trying again."
+            } finally { supportBusy = false }
+        }
+    }
+
+    private fun triageSupportTicket() {
+        val summary = supportTicket?.summary ?: return
+        if (supportBusy || summary.status != "open" || supportTriageReason.trim().length !in 3..1000) return
+        if (demoActive) {
+            val current = NativeDemoSession.triage(summary, supportTriageReason.trim())
+            supportTicket = current
+            updateSupportSummary(current.summary)
+            selectedSupportTicket = current.summary
+            supportMessage = "Demo request marked as triaged locally."
+            return
+        }
+        supportBusy = true
+        supportMessage = null
+        lifecycleScope.launch {
+            try {
+                val updated = api.triageSupportTicket(summary, supportTriageReason)
+                updateSupportSummary(updated)
+                supportTicket = api.fetchSupportTicket(updated)
+                selectedSupportTicket = supportTicket?.summary
+                supportMessage = "Request marked as triaged."
+            } catch (_: Exception) {
+                supportMessage = "The request changed or could not be triaged. Refresh it before trying again."
+            } finally { supportBusy = false }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun NativeHome(
+    status: String,
+    busy: Boolean,
+    data: NativeLearning?,
+    signIn: () -> Unit,
+    refresh: () -> Unit,
+    demoEnabled: Boolean,
+    demoActive: Boolean,
+    demoRole: String,
+    startDemo: () -> Unit,
+    setDemoRole: (String) -> Unit,
+    createSupportRequest: () -> Unit,
+    testLoginAvailable: Boolean,
+    testUsername: String,
+    testPassword: String,
+    onTestUsername: (String) -> Unit,
+    onTestPassword: (String) -> Unit,
+    signInTest: () -> Unit,
+    signOut: () -> Unit,
+    respondToInvite: (Int, Boolean) -> Unit,
+    openSupportTicket: (SupportTicketSummary) -> Unit,
+    openQuiz: (QuizSummary) -> Unit,
+    openMaterial: (MaterialSummary) -> Unit,
+    pickMaterial: () -> Unit
+) {
+    var section by remember(demoRole) { mutableStateOf("home") }
+    val sections = listOf(
+        Triple("home", "Home", Icons.Default.Home),
+        Triple("learn", "Learn", Icons.Default.School),
+        Triple("progress", "Progress", Icons.Default.Assessment),
+        Triple("support", "Support", Icons.Default.Forum)
+    )
+    Scaffold(
+        containerColor = Color(0xFFF4F5F1),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("CABO", color = Color(0xFFBFE5D6), fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text("Learning Hub", color = Color.White,
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                navigationIcon = {
+                    Surface(
+                        color = Color(0xFF2A746D), shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.padding(start = 16.dp).size(40.dp)
+                    ) {
+                        Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            Text("C", color = Color.White, fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
+                },
+                actions = {
+                    if (data != null) {
+                        IconButton(onClick = refresh, enabled = !busy) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh dashboard", tint = Color.White)
+                        }
+                        IconButton(onClick = signOut, enabled = !busy) {
+                            Icon(Icons.Default.Logout, contentDescription = if (demoActive) "Exit demo" else "Sign out", tint = Color.White)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF153B38))
+            )
+        },
+        bottomBar = {
+            if (data != null) {
+                NavigationBar(containerColor = Color(0xFFFFFEFA)) {
+                    sections.forEach { (key, label, icon) ->
+                        NavigationBarItem(
+                            selected = section == key,
+                            onClick = { section = key },
+                            icon = { Icon(icon, contentDescription = null) },
+                            label = { Text(label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color(0xFF14635D),
+                                selectedTextColor = Color(0xFF14635D),
+                                indicatorColor = Color(0xFFD9ECE4)
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (data == null) {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("Learning that moves with you", style = MaterialTheme.typography.headlineMedium,
+                        color = Color(0xFF153B38), fontWeight = FontWeight.Bold)
+                    Text("A secure space for learners, families and educators to stay connected to progress.",
+                        style = MaterialTheme.typography.bodyLarge, color = Color(0xFF53625F))
+                    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
+                        containerColor = Color(0xFFFFFEFA))) {
+                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(status, color = if (busy) MaterialTheme.colorScheme.primary else Color(0xFF53625F))
+                            SessionButtons(data, busy, signIn, refresh, signOut, isDemo = false)
+                            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                            if (testLoginAvailable) TestLoginControls(testUsername, testPassword, busy,
+                                onTestUsername, onTestPassword, signInTest)
+                        }
+                    }
+                    if (demoEnabled) {
+                        OutlinedButton(onClick = startDemo, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+                            Text("Explore the interactive demo", fontWeight = FontWeight.SemiBold)
+                        }
+                        Text("Fictional sample records · works without an account or network · no data is sent",
+                            style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+                    }
+                    Text("LEARNER · FAMILY · EDUCATOR", style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF14635D), letterSpacing = 1.2.sp)
+                    NativeCard("Your learning space", "Study resources, practice and progress in one place.")
+                    NativeCard("Family connection", "Guardian access follows school verification and enrolment rules.")
+                    NativeCard("Educator workspace", "Assigned subjects and learner support stay scoped to your school.")
+                }
+            } else {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(when(section) {
                                 "learn" -> "Your learning space"
                                 "progress" -> "Progress & outcomes"
                                 "support" -> "Support & connection"
