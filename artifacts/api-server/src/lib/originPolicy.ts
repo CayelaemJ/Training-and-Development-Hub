@@ -12,3 +12,41 @@ export function permittedBrowserOrigin(origin:string|undefined,env:NodeJS.Proces
  if(!origin)return true; // CLI/API calls without browser Origin use authentication; mutating browser calls always send Origin.
  return trustedOrigins(env).has(origin);
 }
+
+
+/**
+ * Resolve OIDC callback origins only from an explicit public-origin allowlist.
+ * An inbound Host or X-Forwarded-Host is NEVER an authorization grant.
+ * TRUST_PROXY_HOPS=1 is required before accepting forwarded proxy headers.
+ * This allows Cloudflare preview hosts to be configured individually without
+ * making arbitrary header injection an OAuth redirect.
+ */
+export function trustedOidcRequestOrigin(
+ headers:Record<string,string|string[]|undefined>,
+ env:NodeJS.ProcessEnv
+):string|null{
+ const trusted=trustedOrigins(env);
+ if(trusted.size===0)return null;
+ const one=(value:string|string[]|undefined):string|null=>
+   typeof value==="string"&&value.length>0&&!/[\s,\\/@?#]/.test(value)?value:null;
+ const host=one(headers.host);
+ const candidates:Array<{host:string|null;proto:string|null}>=[];
+ if(env.TRUST_PROXY_HOPS==="1"){
+   const forwardedHost=one(headers["x-forwarded-host"]);
+   const forwardedProto=one(headers["x-forwarded-proto"]);
+   if(forwardedHost && forwardedProto && (forwardedProto==="https"||forwardedProto==="http"))
+     candidates.push({host:forwardedHost,proto:forwardedProto});
+ }
+ if(host){
+   const directProto=env.NODE_ENV!=="production"&&/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)?"http":"https";
+   candidates.push({host,proto:directProto});
+ }
+ for(const candidate of candidates){
+   try{
+     const url=new URL(candidate.proto+"://"+candidate.host);
+     if(url.pathname!=="/"||url.search||url.hash||url.username||url.password)continue;
+     if(trusted.has(url.origin))return url.origin;
+   }catch{/* malformed Host headers are rejected */}
+ }
+ return null;
+}
