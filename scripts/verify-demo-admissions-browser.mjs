@@ -9,7 +9,8 @@ const base=process.env.CABO_UI_TEST_URL;
 assert.ok(base,'Local fixture server URL required');
 try {
  for(const width of [390,1024]){
-  const page=await browser.newPage({viewport:{width,height:900}});
+  const context=await browser.newContext({viewport:{width,height:900}});
+  const page=await context.newPage();
   let status='external_submission_recorded',enabled=true,conflict=false;
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/api/**',async route=>{
@@ -49,7 +50,7 @@ try {
   enabled=false;await page.reload();
   await page.getByRole('heading',{name:'Superadmin command centre'}).waitFor();
   assert.equal(await page.getByRole('heading',{name:'Fictional university inbox'}).count(),0);
-  assert.deepEqual(errors,[]);await page.close();
+  assert.deepEqual(errors,[]);await context.close();
  }
  console.log('PASS: admissions demo review/offer, conflict feedback, feature-off hiding, 390px/1024px layouts, accessible controls and no runtime errors.');
 }finally{await browser.close();}
