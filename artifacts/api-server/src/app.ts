@@ -41,14 +41,15 @@ app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)
 // The limiter keys on req.originalUrl and req.ip, neither requires body or auth.
 app.use("/api", apiRateLimit);
 app.use(cookieParser());
-app.use(express.json({
+// Parse only this signed callback with byte-preserving verification first.
+// Keep the ordinary JSON middleware unchanged for all other API routes.
+app.use("/api/internal/qstash/material-preview", express.json({
+  limit: "1kb",
   verify(req, _res, body) {
-    // Keep QStash's original bytes for JWT body-integrity validation.
-    if (req.originalUrl.split("?", 1)[0] === "/api/internal/qstash/material-preview") {
-      (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
-    }
+    (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
   },
 }));
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 // Explicit rollout flag. Remains off on established Render services until
