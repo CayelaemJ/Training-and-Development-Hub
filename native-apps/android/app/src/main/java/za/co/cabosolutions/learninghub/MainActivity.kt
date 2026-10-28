@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
                         demoActive = demoActive,
                         demoRole = demoRole,
                         startDemo = { startDemo() },
-                        setDemoRole = { setDemoRole(it) },
+                        setDemoRole = { switchDemoRole(it) },
                         createSupportRequest = { creatingSupportRequest = demoActive },
                         testLoginAvailable = api.testLoginAvailable(),
                         testUsername = testUsername, testPassword = testPassword,
@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
         status = "DEMO MODE · sample data only · no account connected"
     }
 
-    private fun setDemoRole(role: String) {
+    private fun switchDemoRole(role: String) {
         if (!demoActive || role !in listOf("learner", "teacher", "parent")) return
         closeSupportTicket()
         demoRole = role
