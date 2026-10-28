@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
+import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
 import { logger } from "./lib/logger";
 import {permittedBrowserOrigin, permittedMutationOrigin} from "./lib/originPolicy";
 import { apiRateLimit } from "./middlewares/rateLimit";
@@ -40,6 +41,14 @@ app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)
 // The limiter keys on req.originalUrl and req.ip, neither requires body or auth.
 app.use("/api", apiRateLimit);
 app.use(cookieParser());
+// Parse only this signed callback with byte-preserving verification first.
+// Keep the ordinary JSON middleware unchanged for all other API routes.
+app.use("/api/internal/qstash/material-preview", express.json({
+  limit: "1kb",
+  verify(req, _res, body) {
+    (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
+  },
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
@@ -49,6 +58,7 @@ app.use(authMiddleware);
 if (process.env.CABO_COUNTRY_PILOT_ENFORCEMENT === "true") {
   app.use("/api", schoolDataReleaseMiddleware);
 }
+app.use("/api", qstashMaterialPreviewRouter);
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
