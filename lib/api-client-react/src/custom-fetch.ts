@@ -149,26 +149,13 @@ function truncate(text: string, maxLength = 300): string {
 }
 
 function buildErrorMessage(response: Response, data: unknown): string {
-  const prefix = `HTTP ${response.status} ${response.statusText}`;
-
-  if (typeof data === "string") {
-    const text = data.trim();
-    return text ? `${prefix}: ${truncate(text)}` : prefix;
-  }
-
-  const title = getStringField(data, "title");
-  const detail = getStringField(data, "detail");
-  const message =
-    getStringField(data, "message") ??
-    getStringField(data, "error_description") ??
-    getStringField(data, "error");
-
-  if (title && detail) return `${prefix}: ${title} — ${detail}`;
-  if (detail) return `${prefix}: ${detail}`;
-  if (message) return `${prefix}: ${message}`;
-  if (title) return `${prefix}: ${title}`;
-
-  return prefix;
+  const message = getStringField(data, "detail") ?? getStringField(data, "message") ?? getStringField(data, "error");
+  if (message) return truncate(message);
+  if (response.status === 401) return "Please sign in again to continue.";
+  if (response.status === 403) return "Your account does not have access to this action.";
+  if (response.status === 413) return "This file is too large. Choose a file of 30 MB or less.";
+  if (response.status === 429) return "This service is busy or has reached its usage allowance. Please try again shortly.";
+  return "We couldn’t finish this request. Please try again shortly.";
 }
 
 export class ApiError<T = unknown> extends Error {

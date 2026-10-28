@@ -5,7 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import * as zod from 'zod';
+import * as zod from 'zod/v4';
 
 
 /**
@@ -37,12 +37,13 @@ export const GetCurrentAuthUserResponse = zod.object({
 
 
 
-
+export const requestUploadUrlBodyAllowAiReadingDefault = false;
 
 export const RequestUploadUrlBody = zod.object({
   "name": zod.string().min(1),
   "size": zod.number().int().min(1),
-  "contentType": zod.string().min(1)
+  "contentType": zod.string().min(1),
+  "allowAiReading": zod.boolean().default(requestUploadUrlBodyAllowAiReadingDefault).describe('Explicit permission to send scanned learning pages or photos to the configured OCR provider.')
 })
 
 export const RequestUploadUrlResponse = zod.object({
@@ -106,7 +107,7 @@ export const GenerateQuizParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
-export const generateQuizBodyQuestionCountMax = 30;
+export const generateQuizBodyQuestionCountMax = 2147483647;
 
 
 
@@ -145,6 +146,19 @@ export const ListQuizzesResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListQuizzesResponse = zod.array(ListQuizzesResponseItem)
+
+
+/**
+ * @summary Delete your own practice test and its attempts; keep the source material
+ */
+
+
+
+export const DeleteQuizParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const DeleteQuizResponse = zod.void()
 
 
 /**

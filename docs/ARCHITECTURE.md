@@ -1,4 +1,8 @@
-# Architecture and Data Model
+# Potential & Opportunity Module — Architecture and Data Model
+
+> **Scope note:** This describes a specific profile/consent architecture within [CABO Learning Hub, the Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). It is not a complete infrastructure description for every learning, academic, administrative, mobile or AI module. Engineering trust boundaries and consent gates take priority over marketing labels.
+
+
 
 ## Stack
 

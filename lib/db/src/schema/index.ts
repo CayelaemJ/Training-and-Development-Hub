@@ -20,4 +20,41 @@ export * from './schoolOperations';
 export * from './talentPassport';
 
 export * from './materialUploadBlobs';
+
+export * from './hubRecords';
+
+export * from './schoolStages';
+
+export * from './aiMetrics';
+
+export * from './institutionSetup';
+
+export * from './schoolProgressionEvents';
+
+export * from './admissions';
+
+export * from './guardianVerification';
+
+export * from './schoolReportIssuance';
+
+export * from './schoolTimetable';
+
+export * from './assessmentQuestionBank';
+
+export * from './timetableSubstitutions';
+
+export * from './assessmentPapers';
+
+export * from "./learnerSupport";
+
+
+
+export * from "./educationFrameworks";
+export * from "./nativeAuth";
+
+export * from "./institutionDataClearances";
+
+export * from "./lifelongPassport";
+export * from "./passportTrustLayers";
+
 export * from "./mlops";

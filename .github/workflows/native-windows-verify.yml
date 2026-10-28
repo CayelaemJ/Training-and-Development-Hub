@@ -1,0 +1,41 @@
+name: CABO native Windows build verification
+on:
+  pull_request:
+    paths:
+      - 'native-apps/windows/**'
+      - 'scripts/package-windows-debug.ps1'
+      - '.github/workflows/native-windows-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+      # WinUI 3 desktop resource packaging targets require Visual Studio's
+      # MSBuild, not the standalone dotnet SDK's incomplete AppxPackage tasks.
+      - uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+      - name: Compile isolated test-only Windows variant (never archived)
+        shell: pwsh
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=true -verbosity:minimal
+      - name: Rebuild standard Windows client with demo sign-in disabled
+        shell: pwsh
+        run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -t:Rebuild -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=false -verbosity:minimal
+      - name: Package non-test-only Windows debug directory
+        shell: pwsh
+        run: ./scripts/package-windows-debug.ps1
+      - name: Upload Windows DEBUG artifact (not signed or certified)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CABO-Windows-DEBUG-no-test-login
+          path: native-apps/windows/artifacts/CABO-Windows-DEBUG-test-only.zip
+          retention-days: 2
+          if-no-files-found: error
+      - name: Validation boundary
+        shell: pwsh
+        run: Write-Output 'Build validation only; no signing, physical Windows lab run, MSIX, or native authentication verified.'

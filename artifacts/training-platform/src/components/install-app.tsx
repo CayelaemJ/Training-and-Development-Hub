@@ -1,23 +1,53 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+
 type PromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{outcome: 'accepted' | 'dismissed'}> };
-export function InstallApp() {
+type InstallState = { installed: boolean; available: boolean; busy: boolean; message: string; install: () => Promise<void> };
+const InstallContext = createContext<InstallState | null>(null);
+export function InstallAppProvider({children}: {children: ReactNode}) {
   const [prompt, setPrompt] = useState<PromptEvent | null>(null);
-  const [standalone, setStandalone] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
   useEffect(() => {
-    const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && Boolean((navigator as Navigator & {standalone?:boolean}).standalone));
-    setStandalone(isStandalone());
-    const onPrompt = (event: Event) => { event.preventDefault(); setPrompt(event as PromptEvent); };
-    const onInstalled = () => { setStandalone(true); setPrompt(null); };
+    const display = window.matchMedia('(display-mode: standalone)');
+    const check = () => setInstalled(display.matches || Boolean((navigator as Navigator & {standalone?: boolean}).standalone));
+    check();
+    const onPrompt = (event: Event) => { event.preventDefault(); setPrompt(event as PromptEvent); setMessage(''); };
+    const onInstalled = () => { setInstalled(true); setPrompt(null); setMessage('CABO has been installed. Open it from your apps.'); };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
-    return () => { window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); };
+    display.addEventListener('change', check);
+    return () => { window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); display.removeEventListener('change', check); };
   }, []);
-  if (standalone || !prompt) return null;
-  return (
-    <div role="region" aria-label="Install CABO app" style={{position:'fixed',bottom:16,right:16,zIndex:40,display:'flex',gap:12,alignItems:'center',padding:'12px 16px',background:'#0d1117',color:'#fff',borderRadius:12,boxShadow:'0 8px 24px #0004',maxWidth:'calc(100vw - 32px)'}}>
-      <span style={{fontSize:13}}>Use CABO as an installed app</span>
-      <button type="button" style={{border:'1px solid #c9a84c',color:'#fff',borderRadius:6,padding:'6px 12px'}} onClick={async()=>{const current=prompt;setPrompt(null);await current.prompt();await current.userChoice;}}>Install</button>
-      <button type="button" aria-label="Dismiss install prompt" style={{color:'#fff',padding:4}} onClick={()=>setPrompt(null)}>×</button>
-    </div>
-  );
+  const install = async () => {
+    if (!prompt || busy) return;
+    const current = prompt;
+    setPrompt(null); setBusy(true); setMessage('');
+    try {
+      await current.prompt();
+      const choice = await current.userChoice;
+      setMessage(choice.outcome === 'accepted' ? 'Installation requested. Follow your browser’s instructions to finish.' : 'Installation cancelled. You can still install CABO from your browser menu.');
+    } catch {
+      setMessage('The install window could not open. Use your browser menu and follow the steps below.');
+    } finally { setBusy(false); }
+  };
+  return <InstallContext.Provider value={{installed, available: Boolean(prompt), busy, message, install}}>{children}</InstallContext.Provider>;
+}
+export function useAppInstall() {
+  const state = useContext(InstallContext);
+  if (!state) throw new Error('InstallAppProvider is required');
+  return state;
+}
+export function InstallApp() {
+  const {installed} = useAppInstall();
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update); window.addEventListener('offline', update);
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
+  }, []);
+  return <>
+    {!online && <div className="app-connectivity" role="status">You’re offline. Reconnect before saving work or submitting a test.</div>}
+    {!installed && window.location.pathname !== '/install' && <a className="app-install-link" href="/install">Get the CABO app <span aria-hidden="true">↗</span></a>}
+  </>;
 }

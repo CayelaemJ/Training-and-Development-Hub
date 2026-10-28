@@ -1,3 +1,9 @@
+import demoAdmissionsInboxRouter from "./demoAdmissionsInbox";
+import nativeAuthRouter from "./nativeAuth";
+import nativeParentRouter from "./nativeParent";
+import educationFrameworksRouter from "./educationFrameworks";
+import learnerSupportRouter from "./learnerSupport";
+
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
@@ -14,11 +20,37 @@ import managementHierarchyRouter from "./managementHierarchy";
 import rolePortalsRouter from "./rolePortals";
 import educationTalentRouter from "./educationTalent";
 import developmentPlansRouter from "./developmentPlans";
+import hubModulesRouter from "./hubModules";
+import schoolStagesRouter from "./schoolStages";
+import mlopsRouter from "./mlops";
+import institutionSetupRouter from "./institutionSetup";
+import schoolProgressionRouter from "./schoolProgression";
+import admissionsRouter from "./admissions";
+import reportCardsRouter from "./reportCards";
+import demoShowcaseRouter from "./demoShowcase";
+import demoStatusRouter from "./demoStatus";
+import guardianVerificationRouter from "./guardianVerification";
+import reportIssuanceRouter from "./reportIssuance";
+import attendanceSyncRouter from "./attendanceSync";
+import academicIntelligenceRouter from "./academicIntelligence";
+import timetableRouter from "./timetable";
+import assessmentQuestionBankRouter from "./assessmentQuestionBank";
+import assessmentPapersRouter from "./assessmentPapers";
+import educationCommandRouter from "./educationCommand";
+import admissionEvidenceRouter from "./admissionEvidence";
+
+import lifelongPassportRouter from "./lifelongPassport";
+import passportTrustRouter from "./passportTrustRoutes";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(educationFrameworksRouter);
+router.use(learnerSupportRouter);
+
 router.use(authRouter);
+router.use(nativeAuthRouter);
+router.use(nativeParentRouter);
 router.use(storageRouter);
 router.use(trainingRouter);
 router.use(writtenExamsRouter);
@@ -32,5 +64,26 @@ router.use(managementHierarchyRouter);
 router.use(rolePortalsRouter);
 router.use(educationTalentRouter);
 router.use(developmentPlansRouter);
+router.use(hubModulesRouter);
+router.use(schoolStagesRouter);
+router.use(mlopsRouter);
+router.use(institutionSetupRouter);
+router.use(schoolProgressionRouter);
+router.use(admissionsRouter);
+router.use(reportCardsRouter);
+router.use(demoShowcaseRouter);
+router.use(demoStatusRouter);
+router.use(demoAdmissionsInboxRouter);
+router.use(guardianVerificationRouter);
+router.use(reportIssuanceRouter);
+router.use(attendanceSyncRouter);
+router.use(academicIntelligenceRouter);
+router.use(timetableRouter);
+router.use(assessmentQuestionBankRouter);
+router.use(assessmentPapersRouter);
+router.use(educationCommandRouter);
+router.use(admissionEvidenceRouter);
+router.use(lifelongPassportRouter);
+router.use(passportTrustRouter);
 
 export default router;

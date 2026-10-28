@@ -1,12 +1,15 @@
 # CABO: Phases 1–4 Delivery Register — 8 October 2026
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 This file explicitly differentiates committed code from end-to-end validated functionality. A passing build is **not** proof of school, university, recruitment, psychometric or production readiness.
 
 ## Phase 1: Identity, permissions, platform reliability
 
 **Implemented in the working branch**
 - Separate institutional management-unit hierarchy, scoped role grants, role-based home dashboards and server-side academic course authorisations
-- Isolated Railway PostgreSQL testing, guarded `cabo_test` superadmin, limited audit records, private learner ownership
+- Isolated Render + Neon PostgreSQL testing, guarded `cabo_test` superadmin, limited audit records, private learner ownership
 - CI unit tests, typecheck and build
 - Private model tables and default-off candidate/employer feature gates
 
@@ -51,11 +54,12 @@ This file explicitly differentiates committed code from end-to-end validated fun
 
 Six months is a *development check-in schedule*. It is NOT necessarily an appropriate retesting frequency for a given psychological construct or licensed test. Never generate employment selection decisions or psychological diagnoses from self-reported development records.
 
-## Isolated Railway test
+## Isolated Render test
 
-Project: CABO Learner Hub - Isolated Test; environment `testing`.
-App: https://cabo-learner-hub-api-testing.up.railway.app/
-Database: dedicated PostgreSQL. Existing EFS/CABO production databases are excluded.
+Render service: `cabo-learning-native-isolated-preview` — https://cabo-learning-native-isolated-preview.onrender.com
+Source branch: `feat/real-native-cabo-apps`; dedicated Neon project/database; synthetic fixtures only.
+
+The preview's guarded migration, native test superadmin and synthetic parent smoke checks have passed. The parent test confirmed an accepted-but-unverified relationship returns no learner name or learner ID. Production authentication, school-verified guardian scenarios, physical-device acceptance, independent security review and legal sign-off remain incomplete.
 
 Do not enable employment application pilot, employer portfolio disclosure, or school-to-employer history sharing simply to demo a feature. Use adult dummy data and separately authorised test users.
 

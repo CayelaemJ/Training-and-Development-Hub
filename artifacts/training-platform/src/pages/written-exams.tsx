@@ -60,7 +60,7 @@ export default function WrittenExamsPage() {
   return <section className="mx-auto max-w-4xl space-y-7 pb-12">
     <header className="space-y-2"><p className="text-sm uppercase tracking-widest text-muted-foreground">Learning assessment</p>
       <h1 className="text-3xl font-semibold">Written examinations</h1>
-      <p className="text-muted-foreground">Create a written assessment from your own learning material. Answer in your own words and receive rubric-based AI feedback.</p>
+      <p className="text-muted-foreground">Create a written assessment from your own learning material. Answer in your own words and get AI feedback based on the marking guide.</p>
     </header>
     {error && <div role="alert" className="rounded-lg border border-destructive p-4 text-sm">{error}</div>}
     <div className="rounded-xl border bg-card p-5 space-y-4">
@@ -99,10 +99,10 @@ export default function WrittenExamsPage() {
         {result?.feedback.find(m => m.questionIndex===i) && (() => { const mark = result.feedback.find(m => m.questionIndex===i)!; return <div className="rounded-md bg-muted p-4 text-sm space-y-1">
           <p className="font-semibold">Awarded {mark.awardedMarks} / {mark.maxMarks} marks {mark.needsReview ? "· Human review advised" : ""}</p><p>{mark.feedback}</p></div>; })()}
       </article>)}
-      {!result ? <button disabled={working} onClick={submit} className="rounded-md bg-primary px-6 py-3 text-primary-foreground disabled:opacity-50">{working ? "Marking…" : "Submit for AI marking"}</button>
+      {!result ? <button disabled={working} onClick={submit} className="rounded-md bg-primary px-6 py-3 text-primary-foreground disabled:opacity-50">{working ? "Marking…" : "Submit my answers"}</button>
         : <div aria-live="polite" className="rounded-xl border p-6"><h3 className="text-xl font-semibold">Your result: {result.percentage}%</h3>
           <p>{result.awardedMarks} / {result.maxMarks} marks</p>
-          <p className="mt-2 text-sm text-muted-foreground">{result.reviewRequired ? "One or more answers need human review. Treat this score as provisional." : "AI-generated assessment: scores can be reviewed by a teacher or assessor."}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{result.reviewRequired ? "Your teacher needs to check some answers. This score may change." : "AI feedback: ask your teacher or assessor to check the score."}</p>
         </div>}
     </section>}
   </section>;

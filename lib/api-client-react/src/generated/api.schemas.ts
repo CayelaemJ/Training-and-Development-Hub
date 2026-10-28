@@ -36,6 +36,8 @@ export interface UploadUrlRequest {
   size: number;
   /** @minLength 1 */
   contentType: string;
+  /** Explicit permission to send scanned learning pages or photos to the configured OCR provider. */
+  allowAiReading?: boolean;
 }
 
 export interface UploadUrlResponse {
@@ -80,7 +82,7 @@ export const QuizGenerationInputOptionCount = {
 export interface QuizGenerationInput {
   /**
      * @minimum 1
-     * @maximum 30
+     * @maximum 2147483647
      */
   questionCount: number;
   difficulty: QuizGenerationInputDifficulty;

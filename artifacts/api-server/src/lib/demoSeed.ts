@@ -1,14 +1,15 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   db, usersTable, organizationsTable, organizationMembersTable, learnerGroupsTable,
   learnerGroupMembersTable, academicSettingsTable, academicCoursesTable, academicPeriodsTable,
   courseEnrollmentsTable, academicAssessmentsTable, academicGradesTable, academicGradeEventsTable,
   courseStaffAssignmentsTable, managementUnitsTable, managementRoleGrantsTable,
   schoolAttendanceTable, schoolNoticesTable, guardianRelationshipsTable,
+  studyMaterialsTable, quizzesTable,
 } from "@workspace/db";
 
 // Fictional, non-identifying test data. No passwords, secrets, real school names or real learners.
-// Only the isolated Railway testing environment may invoke this function.
+// Never seed a live school or a test service without a confirmed disposable database.
 const people = [
   ["headmaster-south", "Nomsa", "Dube"],
   ["teacher-south", "Thabo", "Maseko"],
@@ -28,8 +29,10 @@ const uid = (key: string) => `cabo-fixture-${key}`;
 const demoName = (name: string) => `[DEMO] ${name}`;
 
 export async function seedCaboDemo(): Promise<void> {
-  if (process.env.RAILWAY_ENVIRONMENT_NAME !== "testing" || process.env.ENABLE_CABO_DEMO_SEED !== "true") {
-    throw new Error("CABO demo seeding is restricted to explicitly enabled Railway testing");
+  if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) !== "testing" ||
+      process.env.CABO_TEST_DATABASE_ISOLATED !== "true" ||
+      process.env.ENABLE_CABO_DEMO_SEED !== "true") {
+    throw new Error("CABO demo fixtures require an isolated and explicitly enabled test database.");
   }
   for (const [key, firstName, lastName] of people) {
     await db.insert(usersTable).values({
@@ -162,5 +165,90 @@ export async function seedCaboDemo(): Promise<void> {
     message:"This is a fictional school notice for testing the learner and educator dashboards.",
     audience:"learners",createdBy:uid("headmaster-south"),
   });
-  console.info("CABO synthetic fixtures ready: 4 organisations, 13 identities, 4 courses, 4 assessments");
+  // Fixed synthetic text means no external PDF, AI provider, paid OCR or file
+  // storage is needed. The native reader uses the audited, user-owned API.
+  // These examples are educational demos, never formal examination papers.
+  const studySamples = [
+    {
+      learner: "learner-south-a",
+      key: "grade12-algebra",
+      title: "[DEMO] Grade 12 Algebra - Practice Notes",
+      text: [
+        "CABO DEMO MATERIAL. Fictional practice content, not an official school resource.",
+        "A linear equation has the form ax + b = c. We isolate x using inverse operations.",
+        "Example: 3x + 5 = 20. Subtract 5 from both sides: 3x = 15. Divide both sides by 3: x = 5.",
+        "When factorising x² - 5x + 6, find two numbers whose product is 6 and whose sum is -5.",
+        "Those numbers are -2 and -3, so the expression is (x - 2)(x - 3).",
+        "Always substitute your proposed solution into the original expression to verify it.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "Solve 3x + 5 = 20.",options: ["x = 3","x = 5","x = 15","x = 25"],
+         correctOption: 1,explanation: "3x = 15 after subtracting 5; divide by 3 to get x = 5."},
+        {prompt: "Which factors equal x² - 5x + 6?",
+         options: ["(x + 2)(x + 3)","(x - 1)(x - 6)","(x - 2)(x - 3)","(x + 1)(x - 6)"],
+         correctOption: 2,explanation: "-2 and -3 add to -5 and multiply to +6."},
+        {prompt: "What is the best final check after solving a linear equation?",
+         options: ["Round x to a whole number","Substitute x into the original equation","Change its sign","Ignore the constant"],
+         correctOption: 1,explanation: "Substituting verifies that both sides are equal."},
+      ],
+    },
+    {
+      learner: "learner-north",
+      key: "english-analysis",
+      title: "[DEMO] English Text Analysis - Practice Notes",
+      text: [
+        "CABO DEMO MATERIAL. Fictional study sample for learner device testing.",
+        "A claim states an argument. Evidence may consist of details from a text.",
+        "Good analysis explains how the evidence supports the claim rather than merely repeating it.",
+        "Tone is the attitude suggested by a writer's language and sentence choices.",
+        "A metaphor compares things without using like or as. A simile normally uses like or as.",
+        "A strong paragraph follows claim, evidence, explanation and a concluding connection.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "Which sequence best supports a text-analysis paragraph?",
+         options: ["Claim, evidence, explanation","Summary, title, punctuation","Opinion without evidence","Quotation only"],
+         correctOption: 0,explanation: "Evidence and explanation should follow a clear claim."},
+        {prompt: "What usually signals a simile?",
+         options: ["A rhetorical question","Like or as","A semicolon","Only past-tense verbs"],
+         correctOption: 1,explanation: "Similes commonly compare ideas using like or as."},
+      ],
+    },
+  ] as const;
+  for (const sample of studySamples) {
+    const owner = uid(sample.learner);
+    const objectPath = "/native-demo-material/" + sample.key;
+    const existing = await db.select({ id: studyMaterialsTable.id })
+      .from(studyMaterialsTable)
+      .where(and(eq(studyMaterialsTable.userId, owner),
+                 eq(studyMaterialsTable.objectPath, objectPath))).limit(1);
+    const material = existing[0] ??
+      (await db.insert(studyMaterialsTable).values({
+        userId: owner, title: sample.title, fileName: sample.key + ".txt",
+        contentType: "text/plain", sizeBytes: Buffer.byteLength(sample.text),
+        objectPath, characterCount: sample.text.length,
+      }).returning({ id: studyMaterialsTable.id }))[0];
+    // The additive material-reading migration is mandatory on the disposable
+    // pilot, and ENABLE_MATERIAL_READING must be true for cached reader pages.
+    await db.execute(sql`UPDATE study_materials SET extracted_text=${sample.text},
+      allow_ai_reading=false WHERE id=${material.id} AND user_id=${owner}`);
+    const quizTitle = sample.title.replace("Notes", "Quiz");
+    const quiz = await db.select({ id: quizzesTable.id }).from(quizzesTable)
+      .where(and(eq(quizzesTable.materialId, material.id),
+                 eq(quizzesTable.userId, owner),
+                 eq(quizzesTable.title, quizTitle))).limit(1);
+    if (quiz.length === 0) {
+      await db.insert(quizzesTable).values({
+        userId: owner, materialId: material.id, title: quizTitle,
+        difficulty: "practice", questionCount: sample.questions.length,
+        optionCount: 4, modelId: "synthetic-demo-no-ai",
+        promptVersion: "pilot-demo-v1",
+        questions: sample.questions.map(q => ({
+          prompt: q.prompt, options: [...q.options], correctOption: q.correctOption,
+          explanation: q.explanation,
+        })),
+      });
+    }
+  }
+
+  console.info("CABO synthetic fixtures ready: 4 organisations, 13 identities, 4 courses, 4 assessments, 2 native learner quizzes");
 }

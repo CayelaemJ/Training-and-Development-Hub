@@ -1,0 +1,80 @@
+name: CABO quiz migration rehearsal
+on:
+  pull_request:
+    paths:
+      - 'lib/db/migrations/20261023_quiz_idempotency.sql'
+      - '.github/workflows/native-quiz-migration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cabo_test
+          POSTGRES_USER: cabo_test
+          POSTGRES_PASSWORD: test-only-local-container
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cabo_test -d cabo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: cabo_test
+      PGDATABASE: cabo_test
+      PGPASSWORD: test-only-local-container
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Create an isolated OLD quiz_attempts shape
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE quiz_attempts (
+            id serial PRIMARY KEY,
+            user_id varchar(255) NOT NULL,
+            quiz_id integer NOT NULL,
+            answers jsonb NOT NULL,
+            correct_count integer NOT NULL,
+            total_questions integer NOT NULL,
+            percentage real NOT NULL,
+            feedback jsonb NOT NULL,
+            completed_at timestamptz NOT NULL DEFAULT now()
+          );
+          INSERT INTO quiz_attempts (user_id,quiz_id,answers,correct_count,total_questions,percentage,feedback)
+            VALUES ('legacy-learner',7,'[1]',1,1,100,'[]');
+          SQL
+      - name: Rehearse additive migration twice safely
+        run: |
+          psql -v ON_ERROR_STOP=1 -f lib/db/migrations/20261023_quiz_idempotency.sql
+          psql -v ON_ERROR_STOP=1 -f lib/db/migrations/20261023_quiz_idempotency.sql
+      - name: Verify legacy and native inserts and atomic duplicate suppression
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO quiz_attempts (user_id,quiz_id,answers,correct_count,total_questions,percentage,feedback)
+            VALUES ('legacy-learner',7,'[0]',0,1,0,'[]');
+          INSERT INTO quiz_attempts (user_id,quiz_id,answers,correct_count,total_questions,percentage,feedback,request_key)
+            VALUES ('native-learner',7,'[1]',1,1,100,'[]','example-native-request-key')
+            ON CONFLICT (user_id, request_key) WHERE request_key IS NOT NULL DO NOTHING;
+          INSERT INTO quiz_attempts (user_id,quiz_id,answers,correct_count,total_questions,percentage,feedback,request_key)
+            VALUES ('native-learner',7,'[1]',1,1,100,'[]','example-native-request-key')
+            ON CONFLICT (user_id, request_key) WHERE request_key IS NOT NULL DO NOTHING;
+          DO $$
+          BEGIN
+            IF (SELECT count(*) FROM quiz_attempts WHERE user_id='native-learner') <> 1 THEN
+              RAISE EXCEPTION 'Duplicated a native attempt';
+            END IF;
+            IF (SELECT count(*) FROM quiz_attempts WHERE user_id='legacy-learner') <> 2 THEN
+              RAISE EXCEPTION 'Broke legacy quiz submissions';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Scope limitation
+        run: echo 'Disposable local Postgres SQL validation only; pilot Neon remains unchanged.'

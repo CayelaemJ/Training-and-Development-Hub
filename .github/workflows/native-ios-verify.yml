@@ -1,0 +1,50 @@
+name: CABO native iOS build verification
+on:
+  pull_request:
+    paths:
+      - 'native-apps/ios/**'
+      - '.github/workflows/native-ios-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios-simulator-build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Select installed Xcode
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project from source
+        working-directory: native-apps/ios
+        run: xcodegen generate
+      - name: Compile iPhone simulator app without signing
+        working-directory: native-apps/ios
+        run: |
+          xcodebuild \
+            -project CABOLearningHub.xcodeproj \
+            -scheme CABOLearningHub \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/CABODerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Archive unsigned iOS Simulator test build
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/CABODerivedData/Build/Products/Debug-iphonesimulator/CABOLearningHub.app"
+          test -d "$app"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/CABO-iOS-Simulator-DEBUG.zip"
+      - name: Upload iOS Simulator build (not an IPA)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CABO-iOS-Simulator-DEBUG-test-only
+          path: ${{ runner.temp }}/CABO-iOS-Simulator-DEBUG.zip
+          retention-days: 2
+          if-no-files-found: error
+      - name: Explain validation scope
+        run: echo 'Simulator compilation only. Physical iPhone sign-in, Keychain, notifications and store signing require a separate device test.'

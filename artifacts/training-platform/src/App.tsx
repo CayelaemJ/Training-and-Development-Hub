@@ -1,3 +1,5 @@
+import InstallPage from '@/pages/install';
+import LearnerSuccessPage from "@/pages/learner-success";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -18,11 +20,22 @@ import SchoolOperationsPage from '@/pages/school-operations';
 import SportsDevelopmentPage from '@/pages/sports-development';
 import DevelopmentPlanPage from '@/pages/development-plan';
 import CareerPassportPage from '@/pages/career-passport';
+import HubModulesPage from '@/pages/hub-modules';
+import SchoolStagesPage from '@/pages/school-stages';
+import InstitutionSetupPage from '@/pages/institution-setup';
+import SchoolProgressionPage from '@/pages/school-progression';
+import CaboApplyPage from '@/pages/cabo-apply';
+import EducationReportsPage from '@/pages/education-reports';
+import GuardianConnectPage from '@/pages/guardian-connect';
+import ReportIssuancePage from '@/pages/report-issuance';
+import SchoolIntelligencePage from '@/pages/school-intelligence';
+import QuestionBankPage from '@/pages/assessment-question-bank';
+import EducationCommandPage from '@/pages/education-command';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
   useRequestUploadUrl, useListMaterials, useCreateMaterial, useDeleteMaterial,
-  useGenerateQuiz, useListQuizzes, useGetQuiz, useSubmitQuizAttempt, useGetDashboard,
+  useGenerateQuiz, useDeleteQuiz, useListQuizzes, useGetQuiz, useSubmitQuizAttempt, useGetDashboard,
   getListMaterialsQueryKey, getListQuizzesQueryKey, getGetQuizQueryKey, getGetDashboardQueryKey,
 } from '@workspace/api-client-react';
 import type { QuizDetail, QuizAttemptResult, StudyMaterial, QuizSummary } from '@workspace/api-client-react';
@@ -38,28 +51,40 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
- national_director:['/','/organizations','/governance'],
- provincial_director:['/','/organizations','/governance'],
- district_director:['/','/organizations','/governance'],
- group_executive:['/','/organizations','/governance'],
+ superadmin:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ national_director:['/','/education-command','/organizations','/governance'],
+ provincial_director:['/','/education-command','/organizations','/governance'],
+ district_director:['/','/education-command','/organizations','/governance'],
+ group_executive:['/','/education-command','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
- deputy_headmaster:['/','/organizations','/academics','/governance','/institution-records'],
- department_head:['/','/organizations','/academics','/governance','/written-exams'],
- grade_head:['/','/organizations','/academics','/governance'],
- administrator:['/','/organizations','/governance'],
- teacher:['/','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
- assessor:['/','/organizations','/written-exams'],
- parent:['/','/development-plan','/sports-development','/institution-records'],
- learner:['/','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ headmaster:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
+ department_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
+ grade_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
+ administrator:['/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ teacher:['/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
+ assessor:['/','/learner-success','/organizations','/written-exams'],
+ parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
+ learner:['/','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
+  { href: '/learner-success', label: 'Learner Success Loop', icon: Target },
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
+  { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
+  { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
+  { href: '/education-reports', label: 'Reports & statistics', icon: BookOpen },
+  { href: '/report-issuance', label: 'Issue report cards', icon: FileText },
+  { href: '/school-intelligence', label: 'School progress', icon: BookOpen },
+  { href: '/question-bank', label: 'Assessment question bank', icon: FileText },
+  { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
+  { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
+  { href: '/school-stages', label: 'School stages', icon: BookOpen },
+  { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
+  { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
   { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
   { href: '/school-operations', label: 'School operations', icon: BookOpen },
   { href: '/sports-development', label: 'Sports & activities', icon: Target },
-  { href: '/development-plan', label: 'AI development plan', icon: Sparkles },
+  { href: '/development-plan', label: 'My development plan', icon: Sparkles },
   { href: '/career-passport', label: 'Careers & passport', icon: Target },
   { href: '/study-overview', label: 'Study overview', icon: LayoutDashboard },
   { href: '/materials', label: 'Study materials', icon: BookOpen },
@@ -92,6 +117,7 @@ function SignedOutConfirmation() {
 
 function AuthGate() {
   const auth = useAuth();
+  if (window.location.pathname === '/install') return <InstallPage />;
   if (auth.isLoading) return <BusyScreen />;
   if (auth.isAuthenticated) return <AppShell user={auth.user} />;
   if (window.location.pathname === '/signed-out') return <SignedOutConfirmation />;
@@ -101,6 +127,18 @@ function AuthGate() {
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={RoleHomePage} />
+    <Route path="/learner-success" component={LearnerSuccessPage} />
+    <Route path="/hub-modules" component={HubModulesPage} />
+    <Route path="/cabo-apply" component={CaboApplyPage} />
+    <Route path="/education-reports" component={EducationReportsPage} />
+    <Route path="/report-issuance" component={ReportIssuancePage} />
+    <Route path="/school-intelligence" component={SchoolIntelligencePage} />
+    <Route path="/question-bank" component={QuestionBankPage} />
+    <Route path="/education-command" component={EducationCommandPage} />
+    <Route path="/guardian-connect" component={GuardianConnectPage} />
+    <Route path="/school-stages" component={SchoolStagesPage} />
+    <Route path="/institution-setup" component={InstitutionSetupPage} />
+    <Route path="/school-progression" component={SchoolProgressionPage} />
     <Route path="/platform-admin" component={PlatformAdminPage} />
     <Route path="/school-operations" component={SchoolOperationsPage} />
     <Route path="/sports-development" component={SportsDevelopmentPage} />
@@ -148,13 +186,14 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'AI development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
-      <Link href="/" className="brand"><Mark /><span>Training & Development Hub</span></Link>
+      <Link href="/" className="brand"><Mark /><span>Training &amp; Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
+        <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
         {navItems.filter(item=>portalRole!==null&&allowedNav[portalRole]?.includes(item.href)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
@@ -240,7 +279,7 @@ function GrowthSnapshot() {
       <div><strong>{evidenceTotal}</strong><span>Portfolio entries</span></div>
       <div><strong>{data?.pendingAccessRequests??0}</strong><span>Permission requests</span></div>
     </div>}
-    <div className="growth-actions"><Link href="/potential">Develop my potential <ArrowUpRight size={15}/></Link><Link href="/institution-records">School & guardian records <ArrowUpRight size={15}/></Link></div>
+    <div className="growth-actions"><Link href="/potential">Develop my potential <ArrowUpRight size={15}/></Link><Link href="/institution-records">School &amp; guardian records <ArrowUpRight size={15}/></Link></div>
   </section>;
 }
 function DashboardPage() {
@@ -275,12 +314,24 @@ function DashboardPage() {
 
 function QuizRow({ quiz, index = 0 }: { quiz: QuizSummary; index?: number }) {
   const score = quiz.latestScore;
-  return <Link href={`/quiz/${quiz.id}`} className="activity-row" data-testid={`row-quiz-${quiz.id}`}>
+  const queryClient = useQueryClient();
+  const deletion = useDeleteQuiz();
+  const remove = () => {
+    if (!window.confirm(`Delete “${quiz.title}” and its practice attempts? Your source material will stay saved.`)) return;
+    deletion.mutate({id: quiz.id}, {onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({queryKey: getListQuizzesQueryKey()}),
+        queryClient.invalidateQueries({queryKey: getGetDashboardQueryKey()}),
+      ]);
+      queryClient.removeQueries({queryKey: getGetQuizQueryKey(quiz.id)});
+    }});
+  };
+  return <div><div className="flex items-center gap-2"><Link href={`/quiz/${quiz.id}`} className="activity-row flex-1 min-w-0" data-testid={`row-quiz-${quiz.id}`}>
     <span className={`row-icon row-icon-${index % 3}`}><BrainCircuit size={18} /></span>
     <span className="row-main"><strong>{quiz.title}</strong><small>{quiz.materialTitle} <span className="mini-separator">·</span> {quiz.questionCount} questions <span className="mini-separator">·</span> {quiz.difficulty}</small></span>
     <span className={`score-chip ${score == null ? 'score-empty' : score >= 70 ? 'score-good' : 'score-low'}`}>{score == null ? 'Not attempted' : `${Math.round(score)}%`}</span>
     <span className="row-date">{formatDistanceToNow(new Date(quiz.createdAt), { addSuffix: true })}</span><ChevronRight size={16} className="row-arrow" />
-  </Link>;
+  </Link><button className="button button-outline button-small" aria-label={`Delete test: ${quiz.title}`} onClick={remove} disabled={deletion.isPending} data-testid={`button-delete-quiz-${quiz.id}`}><Trash2 size={16} />{deletion.isPending ? 'Deleting…' : 'Delete'}</button></div>{deletion.isError && <p role="alert">{deletion.error.message}</p>}</div>;
 }
 
 function MaterialsPage() {
@@ -294,22 +345,25 @@ function MaterialsPage() {
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [allowAiReading, setAllowAiReading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const busy = uploading || requestUrl.isPending || createMaterial.isPending;
   const onSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedFile(null); setAllowAiReading(false);
     if (file.size > 30 * 1024 * 1024) { setError('Files must be 30 MB or smaller.'); event.target.value = ''; return; }
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['txt', 'pdf', 'docx'].includes(ext || '')) { setError('Choose a TXT, PDF, or DOCX file.'); return; }
+    if (!['txt','md','csv','pdf','docx','pptx','xlsx','png','jpg','jpeg','webp'].includes(ext || '')) { setError('Choose a PDF, DOCX, PowerPoint, Excel, text, Markdown, CSV or a PNG, JPEG or WebP image.'); return; }
     setSelectedFile(file); setTitle(file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')); setError('');
   };
   const upload = async () => {
     if (!selectedFile || !title.trim()) { setError('Add a title and choose a file to continue.'); return; }
     try {
       setUploading(true); setError('');
-      const contentType = selectedFile.type || (selectedFile.name.endsWith('.txt') ? 'text/plain' : selectedFile.name.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      const signed = await requestUrl.mutateAsync({ data: { name: selectedFile.name, size: selectedFile.size, contentType } });
+      const mime: Record<string,string> = {txt:'text/plain',md:'text/markdown',csv:'text/csv',pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp'};
+      const contentType = mime[selectedFile.name.split('.').pop()?.toLowerCase()??''] || selectedFile.type;
+      const signed = await requestUrl.mutateAsync({ data: { name: selectedFile.name, size: selectedFile.size, contentType, allowAiReading } });
       const put = await fetch(signed.uploadURL, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedFile });
       if (!put.ok) throw new Error('The file could not be uploaded. Please try again.');
       await createMaterial.mutateAsync({ data: { title: title.trim(), objectPath: signed.objectPath } });
@@ -331,10 +385,11 @@ function MaterialsPage() {
       <div className="upload-form-grid">
         <label className="field-label">Give it a name<input className="text-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 4 · Cell biology" data-testid="input-material-title" /></label>
         <div className="field-label">Choose a file<label className={`file-drop ${selectedFile ? 'has-file' : ''}`} htmlFor="material-file">
-          <input id="material-file" ref={fileRef} type="file" accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onSelect} data-testid="input-material-file" />
-          <span className="file-drop-icon">{selectedFile ? <FileText size={21} /> : <FileUp size={21} />}</span><span><strong>{selectedFile?.name || 'Choose a document'}</strong><small>{selectedFile ? formatBytes(selectedFile.size) : 'PDF, DOCX, or TXT · up to 30 MB'}</small></span><span className="choose-file">{selectedFile ? 'Change' : 'Browse'}</span>
+          <input id="material-file" ref={fileRef} type="file" accept=".txt,.md,.csv,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.webp" onChange={onSelect} data-testid="input-material-file" />
+          <span className="file-drop-icon">{selectedFile ? <FileText size={21} /> : <FileUp size={21} />}</span><span><strong>{selectedFile?.name || 'Choose a document'}</strong><small>{selectedFile ? formatBytes(selectedFile.size) : 'Documents, slides, spreadsheets or photos · up to 30 MB'}</small></span><span className="choose-file">{selectedFile ? 'Change' : 'Browse'}</span>
         </label></div>
       </div>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={allowAiReading} onChange={e=>setAllowAiReading(e.target.checked)}/><span>Read scanned pages and images with AI. These pages are sent to our AI provider. Only share learning material you have permission to send; leave out personal records.</span></label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="upload-actions"><span className="privacy-hint"><Check size={14} /> Only you can access your materials</span><button className="button button-primary" disabled={busy || !selectedFile || !title.trim()} onClick={upload} data-testid="button-upload-save">{busy ? <><LoaderCircle className="spin" size={17} /> Uploading…</> : <>Upload material <ArrowRight size={16} /></>}</button></div>
     </section>}
@@ -386,16 +441,16 @@ function MaterialConfigurePage() {
       </div>
       <section className="configure-panel">
         <div className="configure-step"><span className="step-number">01</span><div><h2 className="font-display">Question count</h2><p>How much time do you have?</p></div></div>
-        <div className="count-control"><button className="count-button" aria-label="Decrease question count" disabled={count <= 1} onClick={() => setCount((n) => Math.max(1, n - 1))} data-testid="button-count-decrease">−</button><div className="count-display"><strong>{count}</strong><span>questions</span></div><button className="count-button" aria-label="Increase question count" disabled={count >= 30} onClick={() => setCount((n) => Math.min(30, n + 1))} data-testid="button-count-increase">+</button></div>
-        <input className="range-slider" type="range" min="1" max="30" value={count} onChange={(e) => setCount(Number(e.target.value))} aria-label="Question count" data-testid="input-question-count" />
-        <div className="range-labels"><span>1 question</span><span>30 questions</span></div>
+        <div className="count-control"><button className="count-button" aria-label="Decrease question count" disabled={count <= 1} onClick={() => setCount((n) => Math.max(1, n - 1))} data-testid="button-count-decrease">−</button><div className="count-display"><strong>{count}</strong><span>questions</span></div><button className="count-button" aria-label="Increase question count" onClick={() => setCount((n) => n + 1)} data-testid="button-count-increase">+</button></div>
+        <input className="text-input" type="number" min="1" step="1" value={count} onChange={(e) => setCount(Math.max(1, Math.floor(Number(e.target.value) || 1)))} aria-label="Question count" data-testid="input-question-count" />
+        <p className="generate-foot">Choose your question count. Larger tests take longer; we prepare them in batches and wait when the provider is busy.</p>
         <div className="configure-step step-spaced"><span className="step-number">02</span><div><h2 className="font-display">Difficulty</h2><p>Choose the kind of challenge</p></div></div>
         <div className="choice-row difficulty-choices">{(['beginner', 'intermediate', 'advanced'] as const).map((item) => <button key={item} className={`choice-button ${difficulty === item ? 'selected' : ''}`} onClick={() => setDifficulty(item)} data-testid={`button-difficulty-${item}`}><span className={`choice-level ${item}`} /><strong>{item[0].toUpperCase() + item.slice(1)}</strong>{difficulty === item && <Check size={15} />}</button>)}</div>
         <div className="configure-step step-spaced"><span className="step-number">03</span><div><h2 className="font-display">Answer options</h2><p>How many choices per question?</p></div></div>
         <div className="choice-row option-choices">{([4, 6] as const).map((n) => <button key={n} className={`option-button ${options === n ? 'selected' : ''}`} onClick={() => setOptions(n)} data-testid={`button-options-${n}`}><span className="option-dots">{Array.from({ length: n }, (_, i) => <i key={i} />)}</span><strong>{n} options</strong>{options === n && <Check size={15} />}</button>)}</div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="button button-primary generate-button" onClick={create} disabled={generateQuiz.isPending} data-testid="button-generate-quiz">{generateQuiz.isPending ? <><LoaderCircle className="spin" size={17} /> Building your test…</> : <>Create practice test <ArrowRight size={17} /></>}</button>
-         <p className="generate-foot"><Sparkles size={13} /> Generating a test sends extracted text to OpenAI; your original file stays in your private library.</p>
+         <p className="generate-foot"><Sparkles size={13} /> Creating a test sends selected source text to our AI provider. Long documents are covered in sections. Your original file stays in your private library.</p>
       </section>
     </div>
   </div>;

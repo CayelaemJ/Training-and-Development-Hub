@@ -1,7 +1,8 @@
 import { Readable } from 'stream';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
-import { and,eq } from 'drizzle-orm';
+import { materialReadingEnabled } from '../lib/materialCache';
+import { and,eq,sql } from 'drizzle-orm';
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -10,6 +11,8 @@ import { db, uploadIntentsTable, materialUploadBlobsTable } from '@workspace/db'
 import { Router, type IRouter, type Request, type Response } from 'express';
 
 import { ObjectPermission } from '../lib/objectAcl';
+import { validateMaterial, MaterialReadError, MAX_FILE_BYTES } from '../lib/uploadPolicy';
+import { railwayUploadUrl } from '../lib/railwayUploadUrl';
 import {
   ObjectNotFoundError,
   ObjectStorageService,
@@ -59,22 +62,19 @@ router.post(
 
     try {
       const { name, size, contentType } = parsed.data;
-      const extension = name.toLowerCase().split('.').pop();
-      const supportedExtensions = new Set(['txt', 'md', 'pdf', 'docx']);
-      if (!extension || !supportedExtensions.has(extension)) {
-        res.status(400).json({
-          error: 'Upload a TXT, Markdown, PDF, or DOCX file.',
-        });
-        return;
-      }
-      if (size > 20 * 1024 * 1024) {
-        res.status(400).json({ error: 'Files must be 20 MB or smaller.' });
-        return;
-      }
-
-      const railwayFallback = process.env.RAILWAY_ENVIRONMENT_NAME === 'testing';
+      validateMaterial(name, size);
+      const allowAiReading = req.body.allowAiReading === true;
+      const railwayFallback = (process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === 'testing';
       const objectPath = railwayFallback ? `/railway-uploads/${randomUUID()}` : '';
-      const uploadURL = railwayFallback ? `/api/storage/uploads/railway/${objectPath.split('/').pop()}` : await objectStorageService.getObjectEntityUploadURL();
+      // Return an absolute same-origin URL: the API response schema requires a URL, not a relative path.
+      // The request host keeps demo uploads on the same origin so session cookies accompany the PUT.
+      const host = req.get('host');
+      if (railwayFallback && (!host || !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(host))) {
+        res.status(400).json({error:'Invalid upload host'}); return;
+      }
+      const uploadURL = railwayFallback
+        ? railwayUploadUrl(host!, objectPath)
+        : await objectStorageService.getObjectEntityUploadURL();
       const finalObjectPath = railwayFallback ? objectPath : objectStorageService.normalizeObjectEntityPath(uploadURL);
       await db.insert(uploadIntentsTable).values({
         objectPath: finalObjectPath,
@@ -84,6 +84,7 @@ router.post(
         sizeBytes: size,
       });
 
+      if(materialReadingEnabled())await db.execute(sql`UPDATE upload_intents SET allow_ai_reading=${allowAiReading} WHERE object_path=${finalObjectPath} AND user_id=${req.user.id}`);
       res.json(
         RequestUploadUrlResponse.parse({
           uploadURL,
@@ -91,6 +92,7 @@ router.post(
         }),
       );
     } catch (error) {
+      if(error instanceof MaterialReadError){res.status(400).json({error:error.message});return;}
       req.log.error({ err: error }, 'Error generating upload URL');
       res.status(500).json({ error: 'Failed to generate upload URL' });
     }
@@ -102,9 +104,9 @@ router.post(
  * Binary bytes stay in the isolated PostgreSQL database until material creation.
  * This avoids Replit's unavailable localhost object-storage sidecar on Railway.
  */
-router.put('/storage/uploads/railway/:id',express.raw({type:'*/*',limit:'20mb'}),async(req,res)=>{
+router.put('/storage/uploads/railway/:id',express.raw({type:'*/*',limit:MAX_FILE_BYTES}),async(req,res)=>{
  if(!hasAuthenticatedSession(req)){res.status(401).json({error:'Unauthorized'});return}
- if(process.env.RAILWAY_ENVIRONMENT_NAME!=='testing'){res.sendStatus(404);return}
+ if((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'){res.sendStatus(404);return}
  const identifier=req.params.id;
  if(typeof identifier!=='string'||!/^[a-f0-9-]{36}$/.test(identifier)){res.sendStatus(400);return}
  const objectPath='/railway-uploads/'+identifier;

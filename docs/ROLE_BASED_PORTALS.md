@@ -1,16 +1,20 @@
 # CABO Role-Based Portals and Academic Permissions
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 ## Why a hierarchy needs more than separate menus
 
 The interface must reflect the **server's** permissions. A hidden button is not protection: every API endpoint must authenticate, constrain institutional scope, and check the requested operation against authorised membership, grants and course assignments.
 
 ## Test superadmin
 
-For the isolated Railway `testing` environment, the existing `cabo_test` website account signs in to a fixed internal user ID. The API recognises that account as superadmin **only if all three conditions hold**:
+For the isolated Render `testing` environment, native test login maps `cabo_test` to a fixed internal user ID. The API recognises that account as superadmin only when all of these hold:
 
-1. `RAILWAY_ENVIRONMENT_NAME=testing`
-2. `ENABLE_CABO_SUPERADMIN=true`
-3. `CABO_SUPERADMIN_USER_ID` equals the authenticated user ID.
+1. `CABO_ENVIRONMENT=testing` (the legacy `RAILWAY_ENVIRONMENT_NAME` fallback remains for older deployments)
+2. `CABO_TEST_DATABASE_ISOLATED=true`
+3. `ENABLE_CABO_SUPERADMIN=true`
+4. `CABO_SUPERADMIN_USER_ID` equals the authenticated user ID.
 
 The website username is not trusted as an authorisation claim. No new password is stored in source control. This arrangement is **temporary for isolated testing**, not a production identity and governance model.
 
@@ -56,7 +60,7 @@ When an account has several roles, its highest ranked granted role selects the d
 
 - An academic course staff assignment is distinct from a management hierarchy role. A manager does not automatically receive permission to teach or change grades.
 - Full teacher/class/group mappings, subject-specific learning progress dashboards, verified parent visibility, application-wide impersonation with approval, delegated leadership reporting at all levels, and consistent audit coverage are not yet implemented.
-- This test login uses one account, not a test suite with independent principals. Verify isolation with separate authenticated school, teacher, district, parent, guardian and learner accounts before release.
+- The isolated native test route now supports validated synthetic principals in addition to the pinned superadmin. Superadmin and one synthetic parent redaction flow have passed smoke checks; verify separate school, teacher, district, learner and guardian permissions before release.
 - `drizzle-kit push` is configured only for the **isolated test database**. Production must use reviewed, versioned migrations, backups and rollback.
 - Review the lawful basis and required safeguards for all children's data under POPIA. Never enable unrestricted employer access through the platform superadmin feature.
 - Server authorisation must be re-tested after merging or changing a user's role, membership, organisation or assigned course.

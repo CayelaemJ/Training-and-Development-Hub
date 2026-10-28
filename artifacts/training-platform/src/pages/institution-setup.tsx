@@ -1,0 +1,37 @@
+import {useEffect,useState} from "react";
+type Org={id:number;name:string;role:string};
+type Setup={countryCode:"ZA"|"BW"|null;institutionType:string;province:string;district:string;circuit:string;officialReference:string;curriculum:string;language:string;academicYear:number;status:string};
+const provinces=["Eastern Cape","Free State","Gauteng","KwaZulu-Natal","Limpopo","Mpumalanga","North West","Northern Cape","Western Cape"];
+const types=["preprimary","primary","highschool","combined","special","independent","tvet","university","training"];
+const curricular=["CAPS","IEB","Montessori","Cambridge","CUSTOM","UNIVERSITY","TVET"];
+const defaults:Setup={countryCode:null,institutionType:"combined",province:"",district:"",circuit:"",officialReference:"",curriculum:"CUSTOM",language:"English",academicYear:new Date().getFullYear(),status:"draft"};
+const field="mt-1 w-full rounded-md border bg-background p-3 text-sm";
+async function api<T>(p:string,method="GET",body?:unknown):Promise<T>{const r=await fetch("/api"+p,{method,credentials:"include",cache:"no-store",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});if(!r.ok){const j=await r.json().catch(()=>({}));throw Error(j.error??"Request failed")}return r.json()}
+export default function InstitutionSetupPage(){
+ const [orgs,setOrgs]=useState<Org[]>([]),[org,setOrg]=useState(""),[details,setDetails]=useState<Setup>(defaults),[notice,setNotice]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false),[classifiedCountry,setClassifiedCountry]=useState<"ZA"|"BW"|null>(null);
+ useEffect(()=>{api<Org[]>("/organizations").then(list=>{setOrgs(list);if(list.length)setOrg(String(list[0].id))}).catch(e=>setError(e.message))},[]);
+ useEffect(()=>{if(!org)return;setError("");api<Setup|null>("/organizations/"+org+"/setup").then(v=>{setDetails(v?{...v,countryCode:v.countryCode??null}:{...defaults});setClassifiedCountry(v?.countryCode??null)}).catch(e=>setError(e.message))},[org]);
+ const update=(k:keyof Setup,v:string|number)=>setDetails(d=>({...d,[k]:v}));
+ async function save(status:"draft"|"submitted"){setBusy(true);setNotice("");setError("");try{const result=await api<{status:string;countryCode:"ZA"|"BW"|null}>("/organizations/"+org+"/setup","PUT",{...details,status});update("status",result.status);setClassifiedCountry(result.countryCode);setNotice(status==="submitted"?"Submitted for internal review. This is not government verification.":"Configuration saved")}catch(e){setError(e instanceof Error?e.message:"Unable to save")}finally{setBusy(false)}}
+ return <section className="mx-auto max-w-5xl space-y-6 pb-16"><header className="border-b pb-5 space-y-2"><p className="text-xs uppercase tracking-[.2em] text-muted-foreground">CABO Institution Onboarding</p><h1 className="font-display text-3xl sm:text-4xl">Configure your institution</h1><p className="max-w-2xl text-sm text-muted-foreground">Set up an institution for stage-appropriate teaching, records and governance. Official school registration and EMIS details require verification before national data exchange.</p></header>
+ {error&&<p role="alert" className="rounded-lg border border-destructive p-3">{error}</p>}{notice&&<p role="status" className="rounded-lg border p-3">{notice}</p>}
+ <div className="rounded-xl border p-5 space-y-4"><label className="block text-sm">Organisation<select className={field} value={org} onChange={e=>setOrg(e.target.value)}><option value="">Select institution</option>{orgs.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+ <div className="grid gap-4 sm:grid-cols-2">
+ <label className="text-sm">Country / legal jurisdiction
+ <select className={field} value={details.countryCode??""} disabled={classifiedCountry!==null}
+  onChange={e=>setDetails(d=>({...d,countryCode:e.target.value==="ZA"||e.target.value==="BW"?e.target.value:null}))}>
+  <option value="">Select country before submission</option>
+  <option value="ZA">South Africa</option><option value="BW">Botswana</option>
+ </select></label><label className="text-sm">Institution type<select className={field} value={details.institutionType} onChange={e=>update("institutionType",e.target.value)}>{types.map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+ <label className="text-sm">Region / province<input className={field} maxLength={60} value={details.province} onChange={e=>update("province",e.target.value)} placeholder="e.g. South-East, Botswana"/></label>
+ <label className="text-sm">District<input className={field} maxLength={120} value={details.district} onChange={e=>update("district",e.target.value)} placeholder="Education district"/></label>
+ <label className="text-sm">Circuit<input className={field} maxLength={120} value={details.circuit} onChange={e=>update("circuit",e.target.value)} placeholder="Optional circuit"/></label>
+ <label className="text-sm">Curriculum<input className={field} maxLength={40} value={details.curriculum} onChange={e=>update("curriculum",e.target.value)} placeholder="e.g. PSLE, JCE, BGCSE, CAPS or custom"/></label>
+ <label className="text-sm">Academic year<input className={field} type="number" min={2020} max={2200} value={details.academicYear} onChange={e=>update("academicYear",Number(e.target.value))}/></label>
+ <label className="text-sm">Language<input className={field} maxLength={40} value={details.language} onChange={e=>update("language",e.target.value)}/></label>
+ <label className="text-sm">Claimed official reference<input className={field} maxLength={100} value={details.officialReference} onChange={e=>update("officialReference",e.target.value)} placeholder="Optional EMIS/registration reference"/></label></div>
+ <p className="text-xs text-muted-foreground">{classifiedCountry?"Country classification is locked after first save. Changing it requires an authorised data-governance migration.":"Existing records without a country remain unclassified until an administrator selects one."}</p>
+ {details.countryCode==="BW"&&<p className="text-xs text-muted-foreground">Botswana: data-transfer safeguards and, when section 74 applies, a copy in Botswana must be verified before learner data is processed abroad. This setup alone does not authorise live learner data.</p>}
+ {details.countryCode==="ZA"&&<p className="text-xs text-muted-foreground">South Africa: POPIA child-data authorisation and applicable section 72 transfer safeguards require review before live learner data.</p>}
+ <div className="flex flex-wrap gap-3"><button disabled={busy||!org||details.district.trim().length<2} onClick={()=>save("draft")} className="rounded-md border px-5 py-3 disabled:opacity-50">Save draft</button><button disabled={busy||!org||!details.countryCode||details.district.trim().length<2} onClick={()=>save("submitted")} className="rounded-md bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">Submit setup</button></div><p className="text-xs text-muted-foreground">Submission establishes no official DBE partnership, accreditation or permission to import real learner data.</p></div></section>;
+}

@@ -249,6 +249,8 @@ async function signObjectURL({
     method,
     expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
   };
+  // Replit's sidecar is bound to loopback; HTTPS is not exposed on this local-only endpoint.
+  // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
   const response = await fetch(
     `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
     {

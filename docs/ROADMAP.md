@@ -1,4 +1,8 @@
-# Product Roadmap and Acceptance Criteria
+# Potential & Opportunity Module — Roadmap and Acceptance Criteria
+
+> **Scope:** These phases describe the candidate-owned potential and opportunity workstream, **not CABO Learning Hub's full platform roadmap**. For the overall platform identity, education operations and verified current state, see [Platform Identity](PLATFORM_IDENTITY.md), [Connected Hub sprints](CONNECTED_HUB_SPRINTS.md) and [Delivery Register](PHASES_1_TO_4_DELIVERY_REGISTER.md).
+
+
 
 ## Phase 1 — Foundation (feature branch)
 

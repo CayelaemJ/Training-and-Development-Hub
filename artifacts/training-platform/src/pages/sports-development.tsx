@@ -13,7 +13,7 @@ export default function SportsDevelopmentPage(){
  return <section className="mx-auto max-w-5xl space-y-6 pb-20" aria-labelledby="sports-page-title">
   <header className="space-y-3 border-b pb-6">
    <p className="text-xs uppercase tracking-[.18em] text-muted-foreground">CABO / Whole-child development</p>
-   <h1 id="sports-page-title" className="font-display text-3xl sm:text-5xl">Sport & extracurricular growth</h1>
+   <h1 id="sports-page-title" className="font-display text-3xl sm:text-5xl">Sport &amp; extracurricular growth</h1>
    <p className="max-w-2xl text-muted-foreground leading-relaxed">A learner is more than their marks. Recognise dedication, creativity, teamwork and growth outside the classroom.</p>
   </header>
   <div className="rounded-xl border bg-card p-5 sm:p-7 space-y-3">
@@ -27,6 +27,6 @@ export default function SportsDevelopmentPage(){
     <Icon size={23} className="text-primary" aria-hidden="true"/><h3 className="font-semibold">{name}</h3><p className="text-sm leading-relaxed text-muted-foreground">{detail}</p>
    </article>)}
   </div>
-  <div className="rounded-xl border p-5 space-y-2"><h2 className="font-semibold">How progress intelligence will work</h2><p className="text-sm leading-relaxed text-muted-foreground">Compare a learner with their own previous observations using the same rubric, age band and activity. Visualise participation and growth over time, highlight areas for supportive practice, and require coach review before verified results appear. The platform will not rank unrelated sports or use automated talent predictions to exclude children.</p></div>
+  <div className="rounded-xl border p-5 space-y-2"><h2 className="font-semibold">Following your progress</h2><p className="text-sm leading-relaxed text-muted-foreground">Compare a learner with their own previous observations using the same rubric, age band and activity. Visualise participation and growth over time, highlight areas for supportive practice, and require coach review before verified results appear. The platform will not rank unrelated sports or use automated talent predictions to exclude children.</p></div>
  </section>;
 }
