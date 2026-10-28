@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac, createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -78,7 +78,7 @@ try {
     await publishPreviewJob({ version:1, materialId:17 }, fetcher, env);
     assert.ok(captured.url.startsWith("https://qstash-eu-central-1.upstash.io/v2/publish/https://"));
     assert.equal(captured.headers["Upstash-Retries"], "2");
-    assert.equal(captured.headers["Upstash-Deduplication-Id"], "cabo-preview-17");
+    assert.match(captured.headers["Upstash-Deduplication-Id"], /^cabo-preview-[a-f0-9]{12}-17$/);
     assert.deepEqual(JSON.parse(captured.body), {version:1,materialId:17});
     assert.ok(!captured.body.includes("userId") && !captured.body.includes("learner"));
   });
@@ -92,5 +92,5 @@ try {
   });
 } finally {
   // All Node tests are registered synchronously above; cleanup after they run.
-  test.after(async () => { await rm(tmp,{recursive:true,force:true}); });
+  after(async () => { await rm(tmp,{recursive:true,force:true}); });
 }
