@@ -1,0 +1,8 @@
+name = "cabo-learning-django-insights"
+main = "main.py"
+compatibility_date = "2026-10-28"
+compatibility_flags = ["python_workers"]
+
+# No route or custom domain is attached. Deploy to isolated staging first.
+# Set DJANGO_SECRET_KEY and DJANGO_WORKER_TOKEN as Worker secrets.
+# This worker is not intended for direct browser use.
