@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
+import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
 import { logger } from "./lib/logger";
 import {permittedBrowserOrigin} from "./lib/originPolicy";
 import {apiRateLimit} from "./middlewares/rateLimit";
@@ -38,10 +39,17 @@ app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)
 // Protect the API before parsing bodies or retrieving sessions.
 app.use("/api", apiRateLimit);
 app.use(cookieParser());
+app.use("/api/internal/qstash/material-preview", express.json({
+  limit: "1kb",
+  verify(req, _res, body) {
+    (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
+  },
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
+app.use("/api", qstashMaterialPreviewRouter);
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
