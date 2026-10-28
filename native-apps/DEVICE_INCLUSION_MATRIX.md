@@ -17,7 +17,7 @@ A person's phone, tablet brand, purchase price, age of device or network quality
 ## Role and form-factor experience
 
 - **Teacher with tablet**: large two-pane native classroom workspace at 600dp+ on Android or regular horizontal size class on iPad, with assigned course names and permitted support summary. On smaller devices the same authorized user uses a one-pane view. Editing lesson content, marking and interventions remain separate development work and must go through CABO's existing scoped APIs.
-- **Learner with tablet or phone**: progress summary, study materials and practice-test listings, plus an authenticated picker for supported study documents. No force-installed parental control based on hardware or private cache of school records. Live storage/device acceptance and offline learning remain further work.
+- **Learner with tablet or phone**: progress summary, study materials and practice-test listings, an authenticated picker for supported study documents, and encrypted local drafts for school support requests with explicit retry. No force-installed parental control based on hardware or private cache of school records. Live storage/device acceptance and offline learning content remain further work.
 - **Parent with phone or tablet**: large, clearly labeled native Accept/Decline buttons, invitation status, verification guidance. An invitation alone does not authorize child reports. Name is returned **only** for an institution-verified guardian link with an active enrollment.
 - **Any role**: no account is blocked or changed simply because a screen is small, wide, older, or inexpensive. User's server-resolved role is the source of truth, independent of device detection.
 
@@ -30,7 +30,7 @@ A person's phone, tablet brand, purchase price, age of device or network quality
 5. No assumption that camera, biometrics, Google Mobile Services, NFC or powerful hardware exists. Document selection must support each platform's standard system picker.
 6. User-friendly failures for slow connections, school Wi-Fi interruptions and devices with limited storage. Never display a failed submission as successful or silently re-send it.
 7. Keep CABO clay, teal, ink and gold accessible with adequate contrast, actual text labels, dynamic type, readable marks and localization-ready content.
-8. Clear any sensitive session credentials upon logout and never cache private student work by default. Once offline learning is implemented, use explicit downloads, encrypted at-rest storage, per-learner isolation, expiration and conflict-safe synchronization.
+8. Clear sensitive session credentials and unsent drafts upon logout. Persist support drafts only in encrypted app-private storage, bind them to the active token, and keep them available across connectivity loss and app restarts for that account. Offline learning content still requires explicit downloads, expiration and conflict-safe synchronization.
 
 ## Native implementation references
 

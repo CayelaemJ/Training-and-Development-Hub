@@ -27,6 +27,11 @@ private val materialContentTypes = mapOf(
 )
 
 internal data class MaterialSummary(val id: Int, val title: String)
+internal data class SupportCourseOption(val organizationId: Int, val courseId: Int, val name: String)
+internal data class NativeSupportDraft(
+    val requestKey: String, val organizationId: Int, val courseId: Int,
+    val courseName: String, val concept: String, val question: String, val attempted: String
+)
 internal data class QuizSummary(val id: Int, val title: String, val questionCount: Int, val latestScore: Double?)
 internal data class QuizQuestion(val prompt: String, val options: List<String>)
 internal data class PracticeQuiz(val id: Int, val title: String, val questions: List<QuizQuestion>)
@@ -91,6 +96,8 @@ internal data class NativeLearning(
     val journey: List<String> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
+    val supportCourses: List<SupportCourseOption> = emptyList(),
+    val supportDrafts: List<NativeSupportDraft> = emptyList(),
     val quizEntries: List<QuizSummary> = emptyList(),
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
@@ -113,6 +120,99 @@ internal class NativeApi(private val context: Context) {
         return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
     fun testLoginAvailable(): Boolean = BuildConfig.ENABLE_TEST_LOGIN
+
+    private fun supportDraftOwner(): String {
+        val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
+        return Base64.encodeToString(MessageDigest.getInstance("SHA-256")
+            .digest(token.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+    }
+
+    suspend fun loadSupportDrafts(): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val owner = supportDraftOwner()
+            if (secrets.get("support_drafts_owner") != owner) {
+                secrets.put("support_drafts", null)
+                secrets.put("support_courses", null)
+                secrets.put("support_drafts_owner", owner)
+                return@withContext emptyList()
+            }
+            val saved = secrets.get("support_drafts") ?: return@withContext emptyList()
+            val rows = JSONArray(saved)
+            (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val key = row.optString("requestKey")
+                val orgId = row.optInt("organizationId")
+                val courseId = row.optInt("courseId")
+                val name = row.optString("courseName")
+                val concept = row.optString("concept")
+                val question = row.optString("question")
+                val attempted = row.optString("attempted")
+                if (key.isBlank() || orgId <= 0 || courseId <= 0 || name.isBlank() ||
+                    concept.length !in 2..160 || question.length !in 10..4000 || attempted.length !in 3..2000) null
+                else NativeSupportDraft(key, orgId, courseId, name, concept, question, attempted)
+            }.take(20)
+        }
+
+    suspend fun loadCachedSupportCourses(): List<SupportCourseOption> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val owner = try { supportDraftOwner() } catch (_: Exception) { return@withContext emptyList() }
+            if (secrets.get("support_drafts_owner") != owner) return@withContext emptyList()
+            val rows = try { JSONArray(secrets.get("support_courses") ?: return@withContext emptyList()) }
+                catch (_: Exception) { return@withContext emptyList() }
+            (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val orgId = row.optInt("organizationId")
+                val courseId = row.optInt("courseId")
+                val name = row.optString("name").take(120)
+                if (orgId <= 0 || courseId <= 0 || name.isBlank()) null
+                else SupportCourseOption(orgId, courseId, name)
+            }.take(100)
+        }
+
+    suspend fun saveSupportDraft(draft: NativeSupportDraft): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(draft.requestKey.matches(Regex("[a-fA-F0-9-]{36}")) && draft.organizationId > 0 && draft.courseId > 0)
+            require(draft.concept.trim().length in 2..160 && draft.question.trim().length in 10..4000 &&
+                draft.attempted.trim().length in 3..2000)
+            val current = loadSupportDrafts().filterNot { it.requestKey == draft.requestKey }
+            val updated = (current + draft.copy(concept = draft.concept.trim(), question = draft.question.trim(),
+                attempted = draft.attempted.trim())).takeLast(20)
+            val rows = JSONArray()
+            updated.forEach { row -> rows.put(JSONObject()
+                .put("requestKey", row.requestKey).put("organizationId", row.organizationId)
+                .put("courseId", row.courseId).put("courseName", row.courseName)
+                .put("concept", row.concept).put("question", row.question).put("attempted", row.attempted)) }
+            secrets.put("support_drafts_owner", supportDraftOwner())
+            secrets.put("support_drafts", rows.toString())
+            updated
+        }
+
+    suspend fun deleteSupportDraft(requestKey: String): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val updated = loadSupportDrafts().filterNot { it.requestKey == requestKey }
+            val rows = JSONArray()
+            updated.forEach { row -> rows.put(JSONObject()
+                .put("requestKey", row.requestKey).put("organizationId", row.organizationId)
+                .put("courseId", row.courseId).put("courseName", row.courseName)
+                .put("concept", row.concept).put("question", row.question).put("attempted", row.attempted)) }
+            secrets.put("support_drafts", rows.toString())
+            updated
+        }
+
+    suspend fun clearSupportDrafts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        secrets.put("support_drafts", null)
+        secrets.put("support_courses", null)
+        secrets.put("support_drafts_owner", null)
+    }
+
+    suspend fun submitSupportDraft(draft: NativeSupportDraft): Int =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val response = request("/api/organizations/${draft.organizationId}/support", JSONObject()
+                .put("courseId", draft.courseId).put("concept", draft.concept)
+                .put("question", draft.question).put("attempted", draft.attempted)
+                .put("requestKey", draft.requestKey), auth = true)
+            response.getInt("id").also { require(it > 0) { "CABO returned an invalid support request." } }
+        }
 
     suspend fun materialFileName(uri: Uri): String =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -511,6 +611,26 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
+        val supportCourses = if (role == "learner") orgIds.take(12).flatMap { orgId ->
+            try {
+                val response = request("/api/organizations/$orgId/support/options", auth = true)
+                val courses = response.optJSONArray("courses") ?: JSONArray()
+                (0 until courses.length()).mapNotNull { i -> courses.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id")
+                    val name = row.optString("name").trim().take(120)
+                    if (id > 0 && name.isNotBlank()) SupportCourseOption(orgId, id, name) else null
+                } }
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                emptyList()
+            }
+        }.take(100) else emptyList()
+        val cachedCourses = JSONArray()
+        supportCourses.forEach { course -> cachedCourses.put(JSONObject()
+            .put("organizationId", course.organizationId).put("courseId", course.courseId)
+            .put("name", course.name)) }
+        secrets.put("support_drafts_owner", supportDraftOwner())
+        secrets.put("support_courses", cachedCourses.toString())
         val learnerHelp = orgIds.take(3).flatMap { orgId ->
             try {
                 val response = request("/api/organizations/$orgId/support", auth = true)
@@ -528,7 +648,7 @@ internal class NativeApi(private val context: Context) {
         }.take(20)
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            materialEntries = materialEntries, quizEntries = quizEntries,
+            materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
     }
 

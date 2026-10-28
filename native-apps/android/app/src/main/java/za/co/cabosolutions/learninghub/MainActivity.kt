@@ -57,6 +57,11 @@ class MainActivity : ComponentActivity() {
     private var selectedUploadTitle by mutableStateOf("")
     private var materialUploadBusy by mutableStateOf(false)
     private var materialUploadMessage by mutableStateOf<String?>(null)
+    private var supportDrafts by mutableStateOf<List<NativeSupportDraft>>(emptyList())
+    private var supportCourseOptions by mutableStateOf<List<SupportCourseOption>>(emptyList())
+    private var selectedSupportDraft by mutableStateOf<NativeSupportDraft?>(null)
+    private var supportFormBusy by mutableStateOf(false)
+    private var supportFormMessage by mutableStateOf<String?>(null)
     private var activeQuiz by mutableStateOf<PracticeQuiz?>(null)
     private var answers by mutableStateOf<List<Int?>>(emptyList())
     private var attempt by mutableStateOf<QuizAttempt?>(null)
@@ -121,10 +126,15 @@ class MainActivity : ComponentActivity() {
                         upload = { uploadSelectedMaterial() },
                         close = { closeMaterialUpload() }
                     )
-                    creatingSupportRequest -> NativeDemoSupportRequestScreen(
+                    creatingSupportRequest -> if (demoActive) NativeDemoSupportRequestScreen(
                         busy = false, message = null,
                         submit = { concept, question, attempted -> createDemoSupportRequest(concept, question, attempted) },
                         close = { creatingSupportRequest = false }
+                    ) else NativeSupportDraftScreen(
+                        courses = screen?.supportCourses ?: supportCourseOptions, initial = selectedSupportDraft,
+                        busy = supportFormBusy, message = supportFormMessage,
+                        save = { saveSupportDraft(it) }, submit = { sendSupportDraft(it) },
+                        close = { creatingSupportRequest = false; selectedSupportDraft = null }
                     )
                     selectedSupportTicket != null -> NativeSupportTicketScreen(
                         ticket = supportTicket,
@@ -159,7 +169,7 @@ class MainActivity : ComponentActivity() {
                         next = { readNextPage() }, close = { closeStudy() }
                     )
                     else -> NativeHome(
-                        status = status, busy = busy, data = screen,
+                        status = status, busy = busy, data = screen?.copy(supportDrafts = supportDrafts),
                         signIn = { startSignIn() },
                         refresh = { if (demoActive) switchDemoRole(demoRole) else loadDashboard() },
                         demoEnabled = BuildConfig.ENABLE_DEMO_MODE,
@@ -167,7 +177,7 @@ class MainActivity : ComponentActivity() {
                         demoRole = demoRole,
                         startDemo = { startDemo() },
                         setDemoRole = { switchDemoRole(it) },
-                        createSupportRequest = { creatingSupportRequest = demoActive },
+                        createSupportRequest = { creatingSupportRequest = true; selectedSupportDraft = null; supportFormMessage = null },
                         testLoginAvailable = api.testLoginAvailable(),
                         testUsername = testUsername, testPassword = testPassword,
                         onTestUsername = { testUsername = it },
@@ -178,7 +188,12 @@ class MainActivity : ComponentActivity() {
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
-                        pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) }
+                        pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
+                        openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
+                        sendSupportDraft = { sendSupportDraft(it) },
+                        deleteSupportDraft = { deleteSupportDraft(it) },
+                        offlineSupportDrafts = supportDrafts,
+                        offlineSupportCourses = supportCourseOptions
                     )
                 }
             }
@@ -268,6 +283,53 @@ class MainActivity : ComponentActivity() {
         status = "Demo request created locally. Switch to Educator to review it."
     }
 
+    private fun saveSupportDraft(draft: NativeSupportDraft) {
+        if (demoActive || supportFormBusy) return
+        supportFormBusy = true
+        supportFormMessage = null
+        lifecycleScope.launch {
+            try {
+                supportDrafts = api.saveSupportDraft(draft)
+                selectedSupportDraft = null
+                creatingSupportRequest = false
+                status = "Draft saved securely on this device."
+            } catch (_: Exception) {
+                supportFormMessage = "Could not save this draft on the device. Try again."
+            } finally { supportFormBusy = false }
+        }
+    }
+
+    private fun sendSupportDraft(draft: NativeSupportDraft) {
+        if (demoActive || supportFormBusy) return
+        supportFormBusy = true
+        supportFormMessage = null
+        lifecycleScope.launch {
+            try {
+                supportDrafts = api.saveSupportDraft(draft)
+                api.submitSupportDraft(draft)
+                supportDrafts = api.deleteSupportDraft(draft.requestKey)
+                selectedSupportDraft = null
+                creatingSupportRequest = false
+                status = "Support request sent to your school."
+                supportFormBusy = false
+                loadDashboard()
+                return@launch
+            } catch (_: Exception) {
+                supportFormMessage = "Saved securely on this device. Reconnect and try sending again."
+            } finally { supportFormBusy = false }
+        }
+    }
+
+    private fun deleteSupportDraft(draft: NativeSupportDraft) {
+        if (supportFormBusy) return
+        supportFormBusy = true
+        lifecycleScope.launch {
+            try { supportDrafts = api.deleteSupportDraft(draft.requestKey) }
+            catch (_: Exception) { status = "Could not remove this saved draft." }
+            finally { supportFormBusy = false }
+        }
+    }
+
     private fun handleCallback(callback: Intent) {
         if (busy) return
         busy = true
@@ -283,7 +345,11 @@ class MainActivity : ComponentActivity() {
         busy = true
         lifecycleScope.launch {
             try {
+                supportDrafts = try { api.loadSupportDrafts() } catch (_: Exception) { supportDrafts }
+                supportCourseOptions = try { api.loadCachedSupportCourses() } catch (_: Exception) { supportCourseOptions }
                 screen = api.dashboard()
+                supportDrafts = if (screen?.portal?.role == "learner") api.loadSupportDrafts() else emptyList()
+                supportCourseOptions = if (screen?.portal?.role == "learner") screen?.supportCourses.orEmpty() else emptyList()
                 status = "Connected securely as ${screen?.portal?.role ?: "CABO user"}"
             } catch (_: Exception) {
                 screen = null
@@ -462,7 +528,13 @@ class MainActivity : ComponentActivity() {
         if (busy) return
         busy = true
         lifecycleScope.launch {
-            if (!demoActive) api.signOut()
+            if (!demoActive) {
+                api.clearSupportDrafts()
+                api.signOut()
+            }
+            supportDrafts = emptyList()
+            supportCourseOptions = emptyList()
+            selectedSupportDraft = null
             closeStudy()
             demoActive = false
             selectedSupportTicket = null
@@ -636,7 +708,12 @@ internal fun NativeHome(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
-    pickMaterial: () -> Unit
+    pickMaterial: () -> Unit,
+    openSupportDraft: (NativeSupportDraft) -> Unit = {},
+    sendSupportDraft: (NativeSupportDraft) -> Unit = {},
+    deleteSupportDraft: (NativeSupportDraft) -> Unit = {},
+    offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
+    offlineSupportCourses: List<SupportCourseOption> = emptyList()
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -726,6 +803,32 @@ internal fun NativeHome(
                         Text("Fictional sample records · works without an account or network · no data is sent",
                             style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
                     }
+                    if (offlineSupportDrafts.isNotEmpty()) {
+                        ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
+                            containerColor = Color(0xFFE6EFEB))) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Saved drafts on this device", style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold)
+                                Text("Your unsent learner requests are encrypted here. Connect to send them to your educator.",
+                                    style = MaterialTheme.typography.bodyMedium)
+                                offlineSupportDrafts.forEach { draft ->
+                                    Text(draft.concept, style = MaterialTheme.typography.titleSmall)
+                                    Button(onClick = { sendSupportDraft(draft) }, enabled = !busy,
+                                        modifier = Modifier.fillMaxWidth()) { Text("Retry sending") }
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = { openSupportDraft(draft) }, enabled = !busy) { Text("Edit") }
+                                        TextButton(onClick = { deleteSupportDraft(draft) }, enabled = !busy) { Text("Delete") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (offlineSupportCourses.isNotEmpty()) {
+                        OutlinedButton(onClick = createSupportRequest, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                            Text("Start an offline support draft")
+                        }
+                    }
                     Text("LEARNER · FAMILY · EDUCATOR", style = MaterialTheme.typography.labelLarge,
                         color = Color(0xFF14635D), letterSpacing = 1.2.sp)
                     NativeCard("Your learning space", "Study resources, practice and progress in one place.")
@@ -787,7 +890,8 @@ internal fun NativeHome(
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
-                                pickMaterial = pickMaterial
+                                pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
+                                sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft
                             )
                         }
                     } else {
@@ -795,7 +899,9 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive, respondToInvite = respondToInvite,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial
+                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
+                            openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
+                            deleteSupportDraft = deleteSupportDraft
                         )
                     }
                 }
@@ -862,7 +968,10 @@ private fun RoleContent(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
-    pickMaterial: () -> Unit
+    pickMaterial: () -> Unit,
+    openSupportDraft: (NativeSupportDraft) -> Unit,
+    sendSupportDraft: (NativeSupportDraft) -> Unit,
+    deleteSupportDraft: (NativeSupportDraft) -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp),
@@ -1049,10 +1158,32 @@ private fun RoleContent(
                 }
                 else -> {
                     item { Text("My support", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    if (data.supportDrafts.isNotEmpty()) {
+                        item { Text("Saved drafts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                        items(data.supportDrafts, key = { "support-draft:${it.requestKey}" }) { draft ->
+                            ElevatedCard(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(draft.concept, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Text("${draft.courseName} · saved on this device", style = MaterialTheme.typography.bodySmall)
+                                    Button(onClick = { sendSupportDraft(draft) }, enabled = !busy,
+                                        modifier = Modifier.fillMaxWidth()) { Text("Retry sending") }
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = { openSupportDraft(draft) }, enabled = !busy) { Text("Edit") }
+                                        TextButton(onClick = { deleteSupportDraft(draft) }, enabled = !busy) { Text("Delete") }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (data.learnerHelp.isEmpty()) item { NativeCard("No open requests", "When you ask your school for help, updates will appear here.") }
                     items(data.learnerHelp) { NativeCard(it, "Your personal support request") }
                     if (demoActive) item {
                         Button(onClick = createSupportRequest, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                            Text("Ask your educator for help")
+                        }
+                    } else if (data.supportCourses.isNotEmpty()) item {
+                        Button(onClick = createSupportRequest, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                             Text("Ask your educator for help")
                         }
                     } else item {
