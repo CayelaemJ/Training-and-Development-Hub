@@ -39,7 +39,7 @@ import { z } from "zod/v4";
 
 import { cachedMaterial,uploadReadingConsent,saveMaterialText,materialReadingEnabled } from "../lib/materialCache";
 import { questionBatches } from "../lib/generationBatches";
-import { MaterialReadError } from "../lib/uploadPolicy";
+import { MaterialReadError, validateMaterialSignature } from "../lib/uploadPolicy";
 import { extractMaterialText, readObjectBuffer } from "../lib/materialText";
 import { ObjectPermission } from "../lib/objectAcl";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -197,6 +197,7 @@ router.get("/materials/:id/preview", async (req, res): Promise<void> => {
       }
       // Never start paid OCR or AI vision merely because a learner opens a
       // preview; cached text already produced with consent may be displayed.
+      validateMaterialSignature(material.fileName,buffer);
       text = await extractMaterialText(material.fileName, buffer, { allowAiReading: false });
     }
     const start = Math.min(offset.data, text.length);
@@ -256,6 +257,7 @@ router.post("/materials", async (req, res): Promise<void> => {
       res.status(400).json({ error: "The uploaded file size does not match." });
       return;
     }
+    validateMaterialSignature(intent.fileName,buffer);
     const allowAiReading=await uploadReadingConsent(intent.objectPath,req.user.id);
     const extractedText = await extractMaterialText(intent.fileName, buffer, {allowAiReading});
     if (extractedText.length < 30) {
@@ -399,6 +401,7 @@ router.post("/materials/:id/quizzes", async (req, res): Promise<void> => {
       const [blob] = local ? await db.select().from(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,material.objectPath),eq(materialUploadBlobsTable.userId,req.user.id))).limit(1) : [];
       const buffer = local ? blob?.bytes : await readObjectBuffer((await objectStorageService.getObjectEntityFile(material.objectPath)).createReadStream());
       if (!buffer) throw new MaterialReadError('Your uploaded file could not be found. Please upload it again.');
+      validateMaterialSignature(material.fileName,buffer);
       sourceText = await extractMaterialText(material.fileName, buffer, {allowAiReading:cached.allowAiReading});
       await saveMaterialText(material.id,req.user.id,sourceText);
     }
