@@ -1,3 +1,4 @@
+import demoAdmissionsInboxRouter from "./demoAdmissionsInbox";
 import nativeAuthRouter from "./nativeAuth";
 import nativeParentRouter from "./nativeParent";
 import educationFrameworksRouter from "./educationFrameworks";
@@ -72,6 +73,7 @@ router.use(admissionsRouter);
 router.use(reportCardsRouter);
 router.use(demoShowcaseRouter);
 router.use(demoStatusRouter);
+router.use(demoAdmissionsInboxRouter);
 router.use(guardianVerificationRouter);
 router.use(reportIssuanceRouter);
 router.use(attendanceSyncRouter);
