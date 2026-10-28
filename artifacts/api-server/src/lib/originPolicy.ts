@@ -50,3 +50,15 @@ export function trustedOidcRequestOrigin(
  }
  return null;
 }
+
+/** OAuth return destinations must remain a local path, never an external URL. */
+export function safeOidcReturnPath(value:unknown):string {
+ if(typeof value!=="string"||!value.startsWith("/")||value.startsWith("//")
+   ||value.includes("\\")||/[\u0000-\u001f\u007f]/.test(value))return "/";
+ try{
+   const base="https://cabo-redirect.invalid";
+   const parsed=new URL(value,base);
+   if(parsed.origin!==base)return "/";
+   return parsed.pathname+parsed.search+parsed.hash;
+ }catch{return "/";}
+}
