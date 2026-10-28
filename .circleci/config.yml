@@ -1,6 +1,20 @@
 version: 2.1
 # One job, one install, no production secrets or automatic merges.
 jobs:
+  django_worker:
+    docker:
+      - image: cimg/python:3.12
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Django Python Worker checks (isolated, no real learner data)
+          command: |
+            cd services/cloudflare-django-worker
+            python -m pip install "Django>=5.2,<6.0"
+            python -m compileall -q .
+            DJANGO_WORKER_TOKEN=long-test-only-token DJANGO_SECRET_KEY=local-only-test-secret python -m django test --settings=cabo_worker.settings
+
   verify:
     docker:
       - image: node:24-bookworm
@@ -88,6 +102,7 @@ workflows:
   release_checks:
     jobs:
       - verify
+      - django_worker
 
   security_audit:
     jobs:
