@@ -32,13 +32,13 @@ sweep.unref();
 function rulesFor(req: Request): RateLimitRule[] {
   const url = req.originalUrl.split("?", 1)[0].toLowerCase();
   const limits: RateLimitRule[] = [["all", 240, 60_000]];
-  if (/\\/(?:login|test-login|auth|callback|reset-password|forgot-password)(?:\\/|$)/.test(url)) {
+  if (/\/(?:login|test-login|auth|callback|reset-password|forgot-password)(?:\/|$)/.test(url)) {
     limits.push(["authentication", 12, 10 * 60_000]);
   }
-  if (/\\/(?:storage|upload|material)(?:s|\\/|-|$)/.test(url)) {
+  if (/\/(?:storage|upload|material)(?:s|\/|-|$)/.test(url)) {
     limits.push(["uploads", 24, 10 * 60_000]);
   }
-  if (/\\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\\/|-|$)/.test(url)) {
+  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\/|-|$)/.test(url)) {
     limits.push(["generation", 30, 10 * 60_000]);
   }
   if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
