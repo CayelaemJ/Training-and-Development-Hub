@@ -6,9 +6,11 @@ import os
 
 try:
     from workers import env
-    SECRET_KEY = str(env.DJANGO_SECRET_KEY)
-except (ImportError, AttributeError):
+except ImportError:
     SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "local-only-not-a-production-secret")
+else:
+    # Required in Cloudflare; never silently use a fallback in production.
+    SECRET_KEY = str(env.DJANGO_SECRET_KEY)
 
 DEBUG = False
 ROOT_URLCONF = "cabo_worker.urls"
