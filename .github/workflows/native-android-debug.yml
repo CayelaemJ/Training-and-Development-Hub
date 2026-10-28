@@ -39,13 +39,14 @@ jobs:
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
           mkdir -p app/build/ci-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-debug.apk
-      - name: Build isolated Render test-login APK
+      - name: Build isolated Render APK with offline demo mode
         working-directory: native-apps/android
         run: |
           ./gradlew :app:assembleDebug --no-daemon --stacktrace \
             -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
-            -PcaboEnableTestLogin=true
-          cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-isolated-test-debug.apk
+            -PcaboEnableTestLogin=true \
+            -PcaboEnableDemoMode=true
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-demo-debug.apk
       - name: Upload standard Android debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -53,13 +54,14 @@ jobs:
           path: native-apps/android/app/build/ci-artifacts/cabo-native-android-debug.apk
           retention-days: 3
           if-no-files-found: error
-      - name: Upload isolated test-login APK
+      - name: Upload Android offline-demo APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: CABO-native-Android-ISOLATED-test-login-DEBUG
-          path: native-apps/android/app/build/ci-artifacts/cabo-native-android-isolated-test-debug.apk
+          name: CABO-native-Android-DEMO-DEBUG-test-only
+          path: native-apps/android/app/build/ci-artifacts/cabo-native-android-demo-debug.apk
           retention-days: 3
           if-no-files-found: error
 # Both APKs use a generated DEBUG signing key and are internal test builds.
-# The isolated APK embeds only the isolated Render origin and test-login toggle,
-# never a username, password or server-side secret. Never redistribute it as a school or production app.
+# The demo APK embeds only the isolated Render origin and compile-time demo/test-login toggles,
+# never a username, password or server-side secret. Demo fixtures are fictional and local-only.
+# Never redistribute either APK as a school or production app.

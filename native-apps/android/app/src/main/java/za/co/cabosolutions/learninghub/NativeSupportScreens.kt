@@ -1,0 +1,174 @@
+package za.co.cabosolutions.learninghub
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+@Composable
+internal fun NativeDemoSupportRequestScreen(
+    busy: Boolean,
+    message: String?,
+    submit: (String, String, String) -> Unit,
+    close: () -> Unit
+) {
+    var concept by remember { mutableStateOf("Adding unlike fractions") }
+    var question by remember { mutableStateOf("") }
+    var attempted by remember { mutableStateOf("") }
+    Scaffold(topBar = {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = close, enabled = !busy) { Text("Back") }
+                Text("Ask for learning help", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("A useful question starts with what you tried", style = MaterialTheme.typography.titleMedium)
+                    Text("This is a local demo request. It will appear in the educator's synthetic support queue and will not be sent anywhere.")
+                }
+            }
+            OutlinedTextField(value = concept, onValueChange = { concept = it.take(160) },
+                label = { Text("Topic") }, modifier = Modifier.fillMaxWidth(), enabled = !busy)
+            OutlinedTextField(value = question, onValueChange = { question = it.take(4000) },
+                label = { Text("What do you need help with?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 4, maxLines = 8)
+            OutlinedTextField(value = attempted, onValueChange = { attempted = it.take(2000) },
+                label = { Text("What have you tried?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 3, maxLines = 6)
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Button(onClick = { submit(concept, question, attempted) },
+                enabled = !busy && concept.trim().length >= 2 && question.trim().length >= 10 && attempted.trim().length >= 3,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                Text("Send demo request")
+            }
+        }
+    }
+}
+
+@Composable
+internal fun NativeSupportTicketScreen(
+    ticket: SupportTicket?,
+    reply: String,
+    onReply: (String) -> Unit,
+    triageReason: String,
+    onTriageReason: (String) -> Unit,
+    guidance: SupportGuidanceDraft?,
+    busy: Boolean,
+    message: String?,
+    requestGuidance: () -> Unit,
+    useGuidance: () -> Unit,
+    sendReply: () -> Unit,
+    triage: () -> Unit,
+    close: () -> Unit
+) {
+    Scaffold(topBar = {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = close, enabled = !busy) { Text("Back to requests") }
+                Text("Learner support", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (ticket == null) {
+                Text(message ?: "Loading this authorised support request…")
+                return@Column
+            }
+            Text(ticket.summary.concept, style = MaterialTheme.typography.headlineSmall)
+            Text("Status: ${ticket.summary.status.replace('_', ' ')}")
+            Text("School workspace ${ticket.summary.organizationId} · request ${ticket.summary.id}",
+                style = MaterialTheme.typography.bodySmall)
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Learner question", style = MaterialTheme.typography.titleMedium)
+                    Text(ticket.question)
+                    Text("What they tried", style = MaterialTheme.typography.titleMedium)
+                    Text(ticket.attempted)
+                }
+            }
+            if (ticket.summary.status == "open") {
+                OutlinedTextField(
+                    value = triageReason,
+                    onValueChange = onTriageReason,
+                    label = { Text("Triage note") },
+                    supportingText = { Text("This is added to the request history.") },
+                    modifier = Modifier.fillMaxWidth(), enabled = !busy,
+                    minLines = 2, maxLines = 4
+                )
+                Button(onClick = triage, enabled = !busy && triageReason.trim().length >= 3,
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Mark as triaged") }
+            }
+            Text("Reply to learner", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = reply,
+                onValueChange = onReply,
+                label = { Text("Write a response") },
+                supportingText = { Text("Review and edit any suggested text before sending.") },
+                modifier = Modifier.fillMaxWidth(), enabled = !busy,
+                minLines = 4, maxLines = 10
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = requestGuidance, enabled = !busy,
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Draft learning guidance") }
+                Button(onClick = sendReply,
+                    enabled = !busy && reply.trim().length in 2..4000,
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Send reply") }
+            }
+            guidance?.let { draft ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Suggested draft · ${if (draft.source == "ai_draft") "AI, review required" else "CABO template"}",
+                            style = MaterialTheme.typography.titleMedium)
+                        Text(draft.explanation)
+                        draft.questions.forEach { Text("Think about: $it") }
+                        draft.practice.forEach { Text("Practice: $it") }
+                        OutlinedButton(onClick = useGuidance, enabled = !busy,
+                            modifier = Modifier.heightIn(min = 48.dp)) { Text("Add draft to reply") }
+                    }
+                }
+            }
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text("Request history", style = MaterialTheme.typography.titleMedium)
+            if (ticket.history.isEmpty()) Text("No updates have been recorded yet.")
+            ticket.history.forEach { event ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(event.kind.replace('_', ' '), style = MaterialTheme.typography.labelLarge)
+                        Text(event.body)
+                        if (event.createdAt.isNotBlank())
+                            Text(event.createdAt, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
