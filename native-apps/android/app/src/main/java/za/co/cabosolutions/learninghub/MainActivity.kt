@@ -890,7 +890,8 @@ internal fun NativeHome(
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
-                                pickMaterial = pickMaterial
+                                pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
+                                sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft
                             )
                         }
                     } else {
@@ -898,7 +899,9 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive, respondToInvite = respondToInvite,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial
+                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
+                            openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
+                            deleteSupportDraft = deleteSupportDraft
                         )
                     }
                 }
@@ -965,7 +968,10 @@ private fun RoleContent(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
-    pickMaterial: () -> Unit
+    pickMaterial: () -> Unit,
+    openSupportDraft: (NativeSupportDraft) -> Unit,
+    sendSupportDraft: (NativeSupportDraft) -> Unit,
+    deleteSupportDraft: (NativeSupportDraft) -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp),
