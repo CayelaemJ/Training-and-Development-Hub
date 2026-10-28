@@ -46,7 +46,7 @@ await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 try {
   const child = spawn(
     process.execPath,
-    [path.join(import.meta.dirname, process.argv.includes("--pwa") ? "verify-installable-app.mjs" : "verify-learner-success-browser.mjs")],
+    [path.join(import.meta.dirname, process.argv.includes("--admissions") ? "verify-demo-admissions-browser.mjs" : process.argv.includes("--pwa") ? "verify-installable-app.mjs" : "verify-learner-success-browser.mjs")],
     {
       env: {
         ...process.env,

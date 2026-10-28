@@ -38,3 +38,4 @@ jobs:
         run: |
           node scripts/run-learner-success-browser.mjs
           node scripts/run-learner-success-browser.mjs --pwa
+          node scripts/run-learner-success-browser.mjs --admissions
