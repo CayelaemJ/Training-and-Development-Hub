@@ -1,8 +1,8 @@
 import { Router, type IRouter, type Request } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { pool, db, studyMaterialsTable, materialUploadBlobsTable } from "@workspace/db";
-import { cachedMaterial, materialReadingEnabled, saveMaterialText } from "../lib/materialCache";
+import { cachedMaterial, materialReadingEnabled } from "../lib/materialCache";
 import { readObjectBuffer, extractMaterialText } from "../lib/materialText";
 import { MaterialReadError } from "../lib/uploadPolicy";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -108,7 +108,11 @@ router.post("/internal/qstash/material-preview", async (req: Request, res) => {
     // Recheck consent immediately before writing: a guardian/user may revoke it mid-job.
     const latest = await cachedMaterial(material.id,material.userId);
     if (!latest.allowAiReading) { res.sendStatus(204); return; }
-    if (!latest.text) await saveMaterialText(material.id,material.userId,text);
+    if (!latest.text) {
+      // Atomic consent gate at write time prevents a revoke/delete race.
+      await db.execute(sql`UPDATE study_materials SET extracted_text=${text}
+        WHERE id=${material.id} AND user_id=${material.userId} AND allow_ai_reading=TRUE`);
+    }
     res.sendStatus(204);
   } catch (error) {
     if (error instanceof MaterialReadError) {
