@@ -1492,7 +1492,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         var payload: [String: Any] = ["groupId": groupId, "examId": examId]
         if let dueAt, !dueAt.isEmpty {
-            guard dueAt.range(of: #\"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$\"#, options: .regularExpression) != nil else {
+            guard dueAt.range(of: #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$"#, options: .regularExpression) != nil else {
                 throw NSError(domain: "CABO", code: 400)
             }
             payload["dueAt"] = dueAt.count == 17 ? dueAt.replacingOccurrences(of: "Z", with: ":00Z") : dueAt
