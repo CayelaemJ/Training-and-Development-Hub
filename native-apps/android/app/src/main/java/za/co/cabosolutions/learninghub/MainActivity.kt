@@ -1423,7 +1423,7 @@ internal fun NativeHome(
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
-                                learnerJourneyAction = learnerJourneyAction
+                                learnerJourneyAction = learnerJourneyAction, openPassport = openPassport
                             )
                         }
                     } else {
@@ -1837,7 +1837,8 @@ private fun RoleContent(
     openSupportDraft: (NativeSupportDraft) -> Unit,
     sendSupportDraft: (NativeSupportDraft) -> Unit,
     deleteSupportDraft: (NativeSupportDraft) -> Unit,
-    learnerJourneyAction: (LearnerJourneyAction) -> Unit
+    learnerJourneyAction: (LearnerJourneyAction) -> Unit,
+    openPassport: () -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp).testTag("native-role-content"),
