@@ -9,6 +9,8 @@ struct NativeStaffSupportView: View {
     @State private var message: String?
     @State private var busy = false
 
+    private var canManage: Bool { ["teacher", "assessor"].contains(session.role ?? "") }
+
     var body: some View {
         NavigationView {
             Form {
@@ -27,7 +29,7 @@ struct NativeStaffSupportView: View {
                     Text(ticket.attempted).fixedSize(horizontal: false, vertical: true)
                 }
 
-                if ticket.status == "open" {
+                if ticket.status == "open" && canManage {
                     Section("Triage") {
                         TextField("Add a short triage reason", text: $triageReason)
                         Button {
@@ -40,15 +42,22 @@ struct NativeStaffSupportView: View {
                     }
                 }
 
-                Section("Reply to learner") {
-                    TextEditor(text: $reply).frame(minHeight: 120)
-                    Button {
-                        Task { await sendReply() }
-                    } label: {
-                        if busy { ProgressView() }
-                        else { Label("Send reply", systemImage: "paperplane.fill") }
+                if canManage {
+                    Section("Reply to learner") {
+                        TextEditor(text: $reply).frame(minHeight: 120)
+                        Button {
+                            Task { await sendReply() }
+                        } label: {
+                            if busy { ProgressView() }
+                            else { Label("Send reply", systemImage: "paperplane.fill") }
+                        }
+                        .disabled(busy || reply.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                     }
-                    .disabled(busy || reply.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                } else {
+                    Section {
+                        Text("Your account can review this request but cannot update it. Ask a teacher or assessor assigned to the course.")
+                            .font(.subheadline).foregroundColor(.secondary)
+                    }
                 }
 
                 if let message {
