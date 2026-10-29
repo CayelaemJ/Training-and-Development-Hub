@@ -1359,11 +1359,11 @@ private fun RoleContent(
                                             Text("I independently reviewed legal authority", style = MaterialTheme.typography.bodySmall)
                                         }
                                         when (review.status) {
-                                            "accepted" -> Button(onClick = { reviewGuardian(workspace.organizationId, review.id, "verified") },
+                                            "accepted" -> Button(onClick = { reviewGuardianRelationship(workspace.organizationId, review.id, "verified") },
                                                 enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                                                 Text("Verify guardian access")
                                             }
-                                            "verified" -> OutlinedButton(onClick = { reviewGuardian(workspace.organizationId, review.id, "revoked") },
+                                            "verified" -> OutlinedButton(onClick = { reviewGuardianRelationship(workspace.organizationId, review.id, "revoked") },
                                                 enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                                                 Text("Revoke guardian access")
                                             }
