@@ -477,7 +477,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
-    func saveSupportDraft(course: NativeSupportCourse, concept: String, question: String, attempted: String) throws -> NativeSupportDraft {
+    func saveSupportDraft(course: NativeSupportCourse, concept: String, question: String, attempted: String,
+                          replacing requestKey: String? = nil) throws -> NativeSupportDraft {
         guard role == "learner", supportCourses.contains(course) else { throw NSError(domain: "CABO", code: 403) }
         let cleanConcept = concept.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -490,7 +491,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         let draft = NativeSupportDraft(requestKey: UUID().uuidString.lowercased(),
             organizationId: course.organizationId, courseId: course.courseId, courseName: course.name,
             concept: cleanConcept, question: cleanQuestion, attempted: cleanAttempted)
-        let updated = (loadSupportDrafts().filter { $0.requestKey != draft.requestKey } + [draft]).suffix(20)
+        let updated = (loadSupportDrafts().filter {
+            $0.requestKey != draft.requestKey && $0.requestKey != requestKey
+        } + [draft]).suffix(20)
         try storeSupportDrafts(Array(updated))
         supportDrafts = Array(updated)
         return draft
