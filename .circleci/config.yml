@@ -14,6 +14,15 @@ jobs:
             python -m pip install "Django>=5.2,<6.0"
             python -m compileall -q .
             DJANGO_WORKER_TOKEN=long-test-only-token DJANGO_SECRET_KEY=local-only-test-secret python -m django test --settings=cabo_worker.settings
+      - run:
+          name: Verify Cloudflare Django packaging (no deployment)
+          command: |
+            cd services/cloudflare-django-worker
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            uvx --from workers-py pywrangler sync
+            npx --yes wrangler@4.151.3 deploy --dry-run --outdir /tmp/cabo-django-worker-bundle
+
 
   verify:
     docker:
