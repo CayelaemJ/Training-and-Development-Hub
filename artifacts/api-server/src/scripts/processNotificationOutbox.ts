@@ -1,7 +1,7 @@
 /**
  * Explicit, ONE-record operational dispatch. Never scheduled automatically.
- * Requires vetted and legally approved notification producer, installed DB
- * migration and verified sender credentials; all flags default OFF.
+ * Intentionally cannot send until a trustworthy recipient/guardian consent
+ * authorizer is wired. Inspects/quarantines expired leases only, when opted in.
  */
 import { pool } from "@workspace/db";
 import { processOneApprovedNotice, quarantineExpiredLeases } from "../lib/notificationOutbox";
@@ -12,7 +12,8 @@ async function main() {
     throw new Error("Notification outbox worker is not approved");
   }
   const quarantined=await quarantineExpiredLeases();
-  const status=await processOneApprovedNotice();
+  // No trusted recipient/guardian authorizer has been wired yet: dispatch stays disabled.
+  const status=await processOneApprovedNotice(undefined);
   // Only counts and bounded statuses: never print addresses or event IDs.
   process.stdout.write(JSON.stringify({status,quarantined,mode:"manual-single-delivery"})+"\n");
 }
