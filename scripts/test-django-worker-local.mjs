@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { open, rm } from "node:fs/promises";
-import { createServer } from "node:net";
+import { createServer, connect as connectTcp } from "node:net";
 import { request as httpRequest } from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -21,6 +21,9 @@ let child;
 let port = 0;
 let ownsVarsFile = false;
 let spawnFailure = null;
+let listenerSeen = false;
+let lastHttpStatus = null;
+let lastErrorName = null;
 async function unusedPort() {
   const server = createServer();
   server.listen(0, "127.0.0.1");
@@ -57,23 +60,45 @@ async function request(endpoint, options = {}) {
     req.end();
   });
 }
+async function portAcceptsConnections() {
+  return new Promise(resolve => {
+    const socket = connectTcp({host: "127.0.0.1", port});
+    const done = result => { socket.destroy(); resolve(result); };
+    socket.setTimeout(1200);
+    socket.once("connect", () => done(true));
+    socket.once("error", () => done(false));
+    socket.once("timeout", () => done(false));
+  });
+}
+
 async function untilHealthy() {
   const deadline = Date.now() + 360_000;
   while (Date.now() < deadline) {
     if (spawnFailure) throw Error("Worker runtime failed to launch");
     if (child.exitCode !== null || child.signalCode !== null) throw Error("Worker runtime exited before healthy");
+    if (!listenerSeen) {
+      listenerSeen = await portAcceptsConnections();
+      if (listenerSeen) {
+        console.log(`Local workerd TCP listener ready after ${Math.round((Date.now()-started)/1000)}s`);
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        continue;
+      }
+    }
     try {
-      // Do not repeatedly abort Python/WASM first import after 10 seconds.
-      // A single long health probe allows the cold isolate to finish warming.
+      // Allow the first Python/WASM import to finish. Normal API requests
+      // keep their independent 10-second timeout.
       const remaining = Math.max(1_000, deadline - Date.now());
       const response = await request("/health", {timeoutMs: Math.min(180_000, remaining)});
+      lastHttpStatus = response.status;
       if (response.status === 200) return;
-    } catch {
-      // Python/WASM startup may take longer than a normal HTTP request.
+    } catch (error) {
+      // Only record the error class. Never log request bodies or secrets.
+      lastErrorName = error?.name ?? "Error";
     }
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
-  throw Error("Worker runtime did not return healthy within 360 seconds");
+  throw Error(`Worker startup timeout (360s): listener=${listenerSeen}, lastHttpStatus=${lastHttpStatus ?? "none"}, lastErrorType=${lastErrorName ?? "none"}`);
 }
 
 try {
@@ -101,9 +126,15 @@ try {
   const args = cli
     ? [cli, ...argumentsForDev]
     : ["--from", "workers-py==1.17.9", "pywrangler", ...argumentsForDev];
+  // Pass a minimal local-tool environment. Inherited database and cloud
+  // credentials must never reach this disposable Worker process.
+  const cleanEnv = { CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" };
+  for (const name of ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "XDG_CACHE_HOME", "UV_CACHE_DIR", "NPM_CONFIG_CACHE"]) {
+    if (process.env[name]) cleanEnv[name] = process.env[name];
+  }
   child = spawn(command, args, {
     cwd,
-    env: { ...process.env, CI: "1" },
+    env: cleanEnv,
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],
   });
