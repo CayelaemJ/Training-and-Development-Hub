@@ -3,6 +3,7 @@ import nativeAuthRouter from "./nativeAuth";
 import nativeParentRouter from "./nativeParent";
 import educationFrameworksRouter from "./educationFrameworks";
 import learnerSupportRouter from "./learnerSupport";
+import workerInsightsRouter from "./workerInsights";
 
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
@@ -47,6 +48,7 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(educationFrameworksRouter);
 router.use(learnerSupportRouter);
+router.use(workerInsightsRouter);
 
 router.use(authRouter);
 router.use(nativeAuthRouter);

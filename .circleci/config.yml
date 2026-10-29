@@ -1,6 +1,69 @@
 version: 2.1
-# One job, one install, no production secrets or automatic merges.
+# Regular verification runs on all branches; staging deployment is opt-in.
+parameters:
+  deploy_django_staging:
+    type: boolean
+    default: false
+
 jobs:
+  django_worker:
+    docker:
+      # Pywrangler runs the Pyodide interpreter via Node during packaging.
+      - image: cimg/python:3.12-node
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Django Python Worker checks (isolated, no real learner data)
+          command: |
+            cd services/cloudflare-django-worker
+            python -m pip install "Django>=5.2,<6.0"
+            python -m compileall -q .
+            DJANGO_WORKER_TOKEN=long-test-only-token DJANGO_SECRET_KEY=local-only-test-secret python -m django test --settings=cabo_worker.settings
+      - run:
+          name: Verify Cloudflare Django packaging (no deployment)
+          command: |
+            cd services/cloudflare-django-worker
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            uvx --from workers-py==1.17.9 pywrangler sync
+            npx --yes wrangler@4.151.3 deploy --dry-run --outdir /tmp/cabo-django-worker-bundle
+
+
+  deploy_django_staging:
+    docker:
+      - image: cimg/python:3.12-node
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Deploy Django Worker only with approved staging secrets
+          command: |
+            set -euo pipefail
+            if [ "${CLOUDFLARE_ACCOUNT_ID:-}" != "46ab7ae69c9bc2b2fe4595a6abbbe59c" ]; then
+              echo "Refusing unexpected Cloudflare account"; exit 2
+            fi
+            if [ "${CABO_DJANGO_WORKER_URL:-}" != "https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev" ]; then
+              echo "Refusing unexpected staging destination"; exit 2
+            fi
+            : "${CLOUDFLARE_API_TOKEN:?A scoped Cloudflare Workers deployment token is required}"
+            : "${DJANGO_SECRET_KEY:?Django signing secret is required}"
+            : "${DJANGO_WORKER_TOKEN:?Worker-to-API authentication secret is required}"
+            python - <<'PY'
+            import json,os
+            assert len(os.environ["DJANGO_SECRET_KEY"]) >= 32
+            assert len(os.environ["DJANGO_WORKER_TOKEN"]) >= 32
+            path="/tmp/cabo-django-ci-secrets.json"
+            fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(fd,"w") as f:
+                json.dump({name:os.environ[name] for name in ("DJANGO_SECRET_KEY","DJANGO_WORKER_TOKEN")},f)
+            PY
+            trap 'rm -f /tmp/cabo-django-ci-secrets.json' EXIT
+            cd services/cloudflare-django-worker
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            uvx --from workers-py==1.17.9 pywrangler deploy --secrets-file /tmp/cabo-django-ci-secrets.json
+      - run:
+          name: Smoke-test live Cloudflare staging (only synthetic metrics)
+          command: node scripts/test-django-worker-staging.mjs
   verify:
     docker:
       - image: node:24-bookworm
@@ -85,9 +148,28 @@ jobs:
           no_output_timeout: 15m
 
 workflows:
+  # This workflow cannot run unless a maintainer triggers a pipeline on main
+  # with deploy_django_staging=true AND an authorised CircleCI context.
+  django_staging_deploy:
+    when: << pipeline.parameters.deploy_django_staging >>
+    jobs:
+      - django_worker
+      - verify
+      - security_suite
+      - deploy_django_staging:
+          requires:
+            - django_worker
+            - verify
+            - security_suite
+          context: cabo-cloudflare-staging
+          filters:
+            branches:
+              only: main
+
   release_checks:
     jobs:
       - verify
+      - django_worker
 
   security_audit:
     jobs:
