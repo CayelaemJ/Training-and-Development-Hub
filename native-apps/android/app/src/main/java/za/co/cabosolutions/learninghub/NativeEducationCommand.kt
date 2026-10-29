@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -47,7 +48,7 @@ internal fun NativeEducationCommandScreen(
         }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).testTag("education-command-content"),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Privacy-safe school overview", style = MaterialTheme.typography.headlineSmall)
