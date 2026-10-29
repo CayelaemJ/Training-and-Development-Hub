@@ -11,6 +11,8 @@ import { logger } from "./lib/logger";
 import {permittedBrowserOrigin, permittedMutationOrigin} from "./lib/originPolicy";
 import { apiRateLimit } from "./middlewares/rateLimit";
 import { schoolDataReleaseMiddleware } from "./middlewares/schoolDataRelease";
+import { safeRequestCategory, safeErrorType, safeRequestReference } from "./lib/httpPrivacy";
+import { randomUUID } from "node:crypto";
 
 const app: Express = express();
 app.set("trust proxy", process.env.TRUST_PROXY_HOPS === "1" ? 1 : false);
@@ -23,7 +25,7 @@ app.use(
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          routeGroup: safeRequestCategory(req.url),
         };
       },
       res(res) {
@@ -64,6 +66,20 @@ app.use((error: any, _req: express.Request, res: express.Response, next: express
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
   if(error instanceof SyntaxError && 'body' in error){res.status(400).json({error:'We couldn’t read this request. Please try again.'});return;}
   next(error);
+});
+
+// Final API error boundary: do not emit untrusted error messages, stacks,
+// SQL text, learner identifiers or credentials in API responses or logs.
+// This is not a substitute for external alert delivery or tracing.
+app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) { next(error); return; }
+  const requestId = safeRequestReference((req as express.Request & {id?: unknown}).id) ?? randomUUID();
+  req.log.error({
+    requestId, errorType: safeErrorType(error), method: req.method,
+    routeGroup: safeRequestCategory(req.originalUrl), statusCode: 500,
+  }, "Unhandled request failure");
+  res.setHeader("Cache-Control", "no-store");
+  res.status(500).json({ error: "This request could not be completed.", reference: requestId });
 });
 
 // Optional single-origin deployment: deliver the built React SPA from the API server.
