@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
                         recordOutcome = { baseline, followup, reason -> recordSupportOutcome(baseline, followup, reason) },
                         reviewLearningDna = { state, note -> saveSupportLearningDna(state, note) }
                     )
-                    selectedWrittenExams && !managerCreatingExam && (screen?.portal?.role in setOf("owner", "admin")) ->
+                    selectedWrittenExams && !managerCreatingExam && (screen?.canManageExamAssignments == true) ->
                         NativeExamManagementScreen(
                             workspaces = screen?.examManagementWorkspaces.orEmpty(),
                             exams = screen?.writtenExams.orEmpty(),
@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
                         },
                         isDemo = demoActive,
                         close = {
-                            if (screen?.portal?.role in setOf("owner", "admin")) {
+                            if (screen?.canManageExamAssignments == true) {
                                 managerCreatingExam = false
                                 loadDashboard()
                             } else selectedWrittenExams = false
@@ -288,7 +288,7 @@ class MainActivity : ComponentActivity() {
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
                         openWrittenExams = {
-                            if (!demoActive && screen?.portal?.role in setOf("owner", "admin")) {
+                            if (!demoActive && screen?.canManageExamAssignments == true) {
                                 busy = true
                                 lifecycleScope.launch {
                                     try { screen = screen?.copy(examManagementWorkspaces = api.fetchExamManagementWorkspaces()) }
@@ -1887,7 +1887,7 @@ private fun RoleContent(
                     item {
                         OutlinedButton(onClick = openWrittenExams, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text(if (role in setOf("owner", "admin")) "Manage written exam assignments" else "Create or take a written exam")
+                            Text(if (data.canManageExamAssignments) "Manage written exam assignments" else "Create or take a written exam")
                         }
                     }
                     if (data.writtenExams.isNotEmpty()) {
