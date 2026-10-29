@@ -19,14 +19,14 @@ const started = Date.now();
 let child;
 let port = 0;
 let ownsVarsFile = false;
+let spawnFailure = null;
 async function unusedPort() {
   const server = createServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = server.address();
   const selected = typeof address === "object" && address ? address.port : 0;
-  server.close();
-  await once(server, "close");
+  await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
   assert(selected > 0);
   return selected;
 }
@@ -41,6 +41,7 @@ async function request(endpoint, options = {}) {
 async function untilHealthy() {
   const deadline = Date.now() + 150_000;
   while (Date.now() < deadline) {
+    if (spawnFailure) throw Error("Worker runtime failed to launch");
     if (child.exitCode !== null || child.signalCode !== null) throw Error("Worker runtime exited before healthy");
     try {
       const response = await request("/health");
@@ -65,11 +66,13 @@ try {
     await fh.close();
   }
   port = await unusedPort();
+  console.log("Starting synthetic local Python Worker runtime...");
   child = spawn("uvx", [
     "--from", "workers-py==1.17.9", "pywrangler", "dev", "--local",
     "--port", String(port), "--ip", "127.0.0.1",
     "--show-interactive-dev-session", "false", "--log-level", "error",
   ], { cwd, env: { ...process.env, CI: "1" }, detached: true, stdio: ["ignore", "ignore", "ignore"] });
+  child.on("error", error => { spawnFailure = error; });
   await untilHealthy();
   const data = JSON.stringify({ concepts: [
     { code: "fractions", masteryPercent: 45, evidenceCount: 5 },
