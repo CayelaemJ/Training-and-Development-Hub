@@ -920,6 +920,7 @@ internal fun NativeHome(
                             RoleContent(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
+                                openWebExperience = openWebExperience,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
@@ -929,7 +930,8 @@ internal fun NativeHome(
                     } else {
                         RoleContent(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
-                            demoActive = demoActive, respondToInvite = respondToInvite,
+                            demoActive = demoActive, openWebExperience = openWebExperience,
+                            respondToInvite = respondToInvite,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -995,6 +997,7 @@ private fun RoleContent(
     section: String,
     busy: Boolean,
     demoActive: Boolean,
+    openWebExperience: () -> Unit,
     respondToInvite: (Int, Boolean) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
