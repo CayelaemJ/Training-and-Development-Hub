@@ -1,6 +1,7 @@
 import { pool } from "@workspace/db";
 import { Router, type IRouter } from "express";
 import { HealthCheckResponse } from "@workspace/api-zod";
+import { checkRedisReadiness } from "../lib/redisReadiness";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,11 @@ router.get("/readyz", async (_req, res) => {
       (!result.rows[0]?.tickets || !result.rows[0]?.frameworks)
     ) {
       res.status(503).json({ status: "migration_required" });
+      return;
+    }
+    if (process.env.CABO_REDIS_READINESS_CHECK === "true" &&
+        !(await checkRedisReadiness())) {
+      res.status(503).json({status:"dependency_unavailable"});
       return;
     }
     res.json({ status: "ready" });
