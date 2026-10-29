@@ -185,7 +185,7 @@ internal fun NativeExamManagementScreen(
                                         onClick = {
                                             val value = marks[key]?.toDoubleOrNull() ?: mark.awardedMarks
                                             val reason = reasons[key].orEmpty()
-                                            kotlinx.coroutines.MainScope().launch {
+                                            scope.launch {
                                                 try {
                                                     overrideMark(workspace.organizationId, submission.id,
                                                         mark.questionIndex, value, reason)
