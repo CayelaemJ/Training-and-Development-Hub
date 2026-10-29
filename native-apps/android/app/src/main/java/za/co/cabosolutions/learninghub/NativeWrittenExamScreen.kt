@@ -18,6 +18,7 @@ internal fun NativeWrittenExamScreen(
     generate: suspend (Int, Int, String) -> WrittenExam,
     open: suspend (Int) -> WrittenExam,
     submit: suspend (Int, List<String>) -> WrittenExamResult,
+    isDemo: Boolean = false,
     close: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -53,7 +54,7 @@ internal fun NativeWrittenExamScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Build understanding with a written response.", style = MaterialTheme.typography.bodyLarge)
-            Text("Questions are generated from your own CABO study material. CABO marks submitted answers against the exam rubric.",
+            Text(if (isDemo) "Synthetic demo only · sample questions and results stay on this device." else "Questions are generated from your own CABO study material. CABO marks submitted answers against the exam rubric.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             if (materials.isEmpty()) {
@@ -144,7 +145,7 @@ internal fun NativeWrittenExamScreen(
                                 modifier = Modifier.fillMaxWidth().testTag("written-answer-$index")
                             )
                             result?.feedback?.firstOrNull { it.questionIndex == index }?.let { mark ->
-                                Text("CABO feedback · ${mark.awardedMarks}/${mark.maxMarks}",
+                                Text("${if (isDemo) "Demo feedback" else "CABO feedback"} · ${mark.awardedMarks}/${mark.maxMarks}",
                                     style = MaterialTheme.typography.titleSmall)
                                 Text(mark.feedback)
                                 if (mark.needsReview) Text("This response needs educator review.",
