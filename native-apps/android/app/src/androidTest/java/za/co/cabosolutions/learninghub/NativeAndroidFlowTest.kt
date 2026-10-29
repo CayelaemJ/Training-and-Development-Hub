@@ -847,7 +847,9 @@ class NativeAndroidExamManagementTest {
         compose.waitUntil(timeoutMillis = 5000) { assigned.value.startsWith("8:21:10:") }
         assertEquals("8:21:10:null", assigned.value)
         compose.onNodeWithText("Explain fractions.").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("override-mark-44:0").performScrollTo().performTextClearance().performTextInput("4")
+        val markField = compose.onNodeWithTag("override-mark-44:0").performScrollTo()
+        markField.performTextClearance()
+        markField.performTextInput("4")
         compose.onNodeWithText("Reason for change (at least 5 characters)").performScrollTo()
             .performTextInput("Reviewed against the answer guide.")
         compose.onNodeWithTag("save-exam-override-44:0").performScrollTo().performClick()
