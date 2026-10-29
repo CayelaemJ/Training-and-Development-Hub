@@ -728,7 +728,7 @@ class NativeAndroidWrittenExamTest {
                         exam.copy(difficulty = difficulty)
                     },
                     open = { exam },
-                    submit = { _, answers ->
+                    submit = { _, _, answers ->
                         WrittenExamResult(52, 80.0, 4.0, 5.0, 0,
                             listOf(WrittenExamMark(0, 4.0, 5.0, "Good explanation.", false)))
                     },
@@ -748,5 +748,53 @@ class NativeAndroidWrittenExamTest {
         }
         compose.onNodeWithText("Result · 80.0% (4.0/5.0 marks)").assertExists()
         compose.onNodeWithText("Good explanation.").assertExists()
+    }
+
+
+    @Test
+    fun assignedExamKeepsAssignmentScopeThroughSubmission() {
+        val exam = WrittenExam(731, "Demo fractions check", "beginner",
+            listOf(WrittenExamQuestion("Explain one half.", "short_answer", 5)))
+        var submittedAssignmentId: Int? = null
+        compose.setContent {
+            MaterialTheme {
+                NativeWrittenExamScreen(
+                    materials = emptyList(),
+                    exams = emptyList(),
+                    assignments = listOf(WrittenExamAssignment(
+                        id = 73032, examId = 73031, title = "Demo fractions check",
+                        organizationId = 73001, organization = "CABO Demo School",
+                        dueAt = "2026-11-10T12:00:00Z"
+                    )),
+                    generate = { _, _, _ -> error("Assigned exam must not generate a new paper") },
+                    open = { exam },
+                    openAssignment = { assignmentId ->
+                        assertEquals(73032, assignmentId)
+                        exam
+                    },
+                    submit = { examId, assignmentId, answers ->
+                        assertEquals(731, examId)
+                        assertEquals(73032, assignmentId)
+                        assertEquals(1, answers.size)
+                        submittedAssignmentId = assignmentId
+                        WrittenExamResult(53, 80.0, 4.0, 5.0, 0,
+                            listOf(WrittenExamMark(0, 4.0, 5.0, "Good explanation.", false)))
+                    },
+                    close = {}
+                )
+            }
+        }
+
+        compose.onNodeWithTag("assigned-written-exam-73032").assertIsDisplayed().performClick()
+        compose.onNodeWithText("CABO Demo School").assertIsDisplayed()
+        compose.onNodeWithText("Due 2026-11-10").assertIsDisplayed()
+        compose.onNodeWithTag("written-answer-0").performScrollTo()
+            .performTextInput("One half is two quarters.")
+        compose.onNodeWithTag("submit-written-exam").performScrollTo()
+            .assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 10000) {
+            compose.onAllNodesWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(73032, submittedAssignmentId)
     }
 }
