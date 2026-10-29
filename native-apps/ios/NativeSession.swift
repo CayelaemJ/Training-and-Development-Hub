@@ -1824,9 +1824,10 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
               decision != "promote" || candidate.nextGrade != nil else {
             throw NSError(domain: "CABO", code: 403)
         }
-        let candidateIsCurrent = try await fetchSchoolProgression(organizationId: organizationId, year: targetYear - 1)
-            .candidates.contains(where: { $0.id == candidate.id })
-        guard candidateIsCurrent else { throw NSError(domain: "CABO", code: 409) }
+        let current = try await fetchSchoolProgression(organizationId: organizationId, year: targetYear - 1)
+        guard current.candidates.contains(where: { $0.id == candidate.id }) else {
+            throw NSError(domain: "CABO", code: 409)
+        }
         _ = try await request("api/organizations/\(organizationId)/progression/\(candidate.id)",
             method: "POST", body: JSONSerialization.data(withJSONObject: [
                 "targetYear": targetYear, "decision": decision
