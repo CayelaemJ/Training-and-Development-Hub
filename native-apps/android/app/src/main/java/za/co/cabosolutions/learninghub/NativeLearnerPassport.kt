@@ -78,7 +78,7 @@ internal fun NativeLearnerPassportScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Support progress", style = MaterialTheme.typography.titleLarge)
                 if (passportData.items.isEmpty()) {
-                    NativeCard("No support progress yet", "Educator-reviewed support records and published result comparisons will appear here.")
+                    PassportInfoCard("No support progress yet", "Educator-reviewed support records and published result comparisons will appear here.")
                 }
                 passportData.items.forEach { item ->
                     ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
@@ -97,9 +97,9 @@ internal fun NativeLearnerPassportScreen(
                     }
                 }
                 Text("Learning DNA · educator reviewed", style = MaterialTheme.typography.titleLarge)
-                if (passportData.learningDna.isEmpty()) NativeCard("No reviewed learning evidence", "Educator-reviewed concept evidence appears here when available.")
+                if (passportData.learningDna.isEmpty()) PassportInfoCard("No reviewed learning evidence", "Educator-reviewed concept evidence appears here when available.")
                 passportData.learningDna.forEach { evidence ->
-                    NativeCard(evidence.concept, "Reviewed state · ${evidence.state.replace('_', ' ')}")
+                    PassportInfoCard(evidence.concept, "Reviewed state · ${evidence.state.replace('_', ' ')}")
                 }
                 HorizontalDivider()
                 Text(passportData.provenance, style = MaterialTheme.typography.bodySmall,
@@ -107,6 +107,18 @@ internal fun NativeLearnerPassportScreen(
                 Text(passportData.interpretation, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+    }
+}
+
+@Composable
+private fun PassportInfoCard(title: String, detail: String) {
+    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
+        containerColor = Color(0xFFFFFEFA))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(detail, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
