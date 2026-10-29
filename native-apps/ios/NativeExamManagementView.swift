@@ -104,9 +104,12 @@ struct NativeExamManagementView: View {
                                 Text("\(submission.awardedMarks.formatted()) / \(submission.maxMarks.formatted()) marks · Assignment #\(submission.assignmentId)")
                                     .font(.subheadline).foregroundColor(.secondary)
                                 ForEach(submission.feedback, id: \.questionIndex) { mark in
+                                    let assignedExamId = workspace.assignments.first(where: { $0.id == submission.assignmentId })?.examId
+                                    let prompt = session.writtenExams.first(where: { $0.id == assignedExamId })?
+                                        .questions[safe: mark.questionIndex]?.prompt
                                     NativeExamOverrideRow(
                                         session: session, organizationId: workspace.organizationId,
-                                        submission: submission, mark: mark
+                                        submission: submission, mark: mark, prompt: prompt
                                     )
                                 }
                             }
@@ -136,6 +139,7 @@ private struct NativeExamOverrideRow: View {
     let organizationId: Int
     let submission: NativeManagedExamSubmission
     let mark: NativeWrittenExamMark
+    let prompt: String?
     @State private var marksText = ""
     @State private var reason = ""
     @State private var message: String?
@@ -156,7 +160,7 @@ private struct NativeExamOverrideRow: View {
                 .lineLimit(2)
             Button("Save educator mark review") {
                 Task {
-                    guard let value = Double(marksText) else {
+                    guard let value = Double(marksText), value <= mark.maxMarks else {
                         message = "Enter a valid mark between zero and the question maximum."
                         return
                     }
@@ -170,7 +174,8 @@ private struct NativeExamOverrideRow: View {
                     }
                 }
             }
-            .disabled(marksText.isEmpty || reason.trimmingCharacters(in: .whitespacesAndNewlines).count < 5 || session.busy)
+            .disabled(Double(marksText).map { $0 <= mark.maxMarks } != true ||
+                reason.trimmingCharacters(in: .whitespacesAndNewlines).count < 5 || session.busy)
             if let message { Text(message).font(.footnote).foregroundColor(.secondary) }
         }
         .padding(12)
