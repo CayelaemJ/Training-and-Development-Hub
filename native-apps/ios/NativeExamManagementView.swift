@@ -152,8 +152,8 @@ private struct NativeExamOverrideRow: View {
             TextField("Adjusted marks", text: $marksText)
                 .keyboardType(.decimalPad)
                 .accessibilityIdentifier("manager-exam-marks-\(submission.id)-\(mark.questionIndex)")
-            TextField("Reason for adjustment (required)", text: $reason, axis: .vertical)
-                .lineLimit(2...4)
+            TextField("Reason for adjustment (required)", text: $reason)
+                .lineLimit(2)
             Button("Save educator mark review") {
                 Task {
                     guard let value = Double(marksText) else {
