@@ -11,6 +11,7 @@ struct NativeHomeView: View {
     @State private var selectedMaterial: NativeMaterialSummary?
     @State private var selectedStaffTicket: NativeStaffSupportTicket?
     @State private var showSupportRequests = false
+    @State private var showLearnerJourney = false
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
@@ -77,6 +78,9 @@ struct NativeHomeView: View {
         }
         .sheet(isPresented: $showSupportRequests) {
             NativeSupportRequestView(session: session)
+        }
+        .sheet(isPresented: $showLearnerJourney) {
+            NativeLearnerJourneyView(session: session)
         }
         .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
             switch result {
@@ -351,6 +355,12 @@ struct NativeHomeView: View {
     @ViewBuilder
     private var learnerContent: some View {
         title("My learning journey")
+        Button { showLearnerJourney = true } label: {
+            Label("Manage my private learning journey", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
         ForEach(session.summary + session.journey, id: \.self) { item in
             infoTile(item, "Current CABO learning progress", system: "chart.bar")
         }
