@@ -1,6 +1,8 @@
 name = "cabo-learning-django-insights-staging"
 main = "main.py"
-compatibility_date = "2026-10-28"
+# Pinned Wrangler 4.151.3 supports compatibility date 2026-10-26.
+# Local Python WSGI HTTP smoke tests passed with this date.
+compatibility_date = "2026-10-26"
 compatibility_flags = ["python_workers"]
 
 # No route or custom domain is attached. Deploy to isolated staging first.

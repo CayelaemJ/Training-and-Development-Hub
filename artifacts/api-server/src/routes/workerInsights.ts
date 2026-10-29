@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { schoolManager } from "./reportCards";
 import { djangoWorkerDraftURL } from "../lib/djangoWorkerOrigin";
+import { djangoInsightsStagingEnabled } from "../lib/djangoWorkerStagePolicy";
 
 /**
  * Feature-gated internal integration; accepts only pre-aggregated, coded
@@ -38,8 +39,8 @@ const outputSchema = z.object({
 router.post("/organizations/:orgId/learning/insights/draft", async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   if (!req.isAuthenticated()) { res.sendStatus(401); return; }
-  if (process.env.ENABLE_CABO_DJANGO_INSIGHTS !== "true") {
-    res.status(404).json({error: "Learning insights draft is not enabled"});
+  if (!djangoInsightsStagingEnabled(process.env)) {
+    res.status(404).json({error: "Learning insights staging is not enabled"});
     return;
   }
   const org = z.coerce.number().int().positive().safeParse(req.params.orgId);
