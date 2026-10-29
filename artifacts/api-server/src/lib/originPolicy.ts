@@ -12,3 +12,18 @@ export function permittedBrowserOrigin(origin:string|undefined,env:NodeJS.Proces
  if(!origin)return true; // CLI/API calls without browser Origin use authentication; mutating browser calls always send Origin.
  return trustedOrigins(env).has(origin);
 }
+
+/** Build OIDC origins only from an approved deployment origin matching request Host. */
+export function oidcRequestOrigin(host: string | undefined, env: NodeJS.ProcessEnv): string | null {
+  if (!host || !/^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(host)) return null;
+  const approved = trustedOrigins(env);
+  if (env.NODE_ENV !== "production") {
+    const port = env.PORT || "3000";
+    if (/^[0-9]{1,5}$/.test(port) && Number(port) > 0 && Number(port) <= 65535) {
+      approved.add("http://localhost:" + port);
+      approved.add("http://127.0.0.1:" + port);
+    }
+  }
+  for (const origin of approved) if (new URL(origin).host.toLowerCase() === host.toLowerCase()) return origin;
+  return null;
+}
