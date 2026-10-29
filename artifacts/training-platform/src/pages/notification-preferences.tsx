@@ -85,6 +85,7 @@ export default function NotificationPreferencesPage(){
       <div className="space-y-1 sm:pr-6"><h3 className="font-semibold">{copy.title}</h3><p className="text-sm text-muted-foreground">{copy.description}</p>
       <p className="text-xs text-muted-foreground">{choice.enabled?"Email permitted by your recorded choice; delivery still requires live checks.":!choice.canEnable?"This institution is no longer verified for your account. You can withdraw any earlier consent.":locked?"New opt-ins are awaiting identity-provider approval.":"Off by default. You can withdraw consent at any time."}</p></div>
       <button type="button" className="shrink-0 rounded-lg border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label={`${copy.title} at ${school.name}: ${choice.enabled ? "Turn off email" : "Turn on email"}`}
         aria-pressed={choice.enabled} disabled={!!saving||locked||(!choice.enabled&&!consent)}
         onClick={()=>change(school,choice)}>{saving===key?"Saving…":choice.enabled?"Turn off":"Turn on"}</button>
      </div>;
