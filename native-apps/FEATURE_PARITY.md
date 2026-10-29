@@ -24,6 +24,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | Institution hub modules | Role-specific | Role-specific | Role-specific | Role-specific | Missing native workspace |
 | School operations | Learner views | Family views | Attendance/timetable/notices | School leadership | Missing native workspace |
 | Career passport and potential | Learner profile | Shared summaries | Supported review | Admin policy | Missing native workspace |
+| Lifelong learner journey | Learner identity, self-reported education timeline and milestones | — | — | — | Identity/timeline/milestone create, read and delete now available natively on Android/iOS; lifelong passport and credential workflows remain missing |
 | Sports and development plan | Learner goals | Family view | Coach/teacher view | School leadership | Missing native workspace |
 | Platform administration | — | — | — | Superadmin | Read-only organisation list only |
 | Organizations, academics, governance, records | Role scoped | Verified family records | Assigned school scope | Role scoped | Missing native management flows |
@@ -35,7 +36,7 @@ Roles and page access must always come from the authenticated backend response. 
 ## Delivery sequence
 
 1. **Native shell and parity foundation:** secure PKCE login, account/session lifecycle, role-aware navigation, consistent CABO visual tokens, loading/empty/error states, TalkBack/VoiceOver and large text, phone/tablet layouts, CI builds for Android and iOS.
-2. **Learner and family journeys:** learning materials and upload, practice and written assessments, learner success/journey, support, reports, guardian invitations and verified family reports, development and admissions drafts.
+2. **Learner and family journeys:** learning materials and upload, practice and written assessments, learner success/journey, support, reports, guardian invitations and verified family reports, development and admissions drafts. The self-reported education timeline and milestones are implemented on both clients; the wider learner-success, family, admissions and credential flows are still incomplete.
 3. **Educator workspace:** assigned classes, learner-support lifecycle, classroom materials, question bank, assessments/marking, attendance, notices and timetables.
 4. **Institution and platform administration:** school setup, organization and role management, governance, transfers, report issuance/review/integrity, school and district analytics.
 5. **Potential, activities and passports:** learner development evidence, sports and activities, career/passport disclosures, opportunity access and reviews.
