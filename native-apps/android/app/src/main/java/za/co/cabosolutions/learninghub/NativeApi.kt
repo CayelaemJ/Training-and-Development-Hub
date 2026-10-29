@@ -1331,7 +1331,7 @@ internal class NativeApi(private val context: Context) {
 
     private suspend fun loadExamManagementWorkspaces(): List<ExamManagementWorkspace> {
         val memberships = try { getArray("/api/organizations") } catch (_: Exception) { return emptyList() }
-        return (0 until minOf(memberships.length(), 12)).mapNotNull { index ->
+        return (0 until minOf(memberships.length(), 5)).mapNotNull { index ->
             val membership = memberships.optJSONObject(index) ?: return@mapNotNull null
             val orgId = membership.optInt("id")
             val role = membership.optString("role")
