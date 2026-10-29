@@ -725,7 +725,7 @@ class NativeAndroidWrittenExamTest {
                     exams = emptyList(),
                     generate = { materialId, count, difficulty ->
                         assertEquals(9, materialId)
-                        assertEquals(1, count.coerceAtMost(1))
+                        assertEquals(5, count)
                         exam.copy(difficulty = difficulty)
                     },
                     open = { exam },
