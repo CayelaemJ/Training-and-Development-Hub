@@ -27,7 +27,6 @@ assert.equal(base.hash, "");
 const healthURL = new URL("/health", base);
 const draftURL = new URL("/v1/insights/draft", base);
 const options = {
-  signal: AbortSignal.timeout(8_000),
   redirect: "error",
   cache: "no-store",
 };
@@ -40,6 +39,7 @@ const payload = JSON.stringify({
 async function request(method, url, authorized, body = undefined) {
   return fetch(url, {
     ...options,
+    signal: AbortSignal.timeout(8_000),
     method,
     headers: {
       "Content-Type": "application/json",
@@ -56,6 +56,15 @@ try {
 
   const anonymous = await request("POST", draftURL, false, payload);
   assert.equal(anonymous.status, 401, "anonymous request was not rejected");
+
+  const wrongToken = await fetch(draftURL, {
+    ...options,
+    signal: AbortSignal.timeout(8_000),
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer definitely-invalid-token" },
+    body: payload,
+  });
+  assert.equal(wrongToken.status, 401, "invalid bearer token was accepted");
 
   const withToken = await request("POST", draftURL, true, payload);
   assert.equal(withToken.status, 200, "authorised synthetic request failed");
