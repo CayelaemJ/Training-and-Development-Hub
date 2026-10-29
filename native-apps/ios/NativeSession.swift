@@ -667,7 +667,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                         from: await request("api/my-assignments")))?.prefix(100) ?? [])
                 }
                 if ["owner", "admin", "superadmin"].contains(verifiedRole) {
-                    nextExamManagementWorkspaces = await loadExamManagementWorkspaces()
+                    nextExamManagementWorkspaces = []
                     for organizationId in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
                         do {
                             let data = try await request("api/organizations/\(organizationId)/report-issuance/me")
@@ -1453,6 +1453,10 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     private struct NativeQuizAnswers: Encodable {
         let answers: [Int]
+    }
+
+    func refreshExamManagement() async {
+        examManagementWorkspaces = await loadExamManagementWorkspaces()
     }
 
     @MainActor private func loadExamManagementWorkspaces() async -> [NativeExamManagementWorkspace] {
