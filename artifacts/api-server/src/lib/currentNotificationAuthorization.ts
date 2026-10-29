@@ -30,6 +30,13 @@ export async function currentNoticeAuthorization(input:AuthorizationRequest):Pro
     .where(eq(notificationEventSourcesTable.eventId,input.eventId)).limit(1);
   if(!source || !["support_ticket","guardian_relationship"].includes(source.sourceKind)) return false;
   const typed:NoticeSource={kind:source.sourceKind as NoticeSource["kind"],id:source.sourceId};
+  return currentSourceAuthorization(input,typed);
+}
+
+/** Validate an intended source *before* enqueue and again after it is bound. */
+export async function currentSourceAuthorization(input:AuthorizationRequest,typed:NoticeSource):Promise<boolean> {
+  const org=input.organizationId;
+  if(!Number.isSafeInteger(org)||!org||org<1) return false;
   const [account,preference]=await Promise.all([
     db.select({email:usersTable.email}).from(usersTable)
       .where(eq(usersTable.id,input.recipientUserId)).limit(1),
