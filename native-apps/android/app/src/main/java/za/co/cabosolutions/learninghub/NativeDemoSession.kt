@@ -75,4 +75,25 @@ internal object NativeDemoSession {
         )
         return current
     }
+
+    fun transition(summary: SupportTicketSummary, status: String, reason: String): SupportTicket {
+        require(summary.id == current.summary.id && summary.version == current.summary.version)
+        val allowed = when (current.summary.status) {
+            "open" -> setOf("triaged")
+            "triaged" -> setOf("assigned")
+            "assigned" -> setOf("in_progress", "triaged")
+            "in_progress" -> setOf("awaiting_learner", "follow_up_required", "triaged")
+            "awaiting_learner" -> setOf("in_progress", "follow_up_required")
+            "follow_up_required" -> setOf("in_progress", "resolved")
+            "resolved" -> setOf("closed", "in_progress")
+            "closed" -> setOf("in_progress")
+            else -> emptySet()
+        }
+        require(status in allowed && reason.trim().length >= 3)
+        current = current.copy(
+            summary = current.summary.copy(status = status, version = current.summary.version + 1),
+            history = current.history + SupportTicketEvent("transition", reason.trim(), "Just now · demo")
+        )
+        return current
+    }
 }

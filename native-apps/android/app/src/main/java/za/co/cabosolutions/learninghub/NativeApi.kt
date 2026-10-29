@@ -90,9 +90,13 @@ internal data class SupportTicket(
     val question: String,
     val attempted: String,
     val history: List<SupportTicketEvent>,
-    val educators: List<SupportEducator> = emptyList()
+    val educators: List<SupportEducator> = emptyList(),
+    val publishedResults: List<SupportPublishedResult> = emptyList(),
+    val outcome: SupportOutcome? = null
 )
-internal data class SupportTicketEvent(val kind: String, val body: String, val createdAt: String)
+internal data class SupportPublishedResult(val id: Int, val title: String, val marks: Double, val maxMarks: Double, val updatedAt: String)
+internal data class SupportOutcome(val baseline: Double, val followup: Double, val improvementPp: Double, val comparisonReason: String?)
+internal data class SupportTicketEvent(val kind: String, val body: String, val createdAt: String, val state: String? = null)
 internal data class SupportGuidanceDraft(
     val explanation: String,
     val questions: List<String>,
@@ -750,15 +754,33 @@ internal class NativeApi(private val context: Context) {
                     if (body.isBlank()) null else SupportTicketEvent(
                         kind = event.optString("kind", "update").take(32),
                         body = body,
-                        createdAt = event.optString("createdAt").take(40)
+                        createdAt = event.optString("createdAt").take(40),
+                        state = event.optJSONObject("metadata")?.optString("state")?.takeIf { it.isNotBlank() && it != "null" }
                     )
                 }
+            }
+            val publishedJson = json.optJSONArray("publishedResults") ?: JSONArray()
+            val publishedResults = (0 until minOf(publishedJson.length(), 100)).mapNotNull { i ->
+                publishedJson.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id"); val title = row.optString("title").trim()
+                    val max = row.optDouble("maxMarks", -1.0); val marks = row.optDouble("marks", -1.0)
+                    if (id <= 0 || title.isBlank() || max <= 0 || marks < 0) null
+                    else SupportPublishedResult(id, title.take(200), marks, max, row.optString("updatedAt").take(40))
+                }
+            }
+            val outcome = ticket.optJSONObject("outcome")?.let { row ->
+                val before = row.optDouble("baseline", Double.NaN)
+                val after = row.optDouble("followup", Double.NaN)
+                val change = row.optDouble("improvementPp", Double.NaN)
+                if (before.isFinite() && after.isFinite() && change.isFinite())
+                    SupportOutcome(before, after, change, row.optString("comparisonReason").takeIf { it.isNotBlank() && it != "null" })
+                else null
             }
             SupportTicket(
                 summary = canonical,
                 question = ticket.optString("question").take(4000),
                 attempted = ticket.optString("attempted").take(2000),
-                history = history, educators = educators
+                history = history, educators = educators, publishedResults = publishedResults, outcome = outcome
             )
         }
 
@@ -774,6 +796,25 @@ internal class NativeApi(private val context: Context) {
     suspend fun submitLearnerSupportFeedback(ticket: SupportTicket, feedback: String): SupportTicketSummary {
         require(feedback in setOf("helpful", "needs_more_help"))
         return sendSupportAction(ticket.summary, JSONObject().put("kind", "feedback").put("feedback", feedback))
+    }
+
+    suspend fun transitionSupportTicket(ticket: SupportTicket, status: String, reason: String): SupportTicketSummary {
+        require(status in setOf("triaged", "assigned", "in_progress", "awaiting_learner", "follow_up_required", "resolved", "closed"))
+        require(reason.trim().length in 3..1000)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "transition")
+            .put("status", status).put("reason", reason.trim()))
+    }
+
+    suspend fun recordSupportOutcome(ticket: SupportTicket, baselineId: Int, followupId: Int, reason: String): SupportTicketSummary {
+        require(baselineId > 0 && followupId > 0 && baselineId != followupId && reason.trim().length in 20..2000)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "outcome")
+            .put("baselineGradeId", baselineId).put("followupGradeId", followupId).put("comparisonReason", reason.trim()))
+    }
+
+    suspend fun saveLearningDna(ticket: SupportTicket, state: String, body: String): SupportTicketSummary {
+        require(state in setOf("demonstrated", "needs_practice", "not_attempted") && body.trim().length in 20..2000)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "learning_dna")
+            .put("state", state).put("body", body.trim()))
     }
 
     private suspend fun sendSupportAction(summary: SupportTicketSummary, action: JSONObject): SupportTicketSummary =
