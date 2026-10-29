@@ -401,6 +401,58 @@ class NativeAndroidGuardianReviewTest {
 }
 
 @RunWith(AndroidJUnit4::class)
+class NativeAndroidReportIssuanceTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun schoolReportSubmissionAndReviewActionsEnforceRequiredInputs() {
+        var submitted: Triple<Int, String, Int>? = null
+        val actions = mutableListOf<Triple<Int, Int, Pair<String, String>>>()
+        val data = NativeLearning(
+            portal = NativePortal("headmaster", emptyList(), emptyList()),
+            materials = emptyList(), quizzes = emptyList(),
+            reportIssuanceWorkspaces = listOf(ReportIssuanceWorkspace(9, listOf(
+                ReportIssuanceRecord(52, "learner-17", 2026, 1, "submitted", "teacher-1", null, "a".repeat(64), null),
+                ReportIssuanceRecord(53, "learner-18", 2025, 2, "issued", "teacher-2", "admin-1", "b".repeat(64), "2026-01-01")
+            )))
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeHome(
+                    status = "Connected securely to CABO", busy = false, data = data,
+                    signIn = {}, refresh = {}, demoEnabled = false, demoActive = false,
+                    demoRole = "headmaster", startDemo = {}, setDemoRole = {}, createSupportRequest = {},
+                    testLoginAvailable = false, testUsername = "", testPassword = "",
+                    onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
+                    respondToInvite = { _, _ -> }, reviewGuardian = { _, _, _ -> },
+                    submitSchoolReport = { organization, learner, year -> submitted = Triple(organization, learner, year) },
+                    decideSchoolReport = { organization, report, action, reason ->
+                        actions += Triple(organization, report, action to reason)
+                    },
+                    openSupportTicket = {}, openQuiz = {}, openMaterial = {}, pickMaterial = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("Support").performClick()
+        compose.onNodeWithText("Submit report for review").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Enrolled learner account ID").performScrollTo().performTextInput("learner-19")
+        compose.onNodeWithText("Submit report for review").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText("Approve").performScrollTo().performClick()
+        compose.onNodeWithText("Revoke").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Reason for rejection or revocation").performScrollTo().performTextInput("Duplicate record")
+        compose.onNodeWithText("Revoke").performScrollTo().assertIsEnabled().performClick()
+
+        assertEquals(9, submitted?.first)
+        assertEquals("learner-19", submitted?.second)
+        assertEquals(2026, submitted?.third)
+        assertEquals(Triple(9, 52, "approve" to ""), actions[0])
+        assertEquals(Triple(9, 53, "revoke" to "Duplicate record"), actions[1])
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
 class NativeAndroidDemoFlowTest {
     @get:Rule
     val compose = createComposeRule()

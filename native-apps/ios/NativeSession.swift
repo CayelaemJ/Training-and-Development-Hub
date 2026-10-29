@@ -24,6 +24,22 @@ struct NativeGuardianReviewWorkspace: Identifiable {
     let reviews: [NativeGuardianReview]
     var id: Int { organizationId }
 }
+struct NativeReportIssuanceRecord: Identifiable, Decodable {
+    let id: Int
+    let learnerId: String
+    let academicYear: Int
+    let version: Int
+    let status: String
+    let submittedBy: String
+    let reviewedBy: String?
+    let contentHash: String
+    let issuedAt: String?
+}
+struct NativeReportIssuanceWorkspace: Identifiable {
+    let organizationId: Int
+    let records: [NativeReportIssuanceRecord]
+    var id: Int { organizationId }
+}
 struct StaffSchool: Identifiable {
     let id: Int
     let subjects: [String]
@@ -117,6 +133,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var guardians: [GuardianInvitation] = []
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
+    @Published var reportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
     @Published var guardianGuidance = ""
     @Published var guardianReports: [NativeGuardianReport] = []
     @Published var guardianReportNotice = ""
@@ -253,7 +270,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             clearToken()
             role = nil
             summary = []; workspaces = []; materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
-            guardians = []; guardianReviewWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
+            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
             status = "Session expired. Sign in again."
@@ -335,6 +352,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 .compactMap { $0["label"] as? String }
             var nextGuardians: [GuardianInvitation] = []
             var nextGuardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
+            var nextReportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
             var nextStaff: [StaffSchool] = []
             var nextAdminOrganizations: [String] = []
             var nextJourney: [String] = []
@@ -386,6 +404,14 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                         .contains(verifiedRole) {
                 let organizations = Array((decoded["organizationIds"] as? [Int] ?? []).prefix(12))
                 for org in organizations {
+                    do {
+                        let data = try await request("api/organizations/\(org)/report-issuance")
+                        let records = Array((try JSONDecoder().decode([NativeReportIssuanceRecord].self, from: data)).prefix(100))
+                        nextReportIssuanceWorkspaces.append(NativeReportIssuanceWorkspace(organizationId: org, records: records))
+                    } catch {
+                        // The route is restricted to school managers, so absent workspaces stay hidden.
+                        if keychainToken() == nil { throw error }
+                    }
                     do {
                         let reviewData = try await request("api/organizations/\(org)/guardian-reviews")
                         let reviews = Array((try JSONDecoder().decode([NativeGuardianReview].self, from: reviewData)).prefix(200))
@@ -525,6 +551,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             workspaces = nextWorkspaces
             guardians = nextGuardians
             guardianReviewWorkspaces = nextGuardianReviewWorkspaces
+            reportIssuanceWorkspaces = nextReportIssuanceWorkspaces
             guardianGuidance = nextGuidance
             guardianReports = nextGuardianReports
             guardianReportNotice = nextGuardianReportNotice
@@ -547,7 +574,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-            guardians = []; guardianReviewWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
             supportCourses = loadSupportCourses()
@@ -1007,6 +1034,50 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
+    func submitSchoolReport(organizationId: Int, learnerId: String, academicYear: Int) async {
+        let learner = learnerId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, organizationId > 0, !learner.isEmpty, learner.count <= 200,
+              (2000...2200).contains(academicYear),
+              reportIssuanceWorkspaces.contains(where: { $0.organizationId == organizationId }) else {
+            status = "Select an authorised school and enter a valid enrolled learner and year."
+            return
+        }
+        busy = true
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["learnerId": learner, "academicYear": academicYear])
+            _ = try await request("api/organizations/\(organizationId)/report-issuance", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Report snapshot submitted for independent review."
+        } catch {
+            busy = false
+            status = "Could not submit this report. Check enrolment and published assessment results."
+        }
+    }
+
+    func decideSchoolReport(organizationId: Int, reportId: Int, action: String, reason: String) async {
+        let cleanReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, organizationId > 0, reportId > 0,
+              ["approve", "reject", "issue", "revoke"].contains(action), cleanReason.count <= 1000,
+              !["reject", "revoke"].contains(action) || !cleanReason.isEmpty,
+              reportIssuanceWorkspaces.contains(where: { $0.organizationId == organizationId }) else {
+            status = "Check school access, report status, and any required reason."
+            return
+        }
+        busy = true
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["action": action, "reason": cleanReason])
+            _ = try await request("api/organizations/\(organizationId)/report-issuance/\(reportId)/decision",
+                                  method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Report workflow updated: \(action.capitalized)."
+        } catch {
+            busy = false
+            status = "Report action failed. Check the two-reviewer rule, report status, integrity, and required reason."
+        }
+    }
+
     func signOut() async {
         guard !busy else { return }
         busy = true
@@ -1022,7 +1093,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         clearSupportStorage()
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-        guardians = []; guardianReviewWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+        guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
         busy = false
