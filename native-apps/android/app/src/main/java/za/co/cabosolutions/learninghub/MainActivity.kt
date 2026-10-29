@@ -120,6 +120,8 @@ class MainActivity : ComponentActivity() {
                         selectedUploadUri != null -> closeMaterialUpload()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
+                        selectedWrittenExams && managerCreatingExam -> { managerCreatingExam = false; loadDashboard() }
+                        selectedWrittenExams -> selectedWrittenExams = false
                         else -> closeStudy()
                     }
                 }
