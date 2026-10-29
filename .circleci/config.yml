@@ -1,26 +1,6 @@
 version: 2.1
 # Regular verification runs on all branches; staging deployment is opt-in.
 parameters:
-  django_worker_local_smoke:
-    # The staging deploy pipeline must exercise real HTTP via local workerd.
-    # This job does not run on ordinary pushes or deploy anything.
-    docker:
-      - image: cimg/python:3.12-node
-    resource_class: medium
-    steps:
-      - checkout
-      - run:
-          name: Run synthetic Django Worker HTTP contract in local workerd
-          command: |
-            python -m pip install --disable-pip-version-check "uv==0.13.6"
-            cd services/cloudflare-django-worker
-            uvx --from workers-py==1.17.9 pywrangler sync
-            # Install a pinned CLI in an isolated folder, not the repo lockfile.
-            npm install --prefix /tmp/cabo-django-smoke-cli --no-save --no-audit --no-fund wrangler@4.151.3
-            cd ../..
-            CABO_DJANGO_LOCAL_WRANGLER_CLI=/tmp/cabo-django-smoke-cli/node_modules/wrangler/wrangler-dist/cli.js node scripts/test-django-worker-local.mjs
-          no_output_timeout: 8m
-
   deploy_django_staging:
     type: boolean
     default: false
@@ -48,6 +28,26 @@ jobs:
             uvx --from workers-py==1.17.9 pywrangler sync
             npx --yes wrangler@4.151.3 deploy --dry-run --outdir /tmp/cabo-django-worker-bundle
 
+
+  django_worker_local_smoke:
+    # The staging deploy pipeline must exercise real HTTP via local workerd.
+    # This job does not run on ordinary pushes or deploy anything.
+    docker:
+      - image: cimg/python:3.12-node
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Run synthetic Django Worker HTTP contract in local workerd
+          command: |
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            cd services/cloudflare-django-worker
+            uvx --from workers-py==1.17.9 pywrangler sync
+            # Install a pinned CLI in an isolated folder, not the repo lockfile.
+            npm install --prefix /tmp/cabo-django-smoke-cli --no-save --no-audit --no-fund wrangler@4.151.3
+            cd ../..
+            CABO_DJANGO_LOCAL_WRANGLER_CLI=/tmp/cabo-django-smoke-cli/node_modules/wrangler/wrangler-dist/cli.js node scripts/test-django-worker-local.mjs
+          no_output_timeout: 8m
 
   deploy_django_staging:
     docker:
