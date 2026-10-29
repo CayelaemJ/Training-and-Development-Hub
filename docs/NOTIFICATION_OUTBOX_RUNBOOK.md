@@ -22,16 +22,16 @@ The additive database migration is \`lib/db/migrations/20261029_notification_out
 2. Confirm the verified sending domain and provider account, transactional templates, Redis quota, retention, POPIA/Botswana lawful basis, minimum recipient data and withdrawal policy.
 3. Run a complete synthetic sender test with \`CABO_TRANSACTIONAL_EMAIL_ENABLED=true\`, \`RESEND_API_KEY\`, \`CABO_FROM_EMAIL\`, \`UPSTASH_REDIS_REST_URL\`, \`UPSTASH_REDIS_REST_TOKEN\`.
 4. Enable \`CABO_NOTIFICATION_OUTBOX_ENABLED=true\` and set the server-side \`CABO_NOTIFICATION_OUTBOX_KEY\`. **Do not enable on the pilot before a real authorized event producer exists and has been tested**.
-5. Only after all tests pass, run **one** manual dispatch by setting \`CABO_NOTIFICATION_OUTBOX_WORKER_ENABLED=true\` and executing:
+5. For operational validation only, inspect and quarantine expired leases with the explicit CLI below. **It will not send** until a trusted, continuously revalidated recipient/guardian consent authorizer is implemented and wired to the worker:
    \`\`\`bash
    pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/processNotificationOutbox.ts
    \`\`\`
-   This command processes at most one queued item. It is **not** a cron service.
-6. Verify data remains organization-scoped and masked in logs, provider statuses reconcile, unknown responses enter \`needs_review\`, and all consent revocations cancel pending notifications.
+   This command currently performs no dispatch; it can only quarantine expired leases when explicitly enabled. It is **not** a cron service.
+6. Implement the required server-trusted `DispatchAuthorization` callback; it must check current institution/guardian permissions, notification preferences, account state and consent immediately before delivery. Verify data remains organization-scoped and masked in logs, provider statuses reconcile, unknown responses enter \`needs_review\`, and all consent revocations cancel pending notifications.
 
 ## Remaining production blockers
 
-- Server-side recipient/tenant/guardian authorization **must be reverified at dispatch time**, in addition to enqueue-time approval. The current worker has no such integration and must stay disabled until implemented.
+- Server-side recipient/tenant/guardian authorization **must be reverified at dispatch time**, in addition to enqueue-time approval. The code now **requires** a trusted `DispatchAuthorization` callback and refuses to dispatch without one. The CLI intentionally has no authorizer, so it cannot send.
 - Define queue retention and secure delete/subject erasure, encryption key rotation and backup/restore; avoid storing unnecessary relationship information.
 - Audit/recovery UI for staff to reconcile provider delivery receipts, bounced addresses, duplicate notifications and events requiring manual review.
 - Provider webhooks (signature-verified), delivery/failure/abuse alerts, allowlists and continuous cost monitoring.
