@@ -14,6 +14,7 @@ struct NativeHomeView: View {
     @State private var showLearnerJourney = false
     @State private var showLearnerPassport = false
     @State private var showExamManagement = false
+    @State private var showEducationCommand = false
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
@@ -21,6 +22,11 @@ struct NativeHomeView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
     private let gold = Color(red: 201.0 / 255.0, green: 168.0 / 255.0, blue: 76.0 / 255.0)
+
+    private var canOpenEducationCommand: Bool {
+        ["superadmin", "owner", "admin", "national_director", "provincial_director", "district_director", "group_executive"]
+            .contains(session.role ?? "")
+    }
 
     private var isEducator: Bool {
         guard let role = session.role else { return false }
@@ -66,6 +72,8 @@ struct NativeHomeView: View {
                 selectedStaffTicket = nil
                 showExamManagement = false
                 showLearnerPassport = false
+                showEducationCommand = false
+                session.clearEducationCommand()
                 testPassword = ""
                 reviewedGuardianEvidence = []
             }
@@ -93,6 +101,9 @@ struct NativeHomeView: View {
         }
         .sheet(isPresented: $showExamManagement) {
             NativeExamManagementView(session: session)
+        }
+        .sheet(isPresented: $showEducationCommand) {
+            NativeEducationCommandView(session: session)
         }
         .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
             switch result {
@@ -193,6 +204,15 @@ struct NativeHomeView: View {
                         Task { await session.signOut() }
                     }.buttonStyle(.bordered).disabled(session.busy)
                 }.controlSize(.large)
+                if canOpenEducationCommand {
+                    Button {
+                        showEducationCommand = true
+                    } label: {
+                        Label("Open Education Command", systemImage: "building.2.crop.circle")
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
