@@ -23,7 +23,7 @@ test("deployment destination and Cloudflare account remain restricted", () => {
 
 test("required credentials are provided privately and deployment stays opt-in", () => {
   for (const name of ["CLOUDFLARE_API_TOKEN", "DJANGO_SECRET_KEY", "DJANGO_WORKER_TOKEN"]) {
-    assert.ok(deployJob.includes(`\${${name}:?`), `${name} must be required by deploy preflight`);
+    assert.ok(deployJob.includes("${" + name + ":?"), `${name} must be required by deploy preflight`);
   }
   assert.match(config, /deploy_django_staging:\s*\n\s*type: boolean\s*\n\s*default: false/);
   assert.match(config, /context: cabo-cloudflare-staging/);
