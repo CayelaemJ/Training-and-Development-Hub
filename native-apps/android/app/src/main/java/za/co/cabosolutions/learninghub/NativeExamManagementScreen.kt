@@ -19,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -34,6 +36,7 @@ internal fun NativeExamManagementScreen(
     createExam: () -> Unit,
     close: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val groupSelections = remember { mutableStateMapOf<Int, Int>() }
     val examSelections = remember { mutableStateMapOf<Int, Int>() }
     val deadlines = remember { mutableStateMapOf<Int, String>() }
@@ -104,7 +107,7 @@ internal fun NativeExamManagementScreen(
                                 val examId = examSelections[workspace.organizationId] ?: exams.firstOrNull()?.id ?: 0
                                 val dueAt = deadlines[workspace.organizationId]?.trim()?.takeIf { it.isNotEmpty() }
                                 message = null
-                                kotlinx.coroutines.MainScope().launch {
+                                scope.launch {
                                     try {
                                         assign(workspace.organizationId, groupId, examId, dueAt)
                                         message = "Exam assigned to ${workspace.groups.firstOrNull { it.id == groupId }?.name ?: "the selected group"}."
