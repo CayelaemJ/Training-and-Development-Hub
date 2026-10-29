@@ -167,9 +167,32 @@ class MainActivity : ComponentActivity() {
                     )
                     selectedWrittenExams -> NativeWrittenExamScreen(
                         materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
-                        generate = { material, count, difficulty -> api.generateWrittenExam(material, count, difficulty) },
-                        open = { examId -> api.fetchWrittenExam(examId) },
-                        submit = { examId, answers -> api.submitWrittenExam(examId, answers) },
+                        generate = { material, count, difficulty ->
+                            if (demoActive) WrittenExam(73031, "CABO demo · ${material.title}", difficulty,
+                                List(count) { index -> WrittenExamQuestion(
+                                    listOf("Explain one key idea from your study material.", "Give an example of how that idea can be used.") [index % 2],
+                                    "short_answer", 5
+                                ) })
+                            else api.generateWrittenExam(material.id, count, difficulty)
+                        },
+                        open = { examId ->
+                            if (demoActive) throw IllegalStateException("Select a demo exam above.")
+                            else api.fetchWrittenExam(examId)
+                        },
+                        submit = { examId, answers ->
+                            if (demoActive) {
+                                val marks = answers.mapIndexed { index, answer ->
+                                    val awarded = if (answer.trim().length >= 20) 4.0 else 2.0
+                                    WrittenExamMark(index, awarded, 5.0,
+                                        if (awarded > 2) "Clear response. Add one supporting detail to strengthen it."
+                                        else "Add more detail and connect your explanation to the study material.", false)
+                                }
+                                val total = marks.sumOf { it.maxMarks }
+                                val awarded = marks.sumOf { it.awardedMarks }
+                                WrittenExamResult(73099, awarded * 100.0 / total, awarded, total, 0, marks)
+                            } else api.submitWrittenExam(examId, answers)
+                        },
+                        isDemo = demoActive,
                         close = { selectedWrittenExams = false }
                     )
                     selectedQuiz != null -> NativeQuizScreen(
@@ -1822,7 +1845,7 @@ private fun RoleContent(
                     }
                     item { Text("Written exams", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     item {
-                        OutlinedButton(onClick = openWrittenExams, enabled = !busy && !demoActive,
+                        OutlinedButton(onClick = openWrittenExams, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                             Text("Create or take a written exam")
                         }
