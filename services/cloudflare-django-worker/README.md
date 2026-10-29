@@ -1,6 +1,6 @@
 # CABO Learning Hub — Cloudflare Django insights Worker (staging)
 
-This is a **narrow, opt-in processing service**, not a replacement for the CABO Express API, its PostgreSQL database, permissions, exam grading or AI-provider orchestration. Cloudflare Python Workers support Django WSGI as of September 2026. The Django service uses no separate learner database or persistent model state.
+This is a **narrow, opt-in processing service**, not a replacement for the CABO Express API, its PostgreSQL database, permissions, exam grading or AI-provider orchestration. Cloudflare Python Workers support Django WSGI as of September 2026. The Django service uses no separate learner database or persistent model state. The service has no browser session or CSRF middleware: a mandatory strong server-to-server bearer credential protects its POST endpoint.
 
 ## Scope
 - `POST /v1/insights/draft`: validates **coded, aggregate-only** learning metrics and returns deterministic, advisory intervention labels. Never use output as final assessment, progression, diagnosis or automatic learner decisions.
@@ -12,7 +12,7 @@ This is a **narrow, opt-in processing service**, not a replacement for the CABO 
 ## Local and deployment
 From this folder with Python 3.12+, uv and workers-py/Pywrangler installed:
 ```sh
-uv run python -m django test --settings=cabo_worker.settings
+DJANGO_SECRET_KEY=local-only-test-secret DJANGO_WORKER_TOKEN=long-test-only-token-for-ci-tests-1234 uv run python -m django test --settings=cabo_worker.settings
 uvx --from workers-py pywrangler dev
 ```
 Set strong random values for `DJANGO_WORKER_TOKEN` and `DJANGO_SECRET_KEY` using Cloudflare Worker **secret** bindings (never use test values):
