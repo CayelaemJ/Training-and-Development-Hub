@@ -27,6 +27,7 @@ import SchoolProgressionPage from '@/pages/school-progression';
 import CaboApplyPage from '@/pages/cabo-apply';
 import EducationReportsPage from '@/pages/education-reports';
 import GuardianConnectPage from '@/pages/guardian-connect';
+import NotificationPreferencesPage from '@/pages/notification-preferences';
 import ReportIssuancePage from '@/pages/report-issuance';
 import SchoolIntelligencePage from '@/pages/school-intelligence';
 import QuestionBankPage from '@/pages/assessment-question-bank';
@@ -78,6 +79,7 @@ const navItems = [
   { href: '/question-bank', label: 'Assessment question bank', icon: FileText },
   { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
+  { href: '/notification-preferences', label: 'Notifications', icon: CircleHelp },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
@@ -136,6 +138,7 @@ function Router() {
     <Route path="/question-bank" component={QuestionBankPage} />
     <Route path="/education-command" component={EducationCommandPage} />
     <Route path="/guardian-connect" component={GuardianConnectPage} />
+    <Route path="/notification-preferences" component={NotificationPreferencesPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
@@ -186,7 +189,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
@@ -194,7 +197,7 @@ function AppShell({ user }: { user: any }) {
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
         <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
-        {navItems.filter(item=>portalRole!==null&&allowedNav[portalRole]?.includes(item.href)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
+        {navItems.filter(item=>portalRole!==null&&(item.href==='/notification-preferences'||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
         <div className="side-note"><span className="note-mark"><Target size={17} /></span><p>Small sessions add up.<br /><strong>Keep your rhythm.</strong></p></div>
