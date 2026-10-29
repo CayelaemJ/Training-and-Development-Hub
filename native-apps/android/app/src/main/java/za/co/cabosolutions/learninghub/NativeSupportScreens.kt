@@ -1,9 +1,9 @@
 package za.co.cabosolutions.learninghub
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -171,7 +171,9 @@ internal fun NativeSupportTicketScreen(
     triage: () -> Unit,
     assign: (String) -> Unit,
     schedulePractice: (String, String) -> Unit,
-    close: () -> Unit
+    close: () -> Unit,
+    isLearnerOwner: Boolean = false,
+    submitFeedback: (String) -> Unit = {}
 ) {
     var selectedEducator by remember(ticket?.summary?.assignedTo) { mutableStateOf(ticket?.summary?.assignedTo.orEmpty()) }
     var practice by remember { mutableStateOf("") }
@@ -208,6 +210,21 @@ internal fun NativeSupportTicketScreen(
             }
             Text(ticket.summary.concept, style = MaterialTheme.typography.headlineSmall)
             Text("Status: ${ticket.summary.status.replace('_', ' ')}")
+            if (isLearnerOwner) {
+                Text("Your school support request", style = MaterialTheme.typography.bodyMedium)
+                if (ticket.summary.feedback == null && ticket.summary.status !in listOf("resolved", "closed")) {
+                    Text("After reviewing your educator’s reply, tell them whether it helped.")
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { submitFeedback("helpful") }, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("I understood the help") }
+                        OutlinedButton(onClick = { submitFeedback("needs_more_help") }, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("I still need help") }
+                    }
+                } else if (ticket.summary.feedback != null) {
+                    Text(if (ticket.summary.feedback == "helpful") "You confirmed this helped." else "You requested more help.")
+                }
+                ticket.summary.reviewAt?.let { Text("Next practice review: $it") }
+            }
             Text("School workspace ${ticket.summary.organizationId} · request ${ticket.summary.id}",
                 style = MaterialTheme.typography.bodySmall)
             ElevatedCard(Modifier.fillMaxWidth()) {

@@ -472,8 +472,25 @@ struct NativeHomeView: View {
         if session.learnerHelp.isEmpty {
             infoTile("No requests yet", "You can ask your educator for additional help.", system: "person.2")
         }
-        ForEach(session.learnerHelp, id: \.self) { ticket in
-            infoTile(ticket, "My support request", system: "person.2")
+        ForEach(session.learnerHelp) { ticket in
+            Button { selectedStaffTicket = ticket } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2").foregroundColor(clay)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ticket.concept).font(.headline).foregroundColor(.primary)
+                        Text("\(ticket.status.replacingOccurrences(of: "_", with: " ")) · Request #\(ticket.id)")
+                            .font(.subheadline).foregroundColor(.secondary)
+                        if ticket.feedback != nil { Text("Your response has been recorded.").font(.footnote).foregroundColor(.secondary) }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundColor(.secondary)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(session.busy)
         }
     }
 
