@@ -739,8 +739,10 @@ class NativeAndroidWrittenExamTest {
         compose.onNodeWithTag("generate-written-exam").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("submit-written-exam").assertIsNotEnabled()
-        compose.onNodeWithTag("written-answer-0").performTextInput("Add the denominators after making them equal.")
-        compose.onNodeWithTag("submit-written-exam").assertIsEnabled().performClick()
+        compose.onNodeWithTag("written-answer-0").performScrollTo()
+            .performTextInput("Add the denominators after making them equal.")
+        compose.onNodeWithTag("submit-written-exam").performScrollTo()
+            .assertIsEnabled().performClick()
         compose.waitUntil(timeoutMillis = 10000) {
             compose.onAllNodesWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNodes().isNotEmpty()
         }
