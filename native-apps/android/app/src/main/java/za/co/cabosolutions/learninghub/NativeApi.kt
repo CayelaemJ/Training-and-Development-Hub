@@ -690,8 +690,8 @@ internal class NativeApi(private val context: Context) {
     suspend fun fetchSchoolProgression(organizationId: Int, year: Int): SchoolProgressionSnapshot =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(organizationId > 0 && year in 2020..2200)
-            val candidatesJson = request("/api/organizations/$organizationId/progression/candidates?year=$year", auth = true)
-            val historyJson = request("/api/organizations/$organizationId/progression/history", auth = true)
+            val candidatesJson = getArray("/api/organizations/$organizationId/progression/candidates?year=$year")
+            val historyJson = getArray("/api/organizations/$organizationId/progression/history")
             val candidates = (0 until minOf(candidatesJson.length(), 400)).mapNotNull { index ->
                 val row = candidatesJson.optJSONObject(index) ?: return@mapNotNull null
                 val id = row.optInt("id")
