@@ -20,7 +20,7 @@ export function encryptRecipient(
     throw new Error("Recipient encryption requirements not met");
   }
   const nonce=randomBytes(12);
-  const cipher=createCipheriv("aes-256-gcm",key,nonce);
+  const cipher=createCipheriv("aes-256-gcm",key,nonce,{authTagLength:16});
   cipher.setAAD(Buffer.from(eventId.toLowerCase()));
   const payload=Buffer.concat([cipher.update(recipient,"utf8"),cipher.final()]);
   return ["v1",nonce.toString("base64url"),payload.toString("base64url"),cipher.getAuthTag().toString("base64url")].join(".");
@@ -36,7 +36,7 @@ export function decryptRecipient(
   const [nonce,content,tag]=parts.slice(1).map(x=>Buffer.from(x,"base64url"));
   if(nonce.length!==12 || tag.length!==16 || content.length===0) throw new Error("Invalid protected recipient");
   try {
-    const decipher=createDecipheriv("aes-256-gcm",key,nonce);
+    const decipher=createDecipheriv("aes-256-gcm",key,nonce,{authTagLength:16});
     decipher.setAAD(Buffer.from(eventId.toLowerCase()));
     decipher.setAuthTag(tag);
     const plain=Buffer.concat([decipher.update(content),decipher.final()]).toString("utf8");
