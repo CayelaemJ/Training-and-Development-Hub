@@ -173,7 +173,6 @@ class MainActivity : ComponentActivity() {
                     else -> NativeHome(
                         status = status, busy = busy, data = screen?.copy(supportDrafts = supportDrafts),
                         signIn = { startSignIn() },
-                        openWebExperience = { openWebExperience() },
                         refresh = { if (demoActive) switchDemoRole(demoRole) else loadDashboard() },
                         demoEnabled = BuildConfig.ENABLE_DEMO_MODE,
                         demoActive = demoActive,
@@ -216,14 +215,6 @@ class MainActivity : ComponentActivity() {
     private fun startSignIn() {
         try { startActivity(api.authorize()) }
         catch (_: Exception) { status = "No browser could be opened for secure sign-in." }
-    }
-
-    private fun openWebExperience() {
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.WEB_APP_ORIGIN)))
-        } catch (_: Exception) {
-            status = "No browser is available to open the full CABO web app."
-        }
     }
 
     private fun startTestSignIn() {
@@ -716,7 +707,6 @@ internal fun NativeHome(
     busy: Boolean,
     data: NativeLearning?,
     signIn: () -> Unit,
-    openWebExperience: () -> Unit = {},
     refresh: () -> Unit,
     demoEnabled: Boolean,
     demoActive: Boolean,
@@ -829,12 +819,6 @@ internal fun NativeHome(
                         Text("Learner, teacher and parent workspaces · sample data stays on this device",
                             style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                     }
-                    OutlinedButton(onClick = openWebExperience,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
-                        Text("Open the full CABO web app", fontWeight = FontWeight.SemiBold)
-                    }
-                    Text("Opens your browser to the complete CABO learning, teaching and family workspaces.",
-                        style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                     if (offlineSupportDrafts.isNotEmpty()) {
                         ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
                             containerColor = Color(0xFFE8F0E9))) {
@@ -920,7 +904,6 @@ internal fun NativeHome(
                             RoleContent(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
-                                openWebExperience = openWebExperience,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
@@ -930,7 +913,7 @@ internal fun NativeHome(
                     } else {
                         RoleContent(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
-                            demoActive = demoActive, openWebExperience = openWebExperience,
+                            demoActive = demoActive,
                             respondToInvite = respondToInvite,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
@@ -997,7 +980,6 @@ private fun RoleContent(
     section: String,
     busy: Boolean,
     demoActive: Boolean,
-    openWebExperience: () -> Unit,
     respondToInvite: (Int, Boolean) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
@@ -1043,16 +1025,6 @@ private fun RoleContent(
                                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     }
-                }
-            }
-            if (demoActive) item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(onClick = openWebExperience,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
-                        Text("Open the full CABO web app")
-                    }
-                    Text("Opens the existing CABO interface in your browser.",
-                        style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                 }
             }
             if (data.portal.summary.isNotEmpty()) {
