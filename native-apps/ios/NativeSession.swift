@@ -85,6 +85,48 @@ private struct NativeSchoolAttendanceEnvelope: Decodable {
     let attendance: [NativeSchoolAttendance]
 }
 
+struct NativeAssessmentQuestion: Identifiable, Decodable {
+    let id: Int
+    let organizationId: Int
+    let grade: String
+    let subject: String
+    let curriculum: String
+    let stem: String
+    let answerGuide: String
+    let rubric: String
+    let sourceAttribution: String
+    let license: String
+    let status: String
+    let createdBy: String
+    let reviewedBy: String?
+}
+struct NativeAssessmentPaper: Identifiable, Decodable {
+    let id: Int
+    let title: String
+    let grade: String
+    let subject: String
+    let curriculum: String
+    let academicYear: Int
+    let status: String
+    let createdBy: String
+    let approvedBy: String?
+    let questionCount: Int
+}
+struct NativeAssessmentWorkspace: Identifiable {
+    let organizationId: Int
+    let organizationName: String
+    let membershipRole: String
+    let questions: [NativeAssessmentQuestion]
+    let papers: [NativeAssessmentPaper]
+    let notice: String?
+    var id: Int { organizationId }
+}
+private struct NativeAssessmentPaperInput: Decodable {
+    let id: Int
+    let status: String
+    let questionCount: Int
+}
+
 struct StaffSchool: Identifiable {
     let id: Int
     let subjects: [String]
@@ -180,6 +222,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
     @Published var reportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
     @Published var schoolOperations: [NativeSchoolOperationsWorkspace] = []
+    @Published var assessmentWorkspaces: [NativeAssessmentWorkspace] = []
     @Published var guardianGuidance = ""
     @Published var guardianReports: [NativeGuardianReport] = []
     @Published var guardianReportNotice = ""
@@ -402,6 +445,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextGuardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
             var nextReportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
             var nextSchoolOperations: [NativeSchoolOperationsWorkspace] = []
+            var nextAssessmentWorkspaces: [NativeAssessmentWorkspace] = []
             var nextStaff: [StaffSchool] = []
             var nextAdminOrganizations: [String] = []
             var nextJourney: [String] = []
@@ -634,6 +678,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             }
             if !["superadmin", "parent"].contains(verifiedRole) {
                 nextSchoolOperations = await loadSchoolOperations()
+                nextAssessmentWorkspaces = await loadAssessmentWorkspaces()
             }
             // One of the nested requests may have cleared credentials after a 401.
             guard keychainToken() != nil else { throw NSError(domain: "CABO", code: 401) }
@@ -644,6 +689,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             guardianReviewWorkspaces = nextGuardianReviewWorkspaces
             reportIssuanceWorkspaces = nextReportIssuanceWorkspaces
             schoolOperations = nextSchoolOperations
+            assessmentWorkspaces = nextAssessmentWorkspaces
             guardianGuidance = nextGuidance
             guardianReports = nextGuardianReports
             guardianReportNotice = nextGuardianReportNotice
@@ -810,6 +856,96 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             await refresh()
             status = "Teacher substitution recorded"
         } catch { status = "Could not record the substitution. Check your access and try again." }
+    }
+
+    private func loadAssessmentWorkspaces() async -> [NativeAssessmentWorkspace] {
+        guard let data = try? await request("api/organizations"),
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        var workspaces: [NativeAssessmentWorkspace] = []
+        for member in rows.prefix(12) {
+            guard let org = member["id"] as? Int, org > 0,
+                  let name = member["name"] as? String, !name.isEmpty,
+                  let memberRole = member["role"] as? String,
+                  ["owner", "admin", "teacher", "assessor"].contains(memberRole) else { continue }
+            var partialFailure = false
+            var questions: [NativeAssessmentQuestion] = []
+            if let response = try? await request("api/organizations/\(org)/question-bank"),
+               let decoded = try? JSONDecoder().decode([NativeAssessmentQuestion].self, from: response) {
+                questions = Array(decoded.prefix(200))
+            } else if keychainToken() == nil { return [] }
+            else { partialFailure = true }
+            var papers: [NativeAssessmentPaper] = []
+            if let response = try? await request("api/organizations/\(org)/assessment-papers"),
+               let decoded = try? JSONDecoder().decode([NativeAssessmentPaper].self, from: response) {
+                papers = Array(decoded.prefix(100))
+            } else if keychainToken() == nil { return [] }
+            else { partialFailure = true }
+            workspaces.append(NativeAssessmentWorkspace(organizationId: org,
+                organizationName: String(name.prefix(200)), membershipRole: String(memberRole.prefix(40)),
+                questions: questions, papers: papers,
+                notice: partialFailure ? "Some assessment data could not load. Refresh and check school access." : nil))
+        }
+        return workspaces
+    }
+
+    func createAssessmentQuestion(organizationId: Int, grade: String, subject: String, curriculum: String,
+                                  stem: String, answerGuide: String, rubric: String, sourceAttribution: String,
+                                  license: String) async {
+        guard assessmentWorkspaces.contains(where: { $0.organizationId == organizationId &&
+            ["owner", "admin", "teacher"].contains($0.membershipRole) }), !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["grade": grade, "subject": subject,
+                "curriculum": curriculum, "stem": stem, "answerGuide": answerGuide, "rubric": rubric,
+                "sourceAttribution": sourceAttribution, "license": license])
+            _ = try await request("api/organizations/\(organizationId)/question-bank", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Assessment question saved as a draft"
+        } catch { status = "Could not save the question. Check attribution, license and school access." }
+    }
+
+    func decideAssessmentQuestion(organizationId: Int, questionId: Int, action: String, note: String) async {
+        guard assessmentWorkspaces.contains(where: { $0.organizationId == organizationId }), !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["action": action, "note": note])
+            _ = try await request("api/organizations/\(organizationId)/question-bank/\(questionId)/decision", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Question workflow updated"
+        } catch { status = "Question action was not accepted. Independent review and role rules apply." }
+    }
+
+    func createAssessmentPaper(organizationId: Int, academicYear: Int, grade: String, subject: String,
+                               curriculum: String, title: String, questionIds: [Int]) async {
+        guard assessmentWorkspaces.contains(where: { $0.organizationId == organizationId &&
+            ["owner", "admin", "teacher"].contains($0.membershipRole) }), !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["academicYear": academicYear, "grade": grade,
+                "subject": subject, "curriculum": curriculum, "title": title, "questionIds": questionIds])
+            _ = try await request("api/organizations/\(organizationId)/assessment-papers", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Assessment paper created as a draft"
+        } catch { status = "Could not create the paper. Only published matching questions can be used." }
+    }
+
+    func decideAssessmentPaper(organizationId: Int, paperId: Int, action: String, note: String) async {
+        guard assessmentWorkspaces.contains(where: { $0.organizationId == organizationId }), !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["action": action, "note": note])
+            _ = try await request("api/organizations/\(organizationId)/assessment-papers/\(paperId)/decision", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Assessment paper workflow updated"
+        } catch { status = "Paper action was not accepted. Independent review and role rules apply." }
     }
 
     func deleteJourneyItem(_ path: String) async throws {

@@ -211,6 +211,14 @@ class MainActivity : ComponentActivity() {
                         publishSchoolNotice = { org, title, body, audience -> publishSchoolNotice(org, title, body, audience) },
                         recordSchoolAttendance = { org, learner, day, attendanceStatus, note -> recordSchoolAttendance(org, learner, day, attendanceStatus, note) },
                         substituteSchoolTeacher = { org, slot, teacher, reason -> substituteSchoolTeacher(org, slot, teacher, reason) },
+                        createAssessmentQuestion = { org, grade, subject, curriculum, stem, answer, rubric, attribution, license ->
+                            createAssessmentQuestion(org, grade, subject, curriculum, stem, answer, rubric, attribution, license)
+                        },
+                        decideAssessmentQuestion = { org, question, action, note -> decideAssessmentQuestion(org, question, action, note) },
+                        createAssessmentPaper = { org, year, grade, subject, curriculum, title, ids ->
+                            createAssessmentPaper(org, year, grade, subject, curriculum, title, ids)
+                        },
+                        decideAssessmentPaper = { org, paper, action, note -> decideAssessmentPaper(org, paper, action, note) },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
@@ -505,6 +513,54 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             try { api.substituteSchoolTeacher(organizationId, slotId, replacementTeacherId, reason); status = "Teacher substitution recorded and audited." }
             catch (_: Exception) { status = "Substitution was not saved. Check staff membership, reason, and timetable conflicts." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun createAssessmentQuestion(organizationId: Int, grade: String, subject: String, curriculum: String,
+                                         stem: String, answerGuide: String, rubric: String, attribution: String, license: String) {
+        if (demoActive || busy || screen?.assessmentWorkspaces?.none { it.organizationId == organizationId &&
+                it.membershipRole in setOf("owner", "admin", "teacher") } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.createAssessmentQuestion(organizationId, grade, subject, curriculum, stem, answerGuide, rubric, attribution, license); status = "Question saved as a draft." }
+            catch (_: Exception) { status = "Could not save the question. Check source attribution, license and school access." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun decideAssessmentQuestion(organizationId: Int, questionId: Int, action: String, note: String) {
+        if (demoActive || busy || screen?.assessmentWorkspaces?.none { it.organizationId == organizationId } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.decideAssessmentQuestion(organizationId, questionId, action, note); status = "Question workflow updated." }
+            catch (_: Exception) { status = "Question action was not accepted. Independent review and school-role rules apply." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun createAssessmentPaper(organizationId: Int, year: Int, grade: String, subject: String,
+                                      curriculum: String, title: String, questionIds: List<Int>) {
+        if (demoActive || busy || screen?.assessmentWorkspaces?.none { it.organizationId == organizationId &&
+                it.membershipRole in setOf("owner", "admin", "teacher") } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.createAssessmentPaper(organizationId, year, grade, subject, curriculum, title, questionIds); status = "Paper saved as a draft." }
+            catch (_: Exception) { status = "Could not create the paper. Use published questions for the same grade, subject and curriculum." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun decideAssessmentPaper(organizationId: Int, paperId: Int, action: String, note: String) {
+        if (demoActive || busy || screen?.assessmentWorkspaces?.none { it.organizationId == organizationId } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.decideAssessmentPaper(organizationId, paperId, action, note); status = "Assessment paper workflow updated." }
+            catch (_: Exception) { status = "Paper action was not accepted. Independent review and school-role rules apply." }
             finally { busy = false }
             if (api.hasSession()) loadDashboard()
         }
@@ -995,6 +1051,10 @@ internal fun NativeHome(
     publishSchoolNotice: (Int, String, String, String) -> Unit = { _, _, _, _ -> },
     recordSchoolAttendance: (Int, String, String, String, String) -> Unit = { _, _, _, _, _ -> },
     substituteSchoolTeacher: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
+    createAssessmentQuestion: (Int, String, String, String, String, String, String, String, String) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    decideAssessmentQuestion: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
+    createAssessmentPaper: (Int, Int, String, String, String, String, List<Int>) -> Unit = { _, _, _, _, _, _, _ -> },
+    decideAssessmentPaper: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
@@ -1012,7 +1072,8 @@ internal fun NativeHome(
         Triple("learn", "Learn", Icons.Default.School),
         Triple("progress", "Progress", Icons.Default.Assessment),
         Triple("support", if (demoRole == "parent") "Family" else if (demoRole == "learner") "Help" else "Support", Icons.Default.Forum)
-    ) + if (data?.schoolOperations?.isNotEmpty() == true) listOf(Triple("school", "School", Icons.Default.AccountBalance)) else emptyList()
+    ) + (if (data?.assessmentWorkspaces?.isNotEmpty() == true) listOf(Triple("assessments", "Assessments", Icons.Default.Assessment)) else emptyList())
+        + if (data?.schoolOperations?.isNotEmpty() == true) listOf(Triple("school", "School", Icons.Default.AccountBalance)) else emptyList()
     Scaffold(
         containerColor = Color(0xFFF8F6EF),
         topBar = {
@@ -1183,6 +1244,8 @@ internal fun NativeHome(
                                 decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
                                 publishSchoolNotice = publishSchoolNotice, recordSchoolAttendance = recordSchoolAttendance,
                                 substituteSchoolTeacher = substituteSchoolTeacher,
+                                createAssessmentQuestion = createAssessmentQuestion, decideAssessmentQuestion = decideAssessmentQuestion,
+                                createAssessmentPaper = createAssessmentPaper, decideAssessmentPaper = decideAssessmentPaper,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
@@ -1198,6 +1261,8 @@ internal fun NativeHome(
                             decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
                                 publishSchoolNotice = publishSchoolNotice, recordSchoolAttendance = recordSchoolAttendance,
                                 substituteSchoolTeacher = substituteSchoolTeacher,
+                                createAssessmentQuestion = createAssessmentQuestion, decideAssessmentQuestion = decideAssessmentQuestion,
+                                createAssessmentPaper = createAssessmentPaper, decideAssessmentPaper = decideAssessmentPaper,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -1205,6 +1270,152 @@ internal fun NativeHome(
                             learnerJourneyAction = learnerJourneyAction
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssessmentWorkspaceCard(
+    workspace: AssessmentWorkspace,
+    busy: Boolean,
+    demoActive: Boolean,
+    createQuestion: (Int, String, String, String, String, String, String, String, String) -> Unit,
+    decideQuestion: (Int, Int, String, String) -> Unit,
+    createPaper: (Int, Int, String, String, String, String, List<Int>) -> Unit,
+    decidePaper: (Int, Int, String, String) -> Unit
+) {
+    var grade by remember(workspace.organizationId) { mutableStateOf("Form 2") }
+    var subject by remember(workspace.organizationId) { mutableStateOf("Mathematics") }
+    var curriculum by remember(workspace.organizationId) { mutableStateOf("National Curriculum") }
+    var stem by remember(workspace.organizationId) { mutableStateOf("") }
+    var answer by remember(workspace.organizationId) { mutableStateOf("") }
+    var rubric by remember(workspace.organizationId) { mutableStateOf("") }
+    var attribution by remember(workspace.organizationId) { mutableStateOf("") }
+    var license by remember(workspace.organizationId) { mutableStateOf("original") }
+    var showLicenses by remember(workspace.organizationId) { mutableStateOf(false) }
+    var note by remember(workspace.organizationId) { mutableStateOf("") }
+    var paperTitle by remember(workspace.organizationId) { mutableStateOf("") }
+    var paperQuestionIds by remember(workspace.organizationId) { mutableStateOf("") }
+    var demoDraftQuestionSubmitted by remember(workspace.organizationId) { mutableStateOf(false) }
+    var demoDraftPaperSubmitted by remember(workspace.organizationId) { mutableStateOf(false) }
+    var demoSavedMessage by remember(workspace.organizationId) { mutableStateOf("") }
+    val demoDraftQuestionId = workspace.questions.firstOrNull { it.status == "draft" }?.id
+    val demoDraftPaperId = workspace.papers.firstOrNull { it.status == "draft" }?.id
+
+    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFEFA))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(workspace.organizationName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("School membership · " + workspace.membershipRole.replace('_', ' '), style = MaterialTheme.typography.bodySmall)
+            workspace.notice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            if (demoSavedMessage.isNotBlank()) Text(demoSavedMessage, style = MaterialTheme.typography.bodySmall, color = Color(0xFF55725E))
+            Text("Question bank", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (workspace.questions.isEmpty()) Text("No questions are available in this school bank.", style = MaterialTheme.typography.bodySmall)
+            workspace.questions.forEach { question ->
+                val status = if (demoActive && question.id == demoDraftQuestionId && demoDraftQuestionSubmitted) "submitted" else question.status
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(question.subject + " · " + question.grade + " · " + question.curriculum, style = MaterialTheme.typography.labelSmall)
+                    Text(question.stem, fontWeight = FontWeight.SemiBold)
+                    Text("Answer guide: " + question.answerGuide, style = MaterialTheme.typography.bodySmall)
+                    if (question.rubric.isNotBlank()) Text("Rubric: " + question.rubric, style = MaterialTheme.typography.bodySmall)
+                    Text("Source: " + question.sourceAttribution + " · " + question.license, style = MaterialTheme.typography.labelSmall)
+                    Text("Status · " + status.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    if (question.status == "draft" && !demoDraftQuestionSubmitted) {
+                        OutlinedButton(
+                            onClick = {
+                                if (demoActive) { demoDraftQuestionSubmitted = true; demoSavedMessage = "Demo question submitted for independent review on this device." }
+                                else decideQuestion(workspace.organizationId, question.id, "submit", "")
+                            },
+                            enabled = !busy || demoActive, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        ) { Text("Submit for independent review") }
+                    }
+                    if (status == "submitted" && workspace.membershipRole in setOf("owner", "admin")) {
+                        OutlinedTextField(note, { note = it.take(1500) }, label = { Text("Review or rejection note") }, modifier = Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { decideQuestion(workspace.organizationId, question.id, "approve", note) }, enabled = !busy) { Text("Approve") }
+                            OutlinedButton(onClick = { decideQuestion(workspace.organizationId, question.id, "reject", note) }, enabled = !busy && note.isNotBlank()) { Text("Reject") }
+                        }
+                    }
+                    if (question.status == "approved" && workspace.membershipRole in setOf("owner", "admin")) {
+                        Button(onClick = { decideQuestion(workspace.organizationId, question.id, "publish", "") }, enabled = !busy) { Text("Publish question") }
+                    }
+                    if (question.status in setOf("published", "rejected") && workspace.membershipRole in setOf("owner", "admin")) {
+                        OutlinedTextField(note, { note = it.take(1500) }, label = { Text("Archive reason") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = { decideQuestion(workspace.organizationId, question.id, "archive", note) }, enabled = !busy && note.isNotBlank()) { Text("Archive question") }
+                    }
+                }
+                HorizontalDivider(color = Color(0xFFE7E2D7))
+            }
+
+            if (workspace.membershipRole in setOf("owner", "admin", "teacher")) {
+                Text("Create an attributed question", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(grade, { grade = it.take(24) }, label = { Text("Grade") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(subject, { subject = it.take(120) }, label = { Text("Subject") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(curriculum, { curriculum = it.take(32) }, label = { Text("Curriculum") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(stem, { stem = it.take(8000) }, label = { Text("Question stem") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(answer, { answer = it.take(8000) }, label = { Text("Answer guide") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(rubric, { rubric = it.take(6000) }, label = { Text("Rubric (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(attribution, { attribution = it.take(2000) }, label = { Text("Source attribution") }, modifier = Modifier.fillMaxWidth())
+                Box {
+                    OutlinedButton(onClick = { showLicenses = true }) { Text("License · " + license) }
+                    DropdownMenu(expanded = showLicenses, onDismissRequest = { showLicenses = false }) {
+                        listOf("original", "CC-BY", "CC-BY-SA", "public-domain", "institution-licensed").forEach { value ->
+                            DropdownMenuItem(text = { Text(value) }, onClick = { license = value; showLicenses = false })
+                        }
+                    }
+                }
+                Text("Only add content the school has permission to use. Attribution and license are required.", style = MaterialTheme.typography.bodySmall)
+                Button(
+                    onClick = {
+                        if (demoActive) demoSavedMessage = "Demo question draft saved locally. No school account or server was used."
+                        else createQuestion(workspace.organizationId, grade, subject, curriculum, stem, answer, rubric, attribution, license)
+                    },
+                    enabled = (!busy || demoActive) && grade.isNotBlank() && subject.length >= 2 && curriculum.length >= 2 &&
+                        stem.trim().length >= 10 && answer.trim().length >= 3 && attribution.trim().length >= 5,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) { Text("Save question draft") }
+
+                Text("Assessment paper draft", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(paperTitle, { paperTitle = it.take(180) }, label = { Text("Paper title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(paperQuestionIds, { paperQuestionIds = it.take(400) }, label = { Text("Published question IDs, comma separated") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(
+                    onClick = {
+                        val ids = paperQuestionIds.split(",").mapNotNull { it.trim().toIntOrNull() }
+                        if (demoActive) demoSavedMessage = "Demo paper draft saved locally. Its sample question set stays on this device."
+                        else createPaper(workspace.organizationId, java.util.Calendar.getInstance().get(java.util.Calendar.YEAR),
+                            grade, subject, curriculum, paperTitle, ids)
+                    },
+                    enabled = (!busy || demoActive) && paperTitle.trim().length >= 5 && paperQuestionIds.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) { Text("Save paper draft") }
+            }
+
+            Text("Assessment papers", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (workspace.papers.isEmpty()) Text("No paper drafts or published assessments yet.", style = MaterialTheme.typography.bodySmall)
+            workspace.papers.forEach { paper ->
+                val status = if (demoActive && paper.id == demoDraftPaperId && demoDraftPaperSubmitted) "submitted" else paper.status
+                Text(paper.title, fontWeight = FontWeight.SemiBold)
+                Text(paper.grade + " · " + paper.subject + " · " + paper.academicYear + " · " + paper.questionCount + " questions", style = MaterialTheme.typography.bodySmall)
+                Text("Status · " + status.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall)
+                if (paper.status == "draft" && !demoDraftPaperSubmitted) {
+                    OutlinedButton(
+                        onClick = {
+                            if (demoActive) { demoDraftPaperSubmitted = true; demoSavedMessage = "Demo paper submitted for independent review on this device." }
+                            else decidePaper(workspace.organizationId, paper.id, "submit", "")
+                        },
+                        enabled = !busy || demoActive, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("Submit paper for review") }
+                }
+                if (status == "submitted" && workspace.membershipRole in setOf("owner", "admin")) {
+                    OutlinedTextField(note, { note = it.take(1000) }, label = { Text("Paper review note") }, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { decidePaper(workspace.organizationId, paper.id, "approve", note) }, enabled = !busy) { Text("Approve paper") }
+                        OutlinedButton(onClick = { decidePaper(workspace.organizationId, paper.id, "reject", note) }, enabled = !busy && note.isNotBlank()) { Text("Reject paper") }
+                    }
+                }
+                if (paper.status == "approved" && workspace.membershipRole in setOf("owner", "admin")) {
+                    Button(onClick = { decidePaper(workspace.organizationId, paper.id, "publish", "") }, enabled = !busy) { Text("Publish paper") }
                 }
             }
         }
@@ -1357,6 +1568,10 @@ private fun RoleContent(
     publishSchoolNotice: (Int, String, String, String) -> Unit,
     recordSchoolAttendance: (Int, String, String, String, String) -> Unit,
     substituteSchoolTeacher: (Int, Int, String, String) -> Unit,
+    createAssessmentQuestion: (Int, String, String, String, String, String, String, String, String) -> Unit,
+    decideAssessmentQuestion: (Int, Int, String, String) -> Unit,
+    createAssessmentPaper: (Int, Int, String, String, String, String, List<Int>) -> Unit,
+    decideAssessmentPaper: (Int, Int, String, String) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -1377,6 +1592,15 @@ private fun RoleContent(
             return@LazyColumn
         }
         val role = data.portal.role
+        if (section == "assessments") {
+            item { Text("Assessment workspace", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            items(data.assessmentWorkspaces, key = { "assessment-workspace-" + it.organizationId }) { workspace ->
+                AssessmentWorkspaceCard(workspace, busy, demoActive, createAssessmentQuestion,
+                    decideAssessmentQuestion, createAssessmentPaper, decideAssessmentPaper)
+            }
+            if (data.assessmentWorkspaces.isEmpty()) item { NativeCard("No assessment membership", "Question banks and assessment papers are limited to schools that authorize this account.") }
+            return@LazyColumn
+        }
         if (section == "school") {
             item { Text("School operations", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             items(data.schoolOperations, key = { "school-operations:${it.organizationId}" }) { workspace ->

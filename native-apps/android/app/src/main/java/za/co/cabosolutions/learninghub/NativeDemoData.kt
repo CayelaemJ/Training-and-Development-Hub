@@ -28,6 +28,24 @@ internal object NativeDemoData {
         notice = "Sample timetable and school notice. This demo is not connected to a school account."
     ))
 
+    private fun assessmentWorkspaces() = listOf(AssessmentWorkspace(
+        organizationId = DEMO_ORGANIZATION_ID,
+        organizationName = "Cabo Valley Learning Centre",
+        membershipRole = "teacher",
+        questions = listOf(
+            AssessmentQuestion(74001, DEMO_ORGANIZATION_ID, "Form 2", "Mathematics", "National Curriculum",
+                "Calculate 3/4 + 1/8 and show your working.", "3/4 = 6/8; 6/8 + 1/8 = 7/8.",
+                "Award one mark for equivalent fractions and one for the answer.", "Created by Cabo Valley Learning Centre",
+                "original", "published", "sample-teacher", "sample-reviewer"),
+            AssessmentQuestion(74002, DEMO_ORGANIZATION_ID, "Form 2", "Mathematics", "National Curriculum",
+                "Describe how you would compare 5/6 and 7/9.", "Common denominator 18: 15/18 < 14/18, so 7/9 is larger.",
+                "", "Created by Cabo Valley Learning Centre", "original", "draft", "sample-teacher", null)
+        ),
+        papers = listOf(AssessmentPaper(74011, "Fractions checkpoint", "Form 2", "Mathematics",
+            "National Curriculum", 2026, "draft", "sample-teacher", null, 1)),
+        notice = "Fictional assessment content. Demo actions stay on this device."
+    ))
+
     fun learner(): NativeLearning {
         val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
         val demoTicket = NativeDemoSession.ticket(NativeDemoSession.summary())
@@ -93,7 +111,8 @@ internal object NativeDemoData {
                     tickets = listOf(ticket), notice = null
                 )
             ),
-            schoolOperations = schoolOperations("teacher")
+            schoolOperations = schoolOperations("teacher"),
+            assessmentWorkspaces = assessmentWorkspaces()
         )
     }
 

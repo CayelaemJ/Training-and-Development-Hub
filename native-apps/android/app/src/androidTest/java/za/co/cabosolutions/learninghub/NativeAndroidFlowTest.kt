@@ -637,3 +637,33 @@ class NativeAndroidSchoolOperationsTest {
         compose.onNodeWithText("Day 1 · 08:00–08:45 · Mathematics · Form 2 A · Room 4").performScrollTo().assertIsDisplayed()
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidAssessmentWorkspaceTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun teacherCanOpenDemoQuestionBankAndAssessmentPaper() {
+        compose.setContent {
+            MaterialTheme {
+                NativeHome(
+                    status = "Demo workspace", busy = false, data = NativeDemoData.teacher(),
+                    signIn = {}, refresh = {}, demoEnabled = true, demoActive = true,
+                    demoRole = "teacher", startDemo = {}, setDemoRole = {}, createSupportRequest = {},
+                    testLoginAvailable = false, testUsername = "", testPassword = "",
+                    onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
+                    respondToInvite = { _, _ -> }, openSupportTicket = {}, openQuiz = {},
+                    openMaterial = {}, pickMaterial = {}
+                )
+            }
+        }
+        compose.onNodeWithText("Assessments").performClick()
+        val content = compose.onNodeWithTag("native-role-content")
+        content.performScrollToNode(hasText("Fractions checkpoint"))
+        compose.onNodeWithText("Fractions checkpoint").assertExists()
+        content.performScrollToNode(hasText("Calculate 3/4 + 1/8 and show your working."))
+        compose.onNodeWithText("Calculate 3/4 + 1/8 and show your working.").assertExists()
+    }
+}
