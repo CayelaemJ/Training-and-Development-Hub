@@ -46,6 +46,16 @@ struct NativeSupportDraft: Codable, Identifiable {
     let attempted: String
     var id: String { requestKey }
 }
+struct NativeJourneyIdentity: Codable { let displayName: String }
+struct NativeJourneyEntry: Codable, Identifiable {
+    let id: Int; let institutionName: String; let stage: String; let academicYear: Int; let note: String
+}
+struct NativeJourneyMilestone: Codable, Identifiable {
+    let id: Int; let title: String; let description: String; let kind: String; let year: Int
+}
+private struct NativeJourneyEnvelope: Codable {
+    let identity: NativeJourneyIdentity; let journeys: [NativeJourneyEntry]; let milestones: [NativeJourneyMilestone]
+}
 private struct NativeSupportDraftStore: Codable {
     let ownerId: String
     let drafts: [NativeSupportDraft]
@@ -73,6 +83,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var staffSchools: [StaffSchool] = []
     @Published var adminOrganizations: [String] = []
     @Published var journey: [String] = []
+    @Published var journeyIdentity = NativeJourneyIdentity(displayName: "")
+    @Published var journeyEntries: [NativeJourneyEntry] = []
+    @Published var journeyMilestones: [NativeJourneyMilestone] = []
     @Published var learnerHelp: [String] = []
     @Published var learnerReports: [NativeLearnerReport] = []
     @Published var learnerReportNotice = ""
@@ -201,6 +214,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             role = nil
             summary = []; workspaces = []; materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
             guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
+            journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
             status = "Session expired. Sign in again."
             throw NSError(domain: "CABO", code: 401)
@@ -283,6 +297,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextStaff: [StaffSchool] = []
             var nextAdminOrganizations: [String] = []
             var nextJourney: [String] = []
+            var nextJourneyIdentity = NativeJourneyIdentity(displayName: "")
+            var nextJourneyEntries: [NativeJourneyEntry] = []
+            var nextJourneyMilestones: [NativeJourneyMilestone] = []
             var nextLearnerHelp: [String] = []
             var nextLearnerReports: [NativeLearnerReport] = []
             var nextLearnerReportNotice = ""
@@ -435,10 +452,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     }
                 }
                 if let data = try? await request("api/learner-journey/me"),
-                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let stages = (obj["journeys"] as? [Any])?.count ?? 0
-                    let milestones = (obj["milestones"] as? [Any])?.count ?? 0
-                    nextJourney = ["Learning stages: \(stages)", "Milestones: \(milestones)"]
+                   let decodedJourney = try? JSONDecoder().decode(NativeJourneyEnvelope.self, from: data) {
+                    nextJourneyIdentity = decodedJourney.identity
+                    nextJourneyEntries = Array(decodedJourney.journeys.prefix(100))
+                    nextJourneyMilestones = Array(decodedJourney.milestones.prefix(100))
+                    nextJourney = ["Learning stages: \(nextJourneyEntries.count)", "Milestones: \(nextJourneyMilestones.count)"]
                 }
                 if !nextSupportCourses.isEmpty { storeSupportCourses(nextSupportCourses) }
                 else { nextSupportCourses = loadSupportCourses() }
@@ -455,6 +473,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             staffSchools = nextStaff
             adminOrganizations = nextAdminOrganizations
             journey = nextJourney
+            journeyIdentity = nextJourneyIdentity
+            journeyEntries = nextJourneyEntries
+            journeyMilestones = nextJourneyMilestones
             learnerHelp = Array(nextLearnerHelp.prefix(20))
             learnerReports = nextLearnerReports
             learnerReportNotice = nextLearnerReportNotice
@@ -469,12 +490,58 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             if keychainToken() == nil { clearSupportStorage() }
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
             guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+            journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
             supportCourses = loadSupportCourses()
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
         }
+    }
+
+    func updateJourney(displayName: String, institution: String? = nil, stage: String? = nil,
+                       year: Int? = nil, note: String? = nil, milestoneTitle: String? = nil,
+                       description: String? = nil, kind: String? = nil) async throws {
+        guard role == "learner" else { throw NSError(domain: "CABO", code: 403) }
+        let cleanName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanName.count <= 160 else { throw NSError(domain: "CABO", code: 400) }
+        _ = try await request("api/learner-journey/me", method: "PUT",
+            body: JSONSerialization.data(withJSONObject: ["displayName": cleanName]))
+        if let institution, let stage, let year {
+            let cleanInstitution = institution.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard cleanInstitution.count >= 2, cleanInstitution.count <= 160,
+                  (1900...2200).contains(year) else { throw NSError(domain: "CABO", code: 400) }
+            _ = try await request("api/learner-journey/entries", method: "POST", body: JSONSerialization.data(withJSONObject: [
+                "institutionName": cleanInstitution, "stage": stage, "academicYear": year, "note": String((note ?? "").prefix(2000))
+            ]))
+        }
+        if let milestoneTitle, let description, let kind, let year {
+            let title = milestoneTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = description.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard (2...160).contains(title.count), (10...4000).contains(detail.count),
+                  (1900...2200).contains(year) else { throw NSError(domain: "CABO", code: 400) }
+            _ = try await request("api/learner-journey/milestones", method: "POST", body: JSONSerialization.data(withJSONObject: [
+                "title": title, "description": detail, "kind": kind, "year": year
+            ]))
+        }
+        try await reloadJourney()
+    }
+
+    func deleteJourneyItem(_ path: String) async throws {
+        guard role == "learner", path.range(of: #"^api/learner-journey/(entries|milestones)/[1-9][0-9]*$"#, options: .regularExpression) != nil else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        _ = try await request(path, method: "DELETE")
+        try await reloadJourney()
+    }
+
+    private func reloadJourney() async throws {
+        let data = try await request("api/learner-journey/me")
+        let result = try JSONDecoder().decode(NativeJourneyEnvelope.self, from: data)
+        journeyIdentity = result.identity
+        journeyEntries = Array(result.journeys.prefix(100))
+        journeyMilestones = Array(result.milestones.prefix(100))
+        journey = ["Learning stages: \(journeyEntries.count)", "Milestones: \(journeyMilestones.count)"]
     }
 
     func saveSupportDraft(course: NativeSupportCourse, concept: String, question: String, attempted: String,
@@ -767,6 +834,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
         guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+        journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
         busy = false
     }
