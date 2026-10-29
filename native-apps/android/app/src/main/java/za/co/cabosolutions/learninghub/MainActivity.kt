@@ -157,7 +157,10 @@ class MainActivity : ComponentActivity() {
                         schedulePractice = { body, reviewAt -> scheduleSupportPractice(body, reviewAt) },
                         close = { closeSupportTicket() },
                         isLearnerOwner = (!demoActive && screen?.portal?.role == "learner") || (demoActive && demoRole == "learner"),
-                        submitFeedback = { value -> submitLearnerSupportFeedback(value) }
+                        submitFeedback = { value -> submitLearnerSupportFeedback(value) },
+                        transition = { status, reason -> transitionSupportTicket(status, reason) },
+                        recordOutcome = { baseline, followup, reason -> recordSupportOutcome(baseline, followup, reason) },
+                        reviewLearningDna = { state, note -> saveSupportLearningDna(state, note) }
                     )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
@@ -805,6 +808,46 @@ class MainActivity : ComponentActivity() {
                 supportMessage = if (value == "helpful") "Thanks for letting your educator know." else "Your educator will see that you still need help."
             } catch (_: Exception) {
                 supportMessage = "Could not send your response. Refresh this request and try again."
+            } finally { supportBusy = false }
+        }
+    }
+
+    private fun transitionSupportTicket(status: String, reason: String) {
+        val current = supportTicket ?: return
+        if (supportBusy || reason.trim().length !in 3..1000) return
+        if (demoActive) {
+            supportTicket = NativeDemoSession.transition(current.summary, status, reason)
+            updateSupportSummary(supportTicket!!.summary)
+            supportMessage = "Synthetic demo status updated on this device. Nothing was sent to a school."
+            return
+        }
+        applySupportAction("Support status updated.") { api.transitionSupportTicket(it, status, reason) }
+    }
+
+    private fun recordSupportOutcome(baselineId: Int, followupId: Int, reason: String) {
+        if (baselineId == followupId) { supportMessage = "Choose two different published results."; return }
+        applySupportAction("Published assessment evidence saved.") {
+            api.recordSupportOutcome(it, baselineId, followupId, reason)
+        }
+    }
+
+    private fun saveSupportLearningDna(state: String, note: String) {
+        applySupportAction("Learning DNA review saved.") { api.saveLearningDna(it, state, note) }
+    }
+
+    private fun applySupportAction(success: String, action: suspend (SupportTicket) -> SupportTicketSummary) {
+        val current = supportTicket ?: return
+        if (supportBusy) return
+        supportBusy = true; supportMessage = null
+        lifecycleScope.launch {
+            try {
+                val updated = action(current)
+                updateSupportSummary(updated)
+                supportTicket = api.fetchSupportTicket(updated)
+                selectedSupportTicket = supportTicket?.summary
+                supportMessage = success
+            } catch (_: Exception) {
+                supportMessage = "This request changed or the action could not be saved. Refresh and try again."
             } finally { supportBusy = false }
         }
     }

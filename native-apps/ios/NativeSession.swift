@@ -33,8 +33,31 @@ struct NativeStaffSupportTicket: Codable, Identifiable {
     var reviewAt: String? = nil
     var feedback: String? = nil
     var educators: [NativeSupportEducator]? = nil
+    var history: [NativeSupportEvent] = []
+    var publishedResults: [NativeSupportResult] = []
+    var outcome: NativeSupportOutcome? = nil
 }
 struct NativeSupportEducator: Codable, Identifiable { let id: String; let firstName: String?; let lastName: String? }
+struct NativeSupportEvent: Codable, Identifiable {
+    let id: Int
+    let kind: String
+    let body: String
+    let createdAt: String
+    let state: String?
+}
+struct NativeSupportResult: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let marks: Double
+    let maxMarks: Double
+    let updatedAt: String
+}
+struct NativeSupportOutcome: Codable {
+    let baseline: Double
+    let followup: Double
+    let improvementPp: Double
+    let comparisonReason: String?
+}
 struct NativeSupportCourse: Codable, Identifiable, Hashable {
     let organizationId: Int
     let courseId: Int
@@ -625,12 +648,34 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             guard let id = row["id"] as? String else { return nil }
             return NativeSupportEducator(id: id, firstName: row["firstName"] as? String, lastName: row["lastName"] as? String)
         }
+        let history = (object["history"] as? [[String: Any]] ?? []).prefix(500).compactMap { row -> NativeSupportEvent? in
+            guard let id = row["id"] as? Int, let kind = row["kind"] as? String,
+                  let body = row["body"] as? String else { return nil }
+            let metadata = row["metadata"] as? [String: Any]
+            return NativeSupportEvent(id: id, kind: String(kind.prefix(32)), body: String(body.prefix(4000)),
+                createdAt: String((row["createdAt"] as? String ?? "").prefix(40)),
+                state: metadata?["state"] as? String)
+        }
+        let publishedResults = (object["publishedResults"] as? [[String: Any]] ?? []).prefix(100).compactMap { row -> NativeSupportResult? in
+            guard let id = row["id"] as? Int, let title = row["title"] as? String,
+                  let marks = row["marks"] as? Double, let maxMarks = row["maxMarks"] as? Double,
+                  maxMarks > 0, marks >= 0 else { return nil }
+            return NativeSupportResult(id: id, title: String(title.prefix(200)), marks: marks, maxMarks: maxMarks,
+                updatedAt: String((row["updatedAt"] as? String ?? "").prefix(40)))
+        }
+        let outcome = (raw["outcome"] as? [String: Any]).flatMap { row -> NativeSupportOutcome? in
+            guard let baseline = row["baseline"] as? Double, let followup = row["followup"] as? Double,
+                  let improvement = row["improvementPp"] as? Double else { return nil }
+            return NativeSupportOutcome(baseline: baseline, followup: followup, improvementPp: improvement,
+                comparisonReason: String((row["comparisonReason"] as? String ?? "").prefix(2000)))
+        }
         return NativeStaffSupportTicket(id: ticket.id, organizationId: ticket.organizationId, courseId: ticket.courseId,
             concept: ticket.concept, question: String((raw["question"] as? String ?? ticket.question).prefix(4000)),
             attempted: String((raw["attempted"] as? String ?? ticket.attempted).prefix(2000)),
             status: raw["status"] as? String ?? ticket.status, version: raw["version"] as? Int ?? ticket.version,
             assignedTo: raw["assignedTo"] as? String, reviewAt: raw["reviewAt"] as? String,
-            feedback: raw["feedback"] as? String, educators: educators)
+            feedback: raw["feedback"] as? String, educators: educators, history: history,
+            publishedResults: publishedResults, outcome: outcome)
     }
 
     func assignSupportTicket(_ ticket: NativeStaffSupportTicket, staffId: String) async throws {
@@ -645,6 +690,34 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         let reviewAt = ISO8601DateFormatter().string(from: date)
         try await sendStaffSupportAction(ticket, action: ["kind": "practice", "body": String(clean.prefix(4000)), "reviewAt": reviewAt])
+    }
+
+    func transitionSupportTicket(_ ticket: NativeStaffSupportTicket, status: String, reason: String) async throws {
+        let clean = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        let educator = ["teacher", "assessor"].contains(role ?? "")
+        let learnerTargets = ["in_progress", "closed"]
+        guard clean.count >= 3, clean.count <= 1000,
+              ["triaged", "assigned", "in_progress", "awaiting_learner", "follow_up_required", "resolved", "closed"].contains(status),
+              educator || (role == "learner" && learnerTargets.contains(status)) else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        try await sendSupportAction(ticket, action: ["kind": "transition", "status": status, "reason": clean],
+                                    allowedRoles: educator ? ["teacher", "assessor"] : ["learner"])
+    }
+
+    func recordSupportOutcome(_ ticket: NativeStaffSupportTicket, baselineId: Int, followupId: Int, reason: String) async throws {
+        let clean = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard baselineId > 0, followupId > 0, baselineId != followupId,
+              clean.count >= 20, clean.count <= 2000 else { throw NSError(domain: "CABO", code: 400) }
+        try await sendStaffSupportAction(ticket, action: ["kind": "outcome", "baselineGradeId": baselineId,
+            "followupGradeId": followupId, "comparisonReason": clean])
+    }
+
+    func saveLearningDna(_ ticket: NativeStaffSupportTicket, state: String, body note: String) async throws {
+        let clean = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard ["demonstrated", "needs_practice", "not_attempted"].contains(state),
+              clean.count >= 20, clean.count <= 2000 else { throw NSError(domain: "CABO", code: 400) }
+        try await sendStaffSupportAction(ticket, action: ["kind": "learning_dna", "state": state, "body": clean])
     }
 
     func respondToSupportTicket(_ ticket: NativeStaffSupportTicket, feedback: String) async throws {
@@ -667,7 +740,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     private func sendStaffSupportAction(_ ticket: NativeStaffSupportTicket, action: [String: Any]) async throws {
-        guard ["teacher", "assessor"].contains(role ?? "") else {
+        try await sendSupportAction(ticket, action: action, allowedRoles: ["teacher", "assessor"])
+    }
+
+    private func sendSupportAction(_ ticket: NativeStaffSupportTicket, action: [String: Any], allowedRoles: [String]) async throws {
+        guard allowedRoles.contains(role ?? "") else {
             throw NSError(domain: "CABO", code: 403)
         }
         let body = try JSONSerialization.data(withJSONObject: ["version": ticket.version, "action": action])
