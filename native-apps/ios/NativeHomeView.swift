@@ -318,7 +318,12 @@ struct NativeHomeView: View {
     private var educatorContent: some View {
         title("Teaching & learner support")
         if ["owner", "admin"].contains(session.role ?? "") {
-            Button { showExamManagement = true } label: {
+            Button {
+                Task {
+                    await session.refreshExamManagement()
+                    showExamManagement = true
+                }
+            } label: {
                 Label("Manage written exam assignments", systemImage: "doc.text.magnifyingglass")
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
