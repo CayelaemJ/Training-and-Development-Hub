@@ -952,3 +952,53 @@ class NativeEducationCommandPrivacyTest {
         compose.onNodeWithText("CABO has not verified this as national or official education data.").assertIsDisplayed()
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeSchoolIntelligencePrivacyTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun signalsAreLabeledForHumanReviewAndAttendanceAsRecordedData() {
+        compose.setContent {
+            MaterialTheme {
+                NativeSchoolIntelligenceScreen(
+                    organizationName = "Cabo Valley School",
+                    yearText = "2026",
+                    snapshot = SchoolIntelligenceSnapshot(
+                        year = 2026,
+                        attendanceRecords = 3,
+                        attendanceCounts = mapOf("present" to 2, "absent" to 1),
+                        studentsReviewed = 1,
+                        attentionNeeded = 1,
+                        learners = listOf(SchoolIntelligenceLearner(
+                            learnerId = "learner-123",
+                            grade = "Form 2",
+                            average = 45.0,
+                            attendanceRate = 66.0,
+                            subjectsAtRisk = listOf("Mathematics"),
+                            supportPlans = 1
+                        )),
+                        subjectBelow = 50.0,
+                        attendanceBelow = 80.0,
+                        officialDistrictData = false
+                    ),
+                    busy = false,
+                    message = null,
+                    onYearText = {},
+                    refresh = {},
+                    close = {}
+                )
+            }
+        }
+
+        val content = compose.onNodeWithTag("school-intelligence-content")
+        content.performScrollToNode(hasText("They are not automated punishments"))
+        compose.onNodeWithText("Educator review only").assertIsDisplayed()
+        compose.onNodeWithText("Attendance reflects recorded entries and is not verified district data.", substring = true).assertExists()
+        content.performScrollToNode(hasText("learner-123"))
+        compose.onNodeWithText("Educator review: Mathematics").assertExists()
+        compose.onNodeWithText("Official district data").assertExists()
+    }
+}
