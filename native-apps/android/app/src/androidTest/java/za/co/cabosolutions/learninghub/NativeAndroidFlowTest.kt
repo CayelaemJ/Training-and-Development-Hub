@@ -633,7 +633,7 @@ class NativeAndroidSchoolOperationsTest {
         compose.onNodeWithText("Cabo Valley Learning Centre").assertIsDisplayed()
         content.performScrollToNode(hasText("My attendance"))
         compose.onNodeWithText("My attendance").assertIsDisplayed()
-        content.performScrollToNode(hasText("Mathematics"))
-        compose.onNodeWithText("Mathematics", substring = true).assertIsDisplayed()
+        content.performScrollToNode(hasText("Day 1 · 08:00–08:45 · Mathematics · Form 2 A · Room 4"))
+        compose.onNodeWithText("Day 1 · 08:00–08:45 · Mathematics · Form 2 A · Room 4").assertIsDisplayed()
     }
 }
