@@ -4,8 +4,9 @@ import { z } from "zod/v4";
 import { pool, db, studyMaterialsTable, materialUploadBlobsTable } from "@workspace/db";
 import { cachedMaterial, materialReadingEnabled } from "../lib/materialCache";
 import { readObjectBuffer, extractMaterialText } from "../lib/materialText";
-import { MaterialReadError } from "../lib/uploadPolicy";
+import { MaterialReadError, validateMaterialSignature } from "../lib/uploadPolicy";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { isBlobObjectPath, loadPrivateBlob } from "../lib/privateBlob";
 import { publishPreviewJob, qstashConfigured, verifyQstashCallback } from "../lib/qstashMaterialPreview";
 
 const router: IRouter = Router();
@@ -94,13 +95,16 @@ router.post("/internal/qstash/material-preview", async (req: Request, res) => {
       .from(materialUploadBlobsTable)
       .where(and(eq(materialUploadBlobsTable.objectPath,material.objectPath),
                  eq(materialUploadBlobsTable.userId,material.userId))).limit(1) : [];
-    const bytes = legacy ? existing?.bytes : await readObjectBuffer(
-      (await storage.getObjectEntityFile(material.objectPath)).createReadStream(),
-    );
+    const bytes = legacy ? existing?.bytes
+      : isBlobObjectPath(material.objectPath) ? await loadPrivateBlob(material.objectPath)
+      : await readObjectBuffer(
+          (await storage.getObjectEntityFile(material.objectPath)).createReadStream(),
+        );
     if (!bytes) { res.status(503).json({error:"Document storage temporarily unavailable"}); return; }
     if (bytes.length !== material.sizeBytes) {
       res.status(503).json({error:"Document bytes do not match expected size"}); return;
     }
+    validateMaterialSignature(material.fileName,bytes);
     // No AI/OCR is invoked from the callback; no external model receives the document.
     const text = await extractMaterialText(material.fileName,bytes,{allowAiReading:false});
     if (text.length < 30) { res.sendStatus(204); return; }

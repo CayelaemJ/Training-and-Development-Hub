@@ -8,16 +8,16 @@ This is the native Kotlin and Jetpack Compose app. Open this folder as the proje
 
 The normal build opens secure browser-based sign-in and points to the configured CABO API. Demo mode and test-login controls are compiled out of this build.
 
-## Interactive demo
+## CABO role demo
 
-The internal demo build includes synthetic learner, educator and guardian accounts. It runs without a login or backend and supports these walkthroughs:
+The internal demo opens a locally simulated CABO workspace without a login or backend. Switch between the **Child**, **Teacher** and **Parent** roles from the preview bar; each role has its own Home, Learn, Progress and Help/Family/Support areas.
 
-- Learner: open study material, complete a sample practice quiz, see a clearly labelled local score, and review synthetic progress.
-- Educator: open a sample support request, mark it triaged, generate a non-AI guidance draft, edit it, and add a reply locally.
-- Guardian: review a synthetic school-verified progress preview and accept or decline a sample invitation locally.
-- Switch roles from the demo banner to follow the same sample request across learner and educator screens.
+- Child: read two different sample lessons, complete practice activities, review progress and report previews, and send a sample help request.
+- Teacher: open that same request, add a triage note, prepare topic-aware starter guidance, and reply. Switch back to Child to see the reply.
+- Parent: review the explicitly synthetic progress preview, respond to a sample family invitation, and see that school verification is still required after acceptance.
+- All demo changes are shared across role switches during the session, so the walkthrough follows a real flow instead of unrelated static screens.
 
-Every record is fictional. Demo actions stay on the device and never write to CABO. The demo is enabled only when a non-pilot API origin is explicitly supplied at build time:
+Every record is fictional. Demo actions stay in memory on the device and never write to CABO. The interface follows CABO's existing CABO Solutions wordmark, product naming, warm-paper background and green/orange/gold web palette. The demo is enabled only when a non-pilot API origin is explicitly supplied at build time:
 
 ```sh
 ./gradlew :app:assembleDebug \
@@ -25,7 +25,9 @@ Every record is fictional. Demo actions stay on the device and never write to CA
   -PcaboEnableDemoMode=true
 ```
 
-The default build never exposes demo mode.
+The default build never exposes demo mode. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
+
+The Android app is implemented with native Kotlin and Jetpack Compose screens. It does not embed or redirect to the web application. The current native prototype covers selected learner, parent and educator workflows only; it is not full feature parity. Track the remaining native work in [../FEATURE_PARITY.md](../FEATURE_PARITY.md).
 
 ## Run the isolated test build
 
@@ -41,6 +43,10 @@ Enter test credentials in the app when prompted. Do not add credentials to Gradl
 
 The CI APK combines offline demo mode with the isolated test-login control, so the demo can be explored even when the preview backend is unavailable. See [TEST_BUILDS.md](TEST_BUILDS.md) for artifact and test-scope details.
 
+## Authenticated material upload
+
+After secure sign-in, learner accounts can add a supported document from the Android system file picker in **Learn → Add material from this device**. The upload accepts PDF, DOCX, PPTX, XLSX, TXT, Markdown, CSV, PNG, JPEG and WebP files up to 30 MB. CABO validates the file contents on the server before extracting text. AI reading is explicitly left off by the native client. This authenticated flow is not available in the offline demo, whose sample learning data stays local.
+
 ## Build and emulator tests
 
 ```sh
@@ -48,4 +54,4 @@ The CI APK combines offline demo mode with the isolated test-login control, so t
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, and guidance review. Physical-device checks, signed store releases, full teacher parity, learner support creation, uploads, offline drafts, and production authentication remain separate work.
+The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, guidance review, material upload, and the learner support-draft form. Learner drafts and enrolled subject choices are encrypted with Android Keystore-backed storage, bound to the active session, and cleared on logout. Sending is explicit; a failed attempt leaves the draft for retry. Live object-storage uploads, physical-device checks, signed store releases, full teacher parity, and production authentication remain separate work.

@@ -61,7 +61,7 @@ internal object NativeDemoData {
         return NativeLearning(
             portal = NativePortal(
                 role = "teacher",
-                summary = listOf("2 assigned subjects", "3 open requests", "1 follow-up due"),
+                summary = listOf("2 assigned subjects", "1 sample learner request", "Local reply workflow"),
                 areas = listOf("My classes", "Support queue", "Progress")
             ),
             materials = emptyList(), quizzes = emptyList(),
@@ -69,7 +69,7 @@ internal object NativeDemoData {
                 StaffWorkspace(
                     organizationId = DEMO_ORGANIZATION_ID,
                     courses = listOf("Mathematics · Form 2", "Integrated Science · Form 2"),
-                    supportSummary = listOf("Open requests: 3", "Unassigned: 1", "Follow-ups due: 1"),
+                    supportSummary = listOf("Open requests: 1", "Unassigned: 0", "Follow-ups due: 0"),
                     tickets = listOf(ticket), notice = null
                 )
             )
@@ -141,9 +141,15 @@ internal object NativeDemoData {
         )
     }
 
-    fun materialPage(id: Int, offset: Int): MaterialPage = if (offset == 0) {
-        MaterialPage(id, "Fractions made visual", "A fraction names equal parts of a whole.\n\nWhen adding fractions, first check whether the denominators match. If they do not, find a common denominator. For 1/3 and 1/4, twelve works because it is a multiple of both three and four.", 0, 1)
-    } else {
-        MaterialPage(id, "Fractions made visual", "Rewrite 1/3 as 4/12 and 1/4 as 3/12. Then add the numerators: 4/12 + 3/12 = 7/12.\n\nTry drawing two same-sized rectangles and shade each fraction using twelfths.", offset, null)
+    fun materialPage(id: Int, offset: Int): MaterialPage {
+        val reading = id == 73012
+        val title = if (reading) "Reading with evidence" else "Fractions made visual"
+        val text = when {
+            reading && offset == 0 -> "Good readers look for evidence in the text. A character's actions, a repeated idea or a detail in the setting can help support an answer.\n\nAs you read, ask: which exact sentence or detail helped me decide?"
+            reading -> "A strong answer explains the clue and connects it to the question. For example, if the character shares their lunch, that action may show kindness. Point to the detail before making your inference.\n\nTry it: choose one action from a story you know and explain what it suggests about the character."
+            offset == 0 -> "A fraction names equal parts of a whole.\n\nWhen adding fractions, first check whether the denominators match. If they do not, find a common denominator. For 1/3 and 1/4, twelve works because it is a multiple of both three and four."
+            else -> "Rewrite 1/3 as 4/12 and 1/4 as 3/12. Then add the numerators: 4/12 + 3/12 = 7/12.\n\nTry drawing two same-sized rectangles and shade each fraction using twelfths."
+        }
+        return MaterialPage(id, title, text, offset, if (offset == 0) 1 else null)
     }
 }

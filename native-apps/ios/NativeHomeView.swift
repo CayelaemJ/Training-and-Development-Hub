@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // Fully native role-based SwiftUI. Uses NavigationView for iOS 15 support,
 // a sidebar + content pane on iPad and a single touch-first view on iPhone.
@@ -8,6 +9,9 @@ struct NativeHomeView: View {
     @State private var testPassword = ""
     @State private var selectedQuiz: NativeQuizSummary?
     @State private var selectedMaterial: NativeMaterialSummary?
+    @State private var uploadSelection: NativeMaterialUploadSelection?
+    @State private var showMaterialImporter = false
+    @State private var materialImportError: String?
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
 
@@ -61,6 +65,36 @@ struct NativeHomeView: View {
         .sheet(item: $selectedMaterial) { material in
             NativeMaterialView(session: session, item: material)
         }
+        .sheet(item: $uploadSelection) { selection in
+            NativeMaterialUploadView(session: session, selection: selection)
+        }
+        .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
+            switch result {
+            case .success(let url):
+                let baseName = url.deletingPathExtension().lastPathComponent
+                    .replacingOccurrences(of: "[_-]+", with: " ", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                uploadSelection = NativeMaterialUploadSelection(
+                    url: url,
+                    suggestedTitle: String((baseName.isEmpty ? "Study material" : baseName).prefix(200))
+                )
+            case .failure:
+                materialImportError = "CABO could not open that file. Choose a supported study document and try again."
+            }
+        }
+        .alert("File not selected", isPresented: Binding(
+            get: { materialImportError != nil },
+            set: { if !$0 { materialImportError = nil } }
+        )) {
+            Button("OK", role: .cancel) { materialImportError = nil }
+        } message: {
+            Text(materialImportError ?? "")
+        }
+    }
+
+    private var materialUploadTypes: [UTType] {
+        ["pdf", "txt", "md", "csv", "docx", "pptx", "xlsx", "png", "jpg", "jpeg", "webp"]
+            .compactMap { UTType(filenameExtension: $0) }
     }
 
     private var mainScroll: some View {
@@ -238,6 +272,14 @@ struct NativeHomeView: View {
     @ViewBuilder
     private var educatorContent: some View {
         title("Teaching & learner support")
+        if session.role == "teacher" {
+            Button { showMaterialImporter = true } label: {
+                Label("Share study material", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(session.busy)
+        }
         if session.staffSchools.isEmpty {
             infoTile("No school assignments", "Your administrator can set up your assigned classes.", system: "person.crop.rectangle")
         }
@@ -317,8 +359,14 @@ struct NativeHomeView: View {
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
         title("Study materials")
+        Button { showMaterialImporter = true } label: {
+            Label("Add material from this device", systemImage: "square.and.arrow.up")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
         if session.materials.isEmpty {
-            infoTile("No materials available", "Ask your educator or upload through the web edition.", system: "book")
+            infoTile("No materials available", "Ask your educator to share study materials with you.", system: "book")
         }
         ForEach(session.materialSummaries) { material in
             Button {

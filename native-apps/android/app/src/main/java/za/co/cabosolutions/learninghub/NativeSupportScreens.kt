@@ -11,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -66,6 +68,82 @@ internal fun NativeDemoSupportRequestScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                 Text("Send demo request")
             }
+        }
+    }
+}
+
+@Composable
+internal fun NativeSupportDraftScreen(
+    courses: List<SupportCourseOption>,
+    initial: NativeSupportDraft?,
+    busy: Boolean,
+    message: String?,
+    save: (NativeSupportDraft) -> Unit,
+    submit: (NativeSupportDraft) -> Unit,
+    close: () -> Unit
+) {
+    var selectedCourse by remember(initial?.courseId, courses) {
+        mutableStateOf(courses.firstOrNull { it.courseId == initial?.courseId }
+            ?: initial?.let { SupportCourseOption(it.organizationId, it.courseId, it.courseName) }
+            ?: courses.firstOrNull())
+    }
+    var menuExpanded by remember { mutableStateOf(false) }
+    var concept by remember(initial?.requestKey) { mutableStateOf(initial?.concept.orEmpty()) }
+    var question by remember(initial?.requestKey) { mutableStateOf(initial?.question.orEmpty()) }
+    var attempted by remember(initial?.requestKey) { mutableStateOf(initial?.attempted.orEmpty()) }
+    val requestKey = remember(initial?.requestKey) { initial?.requestKey ?: java.util.UUID.randomUUID().toString() }
+    val valid = selectedCourse != null && concept.trim().length >= 2 &&
+        question.trim().length >= 10 && attempted.trim().length >= 3
+    fun draft(): NativeSupportDraft? = selectedCourse?.let { course -> NativeSupportDraft(
+        requestKey = requestKey,
+        organizationId = course.organizationId, courseId = course.courseId, courseName = course.name,
+        concept = concept.trim(), question = question.trim(), attempted = attempted.trim()
+    ) }
+    Scaffold(topBar = {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = close, enabled = !busy) { Text("Back") }
+                Text(if (initial == null) "Ask for learning help" else "Edit saved draft",
+                    style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Your question goes to your enrolled school", style = MaterialTheme.typography.titleMedium)
+                    Text("Save it privately on this device, or send it now. An unsent draft stays encrypted and can be retried when you are online.")
+                }
+            }
+            Text("Subject", style = MaterialTheme.typography.labelLarge)
+            androidx.compose.foundation.layout.Box {
+                OutlinedButton(onClick = { menuExpanded = true }, enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    Text(selectedCourse?.name ?: "Choose an enrolled subject", modifier = Modifier.weight(1f))
+                    Text("⌄")
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    courses.forEach { course -> DropdownMenuItem(
+                        text = { Text(course.name) },
+                        onClick = { selectedCourse = course; menuExpanded = false }
+                    ) }
+                }
+            }
+            OutlinedTextField(value = concept, onValueChange = { concept = it.take(160) },
+                label = { Text("Topic") }, modifier = Modifier.fillMaxWidth(), enabled = !busy)
+            OutlinedTextField(value = question, onValueChange = { question = it.take(4000) },
+                label = { Text("What do you need help with?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 4, maxLines = 8)
+            OutlinedTextField(value = attempted, onValueChange = { attempted = it.take(2000) },
+                label = { Text("What have you tried?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 3, maxLines = 6)
+            message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            OutlinedButton(onClick = { draft()?.let(save) }, enabled = !busy && valid,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save securely on this device") }
+            Button(onClick = { draft()?.let(submit) }, enabled = !busy && valid,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Send to my educator") }
         }
     }
 }

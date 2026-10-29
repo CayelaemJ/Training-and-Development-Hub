@@ -39,10 +39,11 @@ import { z } from "zod/v4";
 
 import { cachedMaterial,uploadReadingConsent,saveMaterialText,materialReadingEnabled } from "../lib/materialCache";
 import { questionBatches } from "../lib/generationBatches";
-import { MaterialReadError } from "../lib/uploadPolicy";
+import { MaterialReadError, validateMaterialSignature } from "../lib/uploadPolicy";
 import { extractMaterialText, readObjectBuffer } from "../lib/materialText";
 import { ObjectPermission } from "../lib/objectAcl";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { isBlobObjectPath, loadPrivateBlob, deletePrivateBlob } from "../lib/privateBlob";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -186,8 +187,8 @@ router.get("/materials/:id/preview", async (req, res): Promise<void> => {
             .where(and(eq(materialUploadBlobsTable.objectPath, material.objectPath),
                        eq(materialUploadBlobsTable.userId, req.user.id))).limit(1)
         : [];
-      const buffer = local
-        ? blob?.bytes
+      const buffer = local ? blob?.bytes
+        : isBlobObjectPath(material.objectPath) ? await loadPrivateBlob(material.objectPath)
         : await readObjectBuffer(
             (await objectStorageService.getObjectEntityFile(material.objectPath)).createReadStream()
           );
@@ -197,6 +198,7 @@ router.get("/materials/:id/preview", async (req, res): Promise<void> => {
       }
       // Never start paid OCR or AI vision merely because a learner opens a
       // preview; cached text already produced with consent may be displayed.
+      validateMaterialSignature(material.fileName,buffer);
       text = await extractMaterialText(material.fileName, buffer, { allowAiReading: false });
     }
     const start = Math.min(offset.data, text.length);
@@ -250,12 +252,13 @@ router.post("/materials", async (req, res): Promise<void> => {
   try {
     const local = intent.objectPath.startsWith('/railway-uploads/');
     const [blob] = local ? await db.select().from(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,intent.objectPath),eq(materialUploadBlobsTable.userId,req.user.id))).limit(1) : [];
-    const buffer = local ? blob?.bytes : await readObjectBuffer((await objectStorageService.getObjectEntityFile(intent.objectPath)).createReadStream());
+    const buffer = local ? blob?.bytes : isBlobObjectPath(intent.objectPath) ? await loadPrivateBlob(intent.objectPath) : await readObjectBuffer((await objectStorageService.getObjectEntityFile(intent.objectPath)).createReadStream());
     if (!buffer) { res.status(400).json({error:'Upload not received. Please retry.'}); return; }
     if (buffer.byteLength !== intent.sizeBytes) {
       res.status(400).json({ error: "The uploaded file size does not match." });
       return;
     }
+    validateMaterialSignature(intent.fileName,buffer);
     const allowAiReading=await uploadReadingConsent(intent.objectPath,req.user.id);
     const extractedText = await extractMaterialText(intent.fileName, buffer, {allowAiReading});
     if (extractedText.length < 30) {
@@ -265,7 +268,7 @@ router.post("/materials", async (req, res): Promise<void> => {
       return;
     }
 
-    if (!local) await objectStorageService.trySetObjectEntityAclPolicy(intent.objectPath, {
+    if (!local && !isBlobObjectPath(intent.objectPath)) await objectStorageService.trySetObjectEntityAclPolicy(intent.objectPath, {
       owner: req.user.id,
       visibility: "private",
     });
@@ -337,6 +340,8 @@ router.delete("/materials/:id", async (req, res): Promise<void> => {
   try {
     if (material.objectPath.startsWith('/railway-uploads/')) {
       await db.delete(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,material.objectPath),eq(materialUploadBlobsTable.userId,req.user.id)));
+    } else if (isBlobObjectPath(material.objectPath)) {
+      await deletePrivateBlob(material.objectPath);
     } else {
       const file = await objectStorageService.getObjectEntityFile(material.objectPath);
       await file.delete({ ignoreNotFound: true });
@@ -397,8 +402,9 @@ router.post("/materials/:id/quizzes", async (req, res): Promise<void> => {
     if (!sourceText) {
       const local = material.objectPath.startsWith('/railway-uploads/');
       const [blob] = local ? await db.select().from(materialUploadBlobsTable).where(and(eq(materialUploadBlobsTable.objectPath,material.objectPath),eq(materialUploadBlobsTable.userId,req.user.id))).limit(1) : [];
-      const buffer = local ? blob?.bytes : await readObjectBuffer((await objectStorageService.getObjectEntityFile(material.objectPath)).createReadStream());
+      const buffer = local ? blob?.bytes : isBlobObjectPath(material.objectPath) ? await loadPrivateBlob(material.objectPath) : await readObjectBuffer((await objectStorageService.getObjectEntityFile(material.objectPath)).createReadStream());
       if (!buffer) throw new MaterialReadError('Your uploaded file could not be found. Please upload it again.');
+      validateMaterialSignature(material.fileName,buffer);
       sourceText = await extractMaterialText(material.fileName, buffer, {allowAiReading:cached.allowAiReading});
       await saveMaterialText(material.id,req.user.id,sourceText);
     }

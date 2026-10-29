@@ -3,15 +3,35 @@ package za.co.cabosolutions.learninghub
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import java.security.SecureRandom
 import android.util.Base64
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+
+private const val MAX_MATERIAL_BYTES = 30L * 1024 * 1024
+private val materialContentTypes = mapOf(
+    "txt" to "text/plain", "md" to "text/markdown", "csv" to "text/csv",
+    "pdf" to "application/pdf",
+    "docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "webp" to "image/webp"
+)
 
 internal data class MaterialSummary(val id: Int, val title: String)
+internal data class SupportCourseOption(val organizationId: Int, val courseId: Int, val name: String)
+internal data class NativeSupportDraft(
+    val requestKey: String, val organizationId: Int, val courseId: Int,
+    val courseName: String, val concept: String, val question: String, val attempted: String
+)
 internal data class QuizSummary(val id: Int, val title: String, val questionCount: Int, val latestScore: Double?)
 internal data class QuizQuestion(val prompt: String, val options: List<String>)
 internal data class PracticeQuiz(val id: Int, val title: String, val questions: List<QuizQuestion>)
@@ -76,6 +96,8 @@ internal data class NativeLearning(
     val journey: List<String> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
+    val supportCourses: List<SupportCourseOption> = emptyList(),
+    val supportDrafts: List<NativeSupportDraft> = emptyList(),
     val quizEntries: List<QuizSummary> = emptyList(),
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
@@ -98,6 +120,201 @@ internal class NativeApi(private val context: Context) {
         return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
     fun testLoginAvailable(): Boolean = BuildConfig.ENABLE_TEST_LOGIN
+
+    private fun supportDraftOwner(): String {
+        val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
+        return Base64.encodeToString(MessageDigest.getInstance("SHA-256")
+            .digest(token.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+    }
+
+    suspend fun loadSupportDrafts(): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val owner = supportDraftOwner()
+            if (secrets.get("support_drafts_owner") != owner) {
+                secrets.put("support_drafts", null)
+                secrets.put("support_courses", null)
+                secrets.put("support_drafts_owner", owner)
+                return@withContext emptyList()
+            }
+            val saved = secrets.get("support_drafts") ?: return@withContext emptyList()
+            val rows = JSONArray(saved)
+            (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val key = row.optString("requestKey")
+                val orgId = row.optInt("organizationId")
+                val courseId = row.optInt("courseId")
+                val name = row.optString("courseName")
+                val concept = row.optString("concept")
+                val question = row.optString("question")
+                val attempted = row.optString("attempted")
+                if (key.isBlank() || orgId <= 0 || courseId <= 0 || name.isBlank() ||
+                    concept.length !in 2..160 || question.length !in 10..4000 || attempted.length !in 3..2000) null
+                else NativeSupportDraft(key, orgId, courseId, name, concept, question, attempted)
+            }.take(20)
+        }
+
+    suspend fun loadCachedSupportCourses(): List<SupportCourseOption> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val owner = try { supportDraftOwner() } catch (_: Exception) { return@withContext emptyList() }
+            if (secrets.get("support_drafts_owner") != owner) return@withContext emptyList()
+            val rows = try { JSONArray(secrets.get("support_courses") ?: return@withContext emptyList()) }
+                catch (_: Exception) { return@withContext emptyList() }
+            (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val orgId = row.optInt("organizationId")
+                val courseId = row.optInt("courseId")
+                val name = row.optString("name").take(120)
+                if (orgId <= 0 || courseId <= 0 || name.isBlank()) null
+                else SupportCourseOption(orgId, courseId, name)
+            }.take(100)
+        }
+
+    suspend fun saveSupportDraft(draft: NativeSupportDraft): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(draft.requestKey.matches(Regex("[a-fA-F0-9-]{36}")) && draft.organizationId > 0 && draft.courseId > 0)
+            require(draft.concept.trim().length in 2..160 && draft.question.trim().length in 10..4000 &&
+                draft.attempted.trim().length in 3..2000)
+            val current = loadSupportDrafts().filterNot { it.requestKey == draft.requestKey }
+            val updated = (current + draft.copy(concept = draft.concept.trim(), question = draft.question.trim(),
+                attempted = draft.attempted.trim())).takeLast(20)
+            val rows = JSONArray()
+            updated.forEach { row -> rows.put(JSONObject()
+                .put("requestKey", row.requestKey).put("organizationId", row.organizationId)
+                .put("courseId", row.courseId).put("courseName", row.courseName)
+                .put("concept", row.concept).put("question", row.question).put("attempted", row.attempted)) }
+            secrets.put("support_drafts_owner", supportDraftOwner())
+            secrets.put("support_drafts", rows.toString())
+            updated
+        }
+
+    suspend fun deleteSupportDraft(requestKey: String): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val updated = loadSupportDrafts().filterNot { it.requestKey == requestKey }
+            val rows = JSONArray()
+            updated.forEach { row -> rows.put(JSONObject()
+                .put("requestKey", row.requestKey).put("organizationId", row.organizationId)
+                .put("courseId", row.courseId).put("courseName", row.courseName)
+                .put("concept", row.concept).put("question", row.question).put("attempted", row.attempted)) }
+            secrets.put("support_drafts", rows.toString())
+            updated
+        }
+
+    suspend fun clearSupportDrafts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        secrets.put("support_drafts", null)
+        secrets.put("support_courses", null)
+        secrets.put("support_drafts_owner", null)
+    }
+
+    suspend fun submitSupportDraft(draft: NativeSupportDraft): Int =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val response = request("/api/organizations/${draft.organizationId}/support", JSONObject()
+                .put("courseId", draft.courseId).put("concept", draft.concept)
+                .put("question", draft.question).put("attempted", draft.attempted)
+                .put("requestKey", draft.requestKey), auth = true)
+            response.getInt("id").also { require(it > 0) { "CABO returned an invalid support request." } }
+        }
+
+    suspend fun materialFileName(uri: Uri): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val displayName = context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            (displayName ?: uri.lastPathSegment ?: "study-material")
+                .replace('\\', '/')
+                .substringAfterLast('/')
+                .filterNot { it.isISOControl() }
+                .take(240)
+                .ifBlank { "study-material" }
+        }
+
+    suspend fun uploadMaterial(uri: Uri, title: String): MaterialSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val safeTitle = title.trim()
+            require(safeTitle.isNotEmpty() && safeTitle.length <= 200) {
+                "Enter a title of 1 to 200 characters."
+            }
+            val fileName = materialFileName(uri)
+            val extension = fileName.substringAfterLast('.', "").lowercase()
+            val contentType = materialContentTypes[extension]
+                ?: throw IllegalArgumentException("Choose a supported PDF, Office, text, CSV, PNG, JPEG or WebP file.")
+            val staged = File.createTempFile("cabo-material-", ".upload", context.cacheDir)
+            try {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IllegalArgumentException("Could not open the selected document.")
+                var total = 0L
+                input.use { source -> FileOutputStream(staged).use { target ->
+                    val buffer = ByteArray(16 * 1024)
+                    while (true) {
+                        val count = source.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= MAX_MATERIAL_BYTES) { "Files must be 30 MB or smaller." }
+                        target.write(buffer, 0, count)
+                    }
+                } }
+                require(total > 0) { "The selected document is empty." }
+
+                val intent = request("/api/storage/uploads/request-url", JSONObject()
+                    .put("name", fileName)
+                    .put("size", total)
+                    .put("contentType", contentType)
+                    .put("allowAiReading", false), auth = true)
+                val targetUrl = URL(intent.getString("uploadURL"))
+                val targetUri = URI(targetUrl.toExternalForm())
+                val apiUrl = URL(origin)
+                require(targetUrl.protocol == "https" && targetUri.userInfo == null) {
+                    "CABO returned an invalid secure upload destination."
+                }
+                val sameApiHost = targetUrl.host.equals(apiUrl.host, ignoreCase = true)
+                val sameApiAuthority = sameApiHost &&
+                    (targetUrl.port.takeIf { it >= 0 } ?: targetUrl.defaultPort) ==
+                    (apiUrl.port.takeIf { it >= 0 } ?: apiUrl.defaultPort)
+                val nativeTestPath = sameApiAuthority &&
+                    targetUrl.path.matches(Regex("/api/storage/uploads/railway/[a-f0-9-]{36}"))
+                if (sameApiHost && !nativeTestPath) {
+                    throw IllegalStateException("CABO returned an unexpected upload destination.")
+                }
+                val upload = targetUrl.openConnection() as HttpURLConnection
+                upload.connectTimeout = 15_000
+                upload.readTimeout = 30_000
+                upload.instanceFollowRedirects = false
+                upload.requestMethod = "PUT"
+                upload.doOutput = true
+                upload.useCaches = false
+                upload.setRequestProperty("Content-Type", contentType)
+                // The isolated Render test fallback is an authenticated API route.
+                // Never send the CABO bearer token to external signed storage URLs.
+                if (nativeTestPath) {
+                    val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
+                    upload.setRequestProperty("Authorization", "Bearer $token")
+                }
+                upload.setFixedLengthStreamingMode(total)
+                try {
+                    FileInputStream(staged).use { source -> upload.outputStream.use { target ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val count = source.read(buffer)
+                            if (count < 0) break
+                            target.write(buffer, 0, count)
+                        }
+                    } }
+                    val status = upload.responseCode
+                    require(status in 200..299) { "The file upload was not accepted. Please retry." }
+                } finally {
+                    upload.disconnect()
+                }
+
+                val saved = request("/api/materials", JSONObject()
+                    .put("title", safeTitle)
+                    .put("objectPath", intent.getString("objectPath")), auth = true)
+                val id = saved.getInt("id")
+                val savedTitle = saved.getString("title")
+                require(id > 0 && savedTitle.isNotBlank()) { "CABO returned an invalid material record." }
+                MaterialSummary(id, savedTitle)
+            } finally {
+                staged.delete()
+            }
+        }
 
     // Explicitly enabled in private, disposable test builds only. The
     // password stays in memory for this single HTTPS request, not on disk.
@@ -394,6 +611,26 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
+        val supportCourses = if (role == "learner") orgIds.take(12).flatMap { orgId ->
+            try {
+                val response = request("/api/organizations/$orgId/support/options", auth = true)
+                val courses = response.optJSONArray("courses") ?: JSONArray()
+                (0 until courses.length()).mapNotNull { i -> courses.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id")
+                    val name = row.optString("name").trim().take(120)
+                    if (id > 0 && name.isNotBlank()) SupportCourseOption(orgId, id, name) else null
+                } }
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                emptyList()
+            }
+        }.take(100) else emptyList()
+        val cachedCourses = JSONArray()
+        supportCourses.forEach { course -> cachedCourses.put(JSONObject()
+            .put("organizationId", course.organizationId).put("courseId", course.courseId)
+            .put("name", course.name)) }
+        secrets.put("support_drafts_owner", supportDraftOwner())
+        secrets.put("support_courses", cachedCourses.toString())
         val learnerHelp = orgIds.take(3).flatMap { orgId ->
             try {
                 val response = request("/api/organizations/$orgId/support", auth = true)
@@ -411,7 +648,7 @@ internal class NativeApi(private val context: Context) {
         }.take(20)
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            materialEntries = materialEntries, quizEntries = quizEntries,
+            materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
     }
 

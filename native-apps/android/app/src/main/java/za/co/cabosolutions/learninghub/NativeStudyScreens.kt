@@ -100,6 +100,69 @@ internal fun NativeQuizScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun NativeMaterialUploadScreen(
+    fileName: String,
+    title: String,
+    busy: Boolean,
+    message: String?,
+    onTitle: (String) -> Unit,
+    upload: () -> Unit,
+    close: () -> Unit
+) {
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text("Add study material") },
+            navigationIcon = {
+                TextButton(onClick = close, enabled = !busy) { Text("Cancel") }
+            }
+        )
+    }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding)
+                .verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Bring your notes in", style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary)
+            Text("Your document is uploaded to your private CABO study library.",
+                style = MaterialTheme.typography.bodyLarge)
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("SELECTED FILE", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text(fileName, style = MaterialTheme.typography.titleMedium)
+                    Text("PDF, Word, PowerPoint, Excel, TXT, Markdown, CSV, PNG, JPEG or WebP · up to 30 MB",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            OutlinedTextField(
+                value = title,
+                onValueChange = { onTitle(it.take(200)) },
+                label = { Text("Material title") },
+                placeholder = { Text("For example, Week 4 · Cell biology") },
+                singleLine = true,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Surface(color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.medium) {
+                Text("AI reading stays off. CABO checks the file format before extracting study text.",
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+            message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Button(onClick = upload, enabled = !busy && title.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                Text(if (busy) "Adding material…" else "Add to my library")
+            }
+        }
+    }
+}
+
 @Composable
 internal fun NativeMaterialScreen(
     summary: MaterialSummary,
