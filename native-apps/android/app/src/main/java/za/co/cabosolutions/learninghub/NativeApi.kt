@@ -858,7 +858,7 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
-        val writtenExams = try {
+        val writtenExams = if (role != "learner") emptyList() else try {
             getArray("/api/written-exams").let { arr ->
                 (0 until arr.length()).mapNotNull { i ->
                     val row = arr.optJSONObject(i) ?: return@mapNotNull null
@@ -1232,7 +1232,7 @@ internal class NativeApi(private val context: Context) {
             require(materialId > 0 && questionCount in 1..10 && difficulty in setOf("beginner", "intermediate", "advanced"))
             val response = request("/api/materials/$materialId/written-exams",
                 JSONObject().put("questionCount", questionCount).put("difficulty", difficulty),
-                auth = true, timeoutMs = 120000)
+                auth = true, timeoutMs = 85000)
             parseWrittenExam(response)
         }
 
