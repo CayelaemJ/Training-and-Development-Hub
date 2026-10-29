@@ -8,16 +8,16 @@ This is the native Kotlin and Jetpack Compose app. Open this folder as the proje
 
 The normal build opens secure browser-based sign-in and points to the configured CABO API. Demo mode and test-login controls are compiled out of this build.
 
-## Interactive demo
+## CABO role demo
 
-The internal demo build includes synthetic learner, educator and guardian accounts. It runs without a login or backend and supports these walkthroughs:
+The internal demo opens a locally simulated CABO workspace without a login or backend. Switch between the **Child**, **Teacher** and **Parent** roles from the preview bar; each role has its own Home, Learn, Progress and Help/Family/Support areas.
 
-- Learner: open study material, complete a sample practice quiz, see a clearly labelled local score, and review synthetic progress.
-- Educator: open a sample support request, mark it triaged, generate a non-AI guidance draft, edit it, and add a reply locally.
-- Guardian: review a synthetic school-verified progress preview and accept or decline a sample invitation locally.
-- Switch roles from the demo banner to follow the same sample request across learner and educator screens.
+- Child: read two different sample lessons, complete practice activities, review progress and report previews, and send a sample help request.
+- Teacher: open that same request, add a triage note, prepare topic-aware starter guidance, and reply. Switch back to Child to see the reply.
+- Parent: review the explicitly synthetic progress preview, respond to a sample family invitation, and see that school verification is still required after acceptance.
+- All demo changes are shared across role switches during the session, so the walkthrough follows a real flow instead of unrelated static screens.
 
-Every record is fictional. Demo actions stay on the device and never write to CABO. The demo is enabled only when a non-pilot API origin is explicitly supplied at build time:
+Every record is fictional. Demo actions stay in memory on the device and never write to CABO. The interface follows CABO's existing CABO Solutions wordmark, product naming, warm-paper background and green/orange/gold web palette. The demo is enabled only when a non-pilot API origin is explicitly supplied at build time:
 
 ```sh
 ./gradlew :app:assembleDebug \
@@ -25,7 +25,7 @@ Every record is fictional. Demo actions stay on the device and never write to CA
   -PcaboEnableDemoMode=true
 ```
 
-The default build never exposes demo mode.
+The default build never exposes demo mode. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
 
 ## Run the isolated test build
 

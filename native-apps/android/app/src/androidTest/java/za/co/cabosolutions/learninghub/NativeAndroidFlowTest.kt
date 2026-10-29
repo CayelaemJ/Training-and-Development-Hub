@@ -226,7 +226,7 @@ class NativeAndroidSupportTest {
         compose.setContent {
             MaterialTheme {
                 NativeHome(
-                    status = "DEMO MODE · sample data only",
+                    status = "CABO demo · sample data only",
                     busy = false,
                     data = data.value,
                     signIn = {}, refresh = {}, demoEnabled = true, demoActive = true,
@@ -238,20 +238,74 @@ class NativeAndroidSupportTest {
                     createSupportRequest = {},
                     testLoginAvailable = false, testUsername = "", testPassword = "",
                     onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
-                    respondToInvite = { _, _ -> },
+                    respondToInvite = { inviteId, accept ->
+                        data.value = data.value.copy(guardians = data.value.guardians.map { invite ->
+                            if (invite.id == inviteId) invite.copy(status = if (accept) "accepted" else "declined") else invite
+                        })
+                    },
                     openSupportTicket = { openedTicket = it }, openQuiz = {}, openMaterial = {}, pickMaterial = {}
                 )
             }
         }
 
-        compose.onNodeWithText("DEMO MODE · synthetic records only").assertIsDisplayed()
+        compose.onNodeWithText("CABO PREVIEW · sample workspace").assertIsDisplayed()
         compose.onNodeWithText("Learn").performClick()
         assertEquals(0, compose.onAllNodesWithText("Add material from this device").fetchSemanticsNodes().size)
-        compose.onNodeWithText("Educator").performClick()
+        compose.onNodeWithText("Teacher").performClick()
         compose.onNodeWithText("Support").performClick()
         compose.onNodeWithText("Learner support queue").assertIsDisplayed()
         compose.onNodeWithText("Adding unlike fractions").performScrollTo().performClick()
         assertEquals(73031, openedTicket?.id)
+
+        compose.onNodeWithText("Parent").performClick()
+        compose.onNodeWithText("Family").performClick()
+        compose.onNodeWithText("Accept invitation").performScrollTo().performClick()
+        compose.onNodeWithText("Accepted · school verification pending").assertIsDisplayed()
+        compose.onNodeWithText("Progress").performClick()
+        compose.onNodeWithText("School-verified progress").assertIsDisplayed()
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidDemoFlowTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun lessonTitlesOpenTheirOwnSampleContent() {
+        val fractions = NativeDemoData.materialPage(73011, 0)
+        val reading = NativeDemoData.materialPage(73012, 0)
+        assertEquals("Fractions made visual", fractions.title)
+        assertEquals("Reading with evidence", reading.title)
+        org.junit.Assert.assertTrue(reading.text.contains("evidence in the text"))
+        org.junit.Assert.assertEquals(1, reading.nextOffset)
+        org.junit.Assert.assertTrue(NativeDemoData.materialPage(73012, 1).text.contains("A strong answer"))
+    }
+
+    @Test
+    fun learnerTeacherSupportHandoffSharesOnlyTheSyntheticDemoRequest() {
+        NativeDemoSession.reset()
+        NativeDemoSession.createRequest(
+            "Equivalent fractions",
+            "How can I find a fraction equal to one third?",
+            "I multiplied the top and bottom by different numbers."
+        )
+        val teacherTicket = NativeDemoData.teacher().staff.single().tickets.single()
+        assertEquals("Equivalent fractions", teacherTicket.concept)
+        val replied = NativeDemoSession.reply(teacherTicket, "Multiply the numerator and denominator by the same number.")
+        assertEquals(2, replied.summary.version)
+        assertEquals("reply", replied.history.last().kind)
+        assertEquals(true, NativeDemoData.learner().learnerHelp.any { it.contains("Educator reply") })
+        NativeDemoSession.reset()
+    }
+
+    @Test
+    fun parentCanSeeExplicitlySyntheticPreviewAndPendingInvitation() {
+        val parent = NativeDemoData.parent()
+        assertEquals("parent", parent.portal.role)
+        assertEquals(false, parent.parentReports.single().official)
+        assertEquals("pending", parent.guardians.single { it.id == 73042 }.status)
+        assertEquals(true, NativeDemoData.learner().learnerReports.single().average != null)
     }
 }
 
