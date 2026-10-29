@@ -892,8 +892,10 @@ class NativeAndroidLearnerPassportTest {
             }
         }
         compose.onNodeWithText("Your private learning progress").assertIsDisplayed()
-        compose.onNodeWithText("Conversations, staff contact details, and unreviewed narratives are excluded.")
-            .assertExists()
+        compose.onNodeWithText(
+            "This account-bound view includes educator-reviewed support progress and published result comparisons. Conversations, staff contact details, and unreviewed narratives are excluded.",
+            substring = true
+        ).assertExists()
         compose.onNodeWithText("Published results · 46.0% to 70.0%").assertExists()
         compose.onNodeWithText("Export JSON").assertIsEnabled().performClick()
         assertEquals(1, exports)
