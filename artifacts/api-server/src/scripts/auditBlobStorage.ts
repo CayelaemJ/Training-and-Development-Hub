@@ -1,12 +1,12 @@
 /**
  * Explicit opt-in, read-only metadata audit. NEVER cleans/deletes anything.
- * Usage: CABO_BLOB_AUDIT_ENABLED=true pnpm --filter @workspace/api-server exec tsx src/scripts/auditBlobStorage.ts
+ * Usage: CABO_BLOB_AUDIT_ENABLED=true pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/auditBlobStorage.ts
  *
  * Output is aggregate counts only: no learner/account/file/object identifiers.
  */
 import { Bucket } from "@upstash/blob";
-import { db, studyMaterialsTable, uploadIntentsTable } from "@workspace/db";
-import { gte, like } from "drizzle-orm";
+import { db, pool, studyMaterialsTable, uploadIntentsTable } from "@workspace/db";
+import { like } from "drizzle-orm";
 import {
   objectKeyFromStoredPath,
   PRIVATE_BLOB_PREFIX,
@@ -63,4 +63,4 @@ main().catch((error:unknown)=>{
   // Do not print exception objects: provider errors may contain signed URLs.
   process.stderr.write("CABO Blob audit aborted: "+(error instanceof Error?error.name:"Unknown")+"\n");
   process.exitCode=2;
-});
+}).finally(async () => { await pool.end().catch(() => undefined); });
