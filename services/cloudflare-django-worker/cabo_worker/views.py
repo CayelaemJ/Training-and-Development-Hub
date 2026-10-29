@@ -42,7 +42,7 @@ def insights_draft(request):
     expected = _required_token()
     auth = request.headers.get("Authorization", "")
     supplied = auth[len("Bearer "):] if auth.startswith("Bearer ") else ""
-    if not expected or not supplied or not hmac.compare_digest(expected, supplied):
+    if len(expected) < 24 or not supplied or not hmac.compare_digest(expected, supplied):
         return _private(JsonResponse({"error": "Unauthorized"}, status=401))
     length = request.META.get("CONTENT_LENGTH", "")
     if length and (not length.isascii() or not length.isdecimal() or int(length) > _MAX_BYTES):
