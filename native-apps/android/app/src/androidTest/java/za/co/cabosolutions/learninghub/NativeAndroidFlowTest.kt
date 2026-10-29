@@ -994,7 +994,7 @@ class NativeSchoolIntelligencePrivacyTest {
         }
 
         val content = compose.onNodeWithTag("school-intelligence-content")
-        content.performScrollToNode(hasText("They are not automated punishments"))
+        content.performScrollToNode(hasText("Low marks and absences are prompts for human support. They are not automated punishments, psychological labels or progression decisions."))
         compose.onNodeWithText("Educator review only").assertIsDisplayed()
         compose.onNodeWithText("Attendance reflects recorded entries and is not verified district data.", substring = true).assertExists()
         content.performScrollToNode(hasText("learner-123"))
