@@ -17,7 +17,9 @@ struct NativeExamManagementView: View {
         NavigationView {
             Form {
                 Section("Create an assignment") {
-                    if session.examManagementWorkspaces.isEmpty {
+                    if session.examManagementBusy {
+                        ProgressView("Loading school assignments and submissions…")
+                    } else if session.examManagementWorkspaces.isEmpty {
                         Text("No school manager workspace is available for this account.")
                             .foregroundColor(.secondary)
                     } else {
