@@ -1073,7 +1073,7 @@ internal fun NativeHome(
         Triple("progress", "Progress", Icons.Default.Assessment),
         Triple("support", if (demoRole == "parent") "Family" else if (demoRole == "learner") "Help" else "Support", Icons.Default.Forum)
     ) + (if (data?.assessmentWorkspaces?.isNotEmpty() == true) listOf(Triple("assessments", "Assessments", Icons.Default.Assessment)) else emptyList())
-        + if (data?.schoolOperations?.isNotEmpty() == true) listOf(Triple("school", "School", Icons.Default.AccountBalance)) else emptyList()
+        + (if (data?.schoolOperations?.isNotEmpty() == true) listOf(Triple("school", "School", Icons.Default.AccountBalance)) else emptyList())
     Scaffold(
         containerColor = Color(0xFFF8F6EF),
         topBar = {
