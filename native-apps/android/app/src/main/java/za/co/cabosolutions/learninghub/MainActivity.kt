@@ -167,7 +167,10 @@ class MainActivity : ComponentActivity() {
                     )
                     selectedWrittenExams -> NativeWrittenExamScreen(
                         materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
-                        assignments = screen?.writtenAssignments.orEmpty(),
+                        assignments = if (demoActive && screen?.portal?.role == "learner")
+                            listOf(WrittenExamAssignment(73032, 73031, "Demo fractions check", 73001,
+                                "Cabo Learning School", null))
+                        else screen?.writtenAssignments.orEmpty(),
                         generate = { materialId, count, difficulty ->
                             if (demoActive) WrittenExam(73031, "CABO demo · ${screen?.materialEntries?.firstOrNull { it.id == materialId }?.title ?: "Study material"}", difficulty,
                                 List(count) { index -> WrittenExamQuestion(
@@ -181,7 +184,8 @@ class MainActivity : ComponentActivity() {
                             else api.fetchWrittenExam(examId)
                         },
                         openAssignment = { assignmentId ->
-                            if (demoActive) throw IllegalStateException("No assigned exams in the local demo.")
+                            if (demoActive) WrittenExam(73031, "CABO demo · Fractions check", "beginner",
+                                listOf(WrittenExamQuestion("Explain one key idea from your study material.", "short_answer", 5)))
                             else api.fetchAssignedWrittenExam(assignmentId)
                         },
                         submit = { examId, assignmentId, answers ->
