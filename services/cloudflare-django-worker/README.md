@@ -21,7 +21,7 @@ uvx --from workers-py pywrangler secret put DJANGO_WORKER_TOKEN
 uvx --from workers-py pywrangler secret put DJANGO_SECRET_KEY
 uvx --from workers-py pywrangler deploy
 ```
-The `DJANGO_ALLOWED_HOST` Wrangler variable is restricted to the verified `cabo-learning-django-insights.cabo-solutions-za.workers.dev` hostname. Change it only when the Cloudflare account/route changes and re-test hostile Host headers.
+The `DJANGO_ALLOWED_HOST` Wrangler variable is restricted to the verified `cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev` hostname. Change it only when the Cloudflare account/route changes and re-test hostile Host headers.
 
 Confirm the deployed Worker URL and authorized health+POST smoke tests first; do not configure a custom public route until security review. Avoid logging inputs, token material or learner data.
 
