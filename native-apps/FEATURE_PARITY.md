@@ -70,3 +70,6 @@ A capability moves to complete only when all of these are true on both native pl
 
 
 - Android and iOS now include an on-demand, read-only Education Command view for roles allowed by the existing endpoint. It shows authorized school aggregates, suppresses learner cohorts below ten, and identifies attendance as recorded data. Server membership and management grants remain authoritative; the screen does not present the figures as a verified national census.
+
+
+- Android and iOS now provide a school-manager-only, on-demand attendance and academic signals workspace. It uses existing server-authorized attendance-summary and academic-intelligence endpoints, supports selecting an academic year, displays recorded attendance totals, and presents subject/attendance thresholds as prompts for educator review. No new permission rules or automated decisions were added; data stays in memory while the screen is open.
