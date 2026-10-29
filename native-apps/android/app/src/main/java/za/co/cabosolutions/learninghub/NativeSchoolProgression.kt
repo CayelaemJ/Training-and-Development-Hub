@@ -127,7 +127,7 @@ internal fun NativeSchoolProgressionScreen(
         val targetGrade = if (decision == "repeat") candidate.stage else candidate.nextGrade.orEmpty()
         AlertDialog(
             onDismissRequest = { if (savingEnrollmentId == null) pending = null },
-            title = { Text("Confirm ${decision} for this learner?") },
+            title = { Text(if (decision == "promote") "Confirm promotion for this learner?" else "Confirm repeating this grade?") },
             text = {
                 Text(
                     "${candidate.learnerId}: Grade ${candidate.stage} → $targetGrade in $targetYear. " +
