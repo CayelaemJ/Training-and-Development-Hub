@@ -16,9 +16,13 @@ def _required_token():
     # Python Workers provide secrets through the bindings environment.
     try:
         from workers import env
-        return str(env.DJANGO_WORKER_TOKEN)
-    except (ImportError, AttributeError):
+    except ImportError:
         return os.environ.get("DJANGO_WORKER_TOKEN", "")
+    # A missing Cloudflare secret must fail closed; never fall back on deploy.
+    try:
+        return str(env.DJANGO_WORKER_TOKEN)
+    except AttributeError:
+        return ""
 
 
 def _private(response):
@@ -40,6 +44,9 @@ def insights_draft(request):
     supplied = auth[len("Bearer "):] if auth.startswith("Bearer ") else ""
     if not expected or not supplied or not hmac.compare_digest(expected, supplied):
         return _private(JsonResponse({"error": "Unauthorized"}, status=401))
+    length = request.META.get("CONTENT_LENGTH", "")
+    if length and (not length.isascii() or not length.isdecimal() or int(length) > _MAX_BYTES):
+        return _private(JsonResponse({"error": "Invalid body size"}, status=400))
     if request.content_type != "application/json" or len(request.body) > _MAX_BYTES:
         return _private(JsonResponse({"error": "Invalid content type or body size"}, status=400))
     try:
