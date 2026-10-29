@@ -5,7 +5,6 @@ import os
 import re
 
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 _CODE = re.compile(r"^[a-z][a-z0-9_-]{1,47}$")
@@ -36,7 +35,6 @@ def health(request):
     return _private(JsonResponse({"service": "cabo-learning-django-insights", "status": "ok"}))
 
 
-@csrf_exempt  # Protected by a server-to-server bearer token, not browser cookies.
 @require_POST
 def insights_draft(request):
     expected = _required_token()
