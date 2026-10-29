@@ -1,5 +1,13 @@
 import SwiftUI
 
+struct NativeWrittenExamAssignment: Decodable, Identifiable {
+    let id: Int
+    let examId: Int
+    let title: String
+    let organizationId: Int
+    let organization: String
+    let dueAt: String?
+}
 struct NativeWrittenExamQuestion: Decodable {
     let prompt: String
     let type: String
@@ -35,6 +43,7 @@ struct NativeWrittenExamView: View {
     @State private var questionCount = 5
     @State private var difficulty = "intermediate"
     @State private var exam: NativeWrittenExam?
+    @State private var assignmentId: Int?
     @State private var answers: [String] = []
     @State private var result: NativeWrittenExamResult?
     @State private var busy = false
@@ -81,6 +90,32 @@ struct NativeWrittenExamView: View {
                     .accessibilityIdentifier("generate-written-exam")
                 }
 
+                if !session.writtenAssignments.isEmpty {
+                    Text("Assigned to you").font(.title2.bold())
+                    ForEach(session.writtenAssignments) { assignment in
+                        Button {
+                            Task { await loadAssignment(assignment) }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(assignment.title).font(.headline)
+                                    Text(assignment.organization).font(.subheadline).foregroundColor(.secondary)
+                                    if let dueAt = assignment.dueAt {
+                                        Text("Due \(dueAt.prefix(10))").font(.footnote).foregroundColor(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundColor(.secondary)
+                            }
+                            .padding(16)
+                            .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(busy)
+                        .accessibilityIdentifier("assigned-written-exam-\(assignment.id)")
+                    }
+                }
+
                 if !session.writtenExams.isEmpty {
                     Text("Your saved exams").font(.title2.bold())
                     ForEach(session.writtenExams) { saved in
@@ -110,6 +145,7 @@ struct NativeWrittenExamView: View {
                 if let exam {
                     Divider()
                     Text(exam.title).font(.title2.bold())
+                    if assignmentId != nil { Text("Assigned exam · \(session.writtenAssignments.first(where: { $0.id == assignmentId })?.organization ?? "School")").font(.subheadline).foregroundColor(.secondary) }
                     Text("\(exam.questions.reduce(0) { $0 + $1.maxMarks }) marks · \(exam.difficulty.capitalized)")
                         .foregroundColor(.secondary)
                     ForEach(Array(exam.questions.enumerated()), id: \.offset) { index, question in
@@ -187,7 +223,7 @@ struct NativeWrittenExamView: View {
             let created = try await session.generateWrittenExam(
                 materialId: selected, questionCount: questionCount, difficulty: difficulty
             )
-            select(created)
+            select(created, assignmentId: nil)
         } catch {
             message = "CABO could not generate this exam right now. Your material is still saved; try again shortly."
         }
@@ -197,8 +233,20 @@ struct NativeWrittenExamView: View {
         guard !busy else { return }
         busy = true; message = nil
         defer { busy = false }
-        do { select(try await session.loadWrittenExam(id: id)) }
+        do { select(try await session.loadWrittenExam(id: id), assignmentId: nil) }
         catch { message = "This exam could not be opened. Check your connection and try again." }
+    }
+
+    @MainActor private func loadAssignment(_ assignment: NativeWrittenExamAssignment) async {
+        guard !busy else { return }
+        busy = true; message = nil
+        defer { busy = false }
+        do {
+            select(try await session.loadAssignedWrittenExam(assignmentId: assignment.id),
+                assignmentId: assignment.id)
+        } catch {
+            message = "This assigned exam could not be opened. Check your connection and try again."
+        }
     }
 
     @MainActor private func submitAnswers() async {
@@ -212,12 +260,13 @@ struct NativeWrittenExamView: View {
         busy = true
         message = nil
         defer { busy = false }
-        do { result = try await session.submitWrittenExam(id: exam.id, answers: answers) }
+        do { result = try await session.submitWrittenExam(id: exam.id, answers: answers, assignmentId: assignmentId) }
         catch { message = "CABO could not confirm the marking result. Do not submit again yet; check with your educator before retrying." }
     }
 
-    private func select(_ value: NativeWrittenExam) {
+    private func select(_ value: NativeWrittenExam, assignmentId: Int?) {
         exam = value
+        self.assignmentId = assignmentId
         answers = Array(repeating: "", count: value.questions.count)
         result = nil
         submissionStarted = false
