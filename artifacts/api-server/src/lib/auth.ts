@@ -16,6 +16,7 @@ export interface SessionData {
   refresh_token?: string;
   expires_at?: number;
   trusted_mfa?: TrustedMfaEvidence;
+  verified_email?: string;
 }
 
 let oidcConfig: client.Configuration | null = null;
