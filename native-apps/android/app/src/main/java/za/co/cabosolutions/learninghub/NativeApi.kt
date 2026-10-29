@@ -52,6 +52,8 @@ internal data class MaterialPage(val id: Int, val title: String, val text: Strin
     val offset: Int, val nextOffset: Int?)
 internal data class WrittenExamQuestion(val prompt: String, val type: String, val maxMarks: Int)
 internal data class WrittenExam(val id: Int, val title: String, val difficulty: String, val questions: List<WrittenExamQuestion>)
+internal data class WrittenExamAssignment(val id: Int, val examId: Int, val title: String,
+    val organizationId: Int, val organization: String, val dueAt: String?)
 internal data class WrittenExamMark(val questionIndex: Int, val awardedMarks: Double, val maxMarks: Double,
     val feedback: String, val needsReview: Boolean)
 internal data class WrittenExamResult(val id: Int, val percentage: Double, val awardedMarks: Double,
@@ -183,6 +185,7 @@ internal data class NativeLearning(
     val supportDrafts: List<NativeSupportDraft> = emptyList(),
     val quizEntries: List<QuizSummary> = emptyList(),
     val writtenExams: List<WrittenExam> = emptyList(),
+    val writtenAssignments: List<WrittenExamAssignment> = emptyList(),
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
     val learnerReportNotice: String = "",
@@ -869,6 +872,25 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
+        val writtenAssignments = if (role != "learner") emptyList() else try {
+            getArray("/api/my-assignments").let { arr ->
+                (0 until arr.length()).mapNotNull { i ->
+                    val row = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val id = row.optInt("id")
+                    val examId = row.optInt("examId")
+                    val organizationId = row.optInt("organizationId")
+                    val title = row.optString("title")
+                    val organization = row.optString("organization")
+                    if (id <= 0 || examId <= 0 || organizationId <= 0 ||
+                        title.isBlank() || organization.isBlank()) null
+                    else WrittenExamAssignment(id, examId, title, organizationId, organization,
+                        if (row.isNull("dueAt")) null else row.optString("dueAt").take(40))
+                }
+            }
+        } catch (error: Exception) {
+            if (!hasSession()) throw error
+            emptyList()
+        }
         var learnerReportNotice = ""
         val learnerReports = orgIds.take(5).mapNotNull { orgId ->
             try {
@@ -982,7 +1004,7 @@ internal class NativeApi(private val context: Context) {
         val learnerHelp = learnerSupportTickets.map { "${it.concept} · ${it.status.replace('_', ' ')}" }
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries, writtenExams = writtenExams,
+            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries, writtenExams = writtenExams, writtenAssignments = writtenAssignments,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports,
             schoolOperations = loadSchoolOperations())
@@ -1236,17 +1258,26 @@ internal class NativeApi(private val context: Context) {
             parseWrittenExam(response)
         }
 
+    suspend fun fetchAssignedWrittenExam(assignmentId: Int): WrittenExam =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(assignmentId > 0)
+            parseWrittenExam(request("/api/assignments/$assignmentId/exam", auth = true))
+        }
+
     suspend fun fetchWrittenExam(id: Int): WrittenExam =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(id > 0)
             parseWrittenExam(request("/api/written-exams/$id", auth = true))
         }
 
-    suspend fun submitWrittenExam(examId: Int, answers: List<String>): WrittenExamResult =
+    suspend fun submitWrittenExam(examId: Int, answers: List<String>, assignmentId: Int? = null): WrittenExamResult =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(examId > 0 && answers.isNotEmpty() && answers.size <= 15 && answers.all { it.length <= 15000 })
+            require(assignmentId == null || assignmentId > 0)
+            val payload = JSONObject().put("answers", JSONArray(answers))
+            if (assignmentId != null) payload.put("assignmentId", assignmentId)
             val response = request("/api/written-exams/$examId/attempts",
-                JSONObject().put("answers", JSONArray(answers)), auth = true, timeoutMs = 120000)
+                payload, auth = true, timeoutMs = 85000)
             val rows = response.getJSONArray("feedback")
             val marks = (0 until rows.length()).map { i ->
                 val row = rows.getJSONObject(i)
