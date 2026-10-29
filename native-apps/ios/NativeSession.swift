@@ -1473,7 +1473,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         guard let data = try? await request("api/organizations"),
               let memberships = try? JSONDecoder().decode([NativeOrganizationMembership].self, from: data) else { return [] }
         var workspaces: [NativeExamManagementWorkspace] = []
-        for membership in memberships.prefix(12) where ["owner", "admin"].contains(membership.role) {
+        for membership in memberships.prefix(5) where ["owner", "admin"].contains(membership.role) {
             do {
                 let groupsData = try await request("api/organizations/\(membership.id)/groups")
                 let groups = try JSONDecoder().decode([NativeManagedExamGroup].self, from: groupsData).prefix(200)
@@ -1677,7 +1677,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearSupportStorage()
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false
         guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
