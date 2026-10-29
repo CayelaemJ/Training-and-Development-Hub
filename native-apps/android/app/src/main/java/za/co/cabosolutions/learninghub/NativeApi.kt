@@ -111,6 +111,16 @@ internal data class EducationCommandSchool(
     val id: Int, val name: String, val learnerCount: Int?,
     val attendanceRate: Int?, val privacySuppressed: Boolean
 )
+internal data class SchoolIntelligenceLearner(
+    val learnerId: String, val grade: String, val average: Double?,
+    val attendanceRate: Double?, val subjectsAtRisk: List<String>, val supportPlans: Int
+)
+internal data class SchoolIntelligenceSnapshot(
+    val year: Int, val attendanceRecords: Int, val attendanceCounts: Map<String, Int>,
+    val studentsReviewed: Int, val attentionNeeded: Int,
+    val learners: List<SchoolIntelligenceLearner>,
+    val subjectBelow: Double, val attendanceBelow: Double, val officialDistrictData: Boolean
+)
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
@@ -664,6 +674,44 @@ internal class NativeApi(private val context: Context) {
                 if (partialFailure) "Some school data could not load. Check your connection and refresh." else null)
         }
     }
+
+    suspend fun fetchSchoolIntelligence(organizationId: Int, year: Int): SchoolIntelligenceSnapshot =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && year in 2000..2200)
+            val attendance = request("/api/organizations/$organizationId/attendance/summary?year=$year", auth = true)
+            val academic = request("/api/organizations/$organizationId/academic-intelligence?year=$year", auth = true)
+            val countsJson = attendance.optJSONObject("counts")
+            val counts = countsJson?.keys()?.asSequence()?.associateWith { countsJson.optInt(it).coerceAtLeast(0) }
+                ?: emptyMap()
+            val rows = academic.optJSONArray("learners") ?: JSONArray()
+            val learners = (0 until minOf(rows.length(), 400)).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val learnerId = row.optString("learnerId").trim().take(160)
+                if (learnerId.isBlank()) return@mapNotNull null
+                val subjects = row.optJSONArray("subjectsAtRisk") ?: JSONArray()
+                SchoolIntelligenceLearner(
+                    learnerId = learnerId,
+                    grade = row.optString("grade").take(40),
+                    average = if (row.isNull("average")) null else row.optDouble("average").takeIf { it.isFinite() && it in 0.0..100.0 },
+                    attendanceRate = if (row.isNull("attendanceRate")) null else row.optDouble("attendanceRate").takeIf { it.isFinite() && it in 0.0..100.0 },
+                    subjectsAtRisk = (0 until minOf(subjects.length(), 20)).mapNotNull { subjectIndex ->
+                        subjects.optString(subjectIndex).trim().takeIf { it.isNotBlank() }?.take(120)
+                    },
+                    supportPlans = row.optInt("supportPlans").coerceAtLeast(0)
+                )
+            }
+            SchoolIntelligenceSnapshot(
+                year = academic.optInt("year", year),
+                attendanceRecords = attendance.optInt("records").coerceAtLeast(0),
+                attendanceCounts = counts,
+                studentsReviewed = academic.optInt("studentsReviewed").coerceAtLeast(0),
+                attentionNeeded = academic.optInt("attentionNeeded").coerceAtLeast(0),
+                learners = learners,
+                subjectBelow = academic.optJSONObject("thresholds")?.optDouble("subjectBelow", 50.0)?.coerceIn(0.0, 100.0) ?: 50.0,
+                attendanceBelow = academic.optJSONObject("thresholds")?.optDouble("attendanceBelow", 80.0)?.coerceIn(0.0, 100.0) ?: 80.0,
+                officialDistrictData = attendance.optBoolean("officialDistrictData")
+            )
+        }
 
     suspend fun fetchEducationCommand(year: Int): EducationCommandSnapshot =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
