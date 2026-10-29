@@ -706,3 +706,46 @@ class NativeAndroidNotificationPreferenceTest {
         assertEquals(listOf(7, "guardian_review_requested", false, false), changes.last())
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidWrittenExamTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun generatesExamRequiresAnswersAndShowsMarkingResult() {
+        val exam = WrittenExam(41, "Fractions written check", "beginner",
+            listOf(WrittenExamQuestion("Explain how you would add 1/4 and 1/2.", "short_answer", 5)))
+        val submitted = mutableListOf<List<String>>()
+        compose.setContent {
+            MaterialTheme {
+                NativeWrittenExamScreen(
+                    materials = listOf(MaterialSummary(9, "Fractions notes")),
+                    exams = emptyList(),
+                    generate = { materialId, count, difficulty ->
+                        assertEquals(9, materialId)
+                        assertEquals(1, count.coerceAtMost(1))
+                        exam.copy(difficulty = difficulty)
+                    },
+                    open = { exam },
+                    submit = { _, answers ->
+                        submitted.add(answers)
+                        WrittenExamResult(52, 80.0, 4.0, 5.0, 0,
+                            listOf(WrittenExamMark(0, 4.0, 5.0, "Good explanation.", false)))
+                    },
+                    close = {}
+                )
+            }
+        }
+        compose.onNodeWithTag("generate-written-exam").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("submit-written-exam").assertIsNotEnabled()
+        compose.onNodeWithTag("written-answer-0").performTextInput("Add the denominators after making them equal.")
+        compose.onNodeWithTag("submit-written-exam").assertIsEnabled().performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(listOf("Add the denominators after making them equal.")), submitted)
+        compose.onNodeWithText("Result · 80.0% (4.0/5.0 marks)").assertExists()
+        compose.onNodeWithText("Good explanation.").assertExists()
+    }
+}
