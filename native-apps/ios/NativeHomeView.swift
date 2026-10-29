@@ -16,6 +16,7 @@ struct NativeHomeView: View {
     @State private var materialImportError: String?
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
+    private let gold = Color(red: 201.0 / 255.0, green: 168.0 / 255.0, blue: 76.0 / 255.0)
 
     private var isEducator: Bool {
         guard let role = session.role else { return false }
@@ -122,7 +123,23 @@ struct NativeHomeView: View {
 
     private var sessionControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("CABO").font(.title.bold()).foregroundColor(clay)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("CABO")
+                        .font(.system(size: 29, weight: .bold, design: .serif))
+                        .tracking(2).foregroundColor(clay)
+                    Text("SOLUTIONS")
+                        .font(.system(size: 8, weight: .medium, design: .monospaced))
+                        .tracking(2.2).foregroundColor(gold)
+                }
+                Rectangle().fill(Color(UIColor.separator)).frame(width: 1, height: 34)
+                Text("Training &\nDevelopment Hub")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color(UIColor.label))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("CABO Solutions, Training and Development Hub")
             Text(session.status).font(.subheadline).foregroundColor(.secondary)
             if session.busy { ProgressView("Connecting…") }
             if session.role == nil {
@@ -463,7 +480,7 @@ struct NativeHomeView: View {
     }
 
     private func title(_ value: String) -> some View {
-        Text(value).font(.title2.bold()).padding(.top, 4)
+        Text(value).font(.system(.title2, design: .serif, weight: .bold)).padding(.top, 4)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -481,3 +498,4 @@ struct NativeHomeView: View {
         .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }
+
