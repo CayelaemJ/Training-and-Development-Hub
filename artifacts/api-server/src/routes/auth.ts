@@ -200,6 +200,10 @@ router.get('/callback', async (req: Request, res: Response) => {
     refresh_token: tokens.refresh_token,
     expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
     trusted_mfa: trustedMfaFromOidcClaims(claims as unknown as Record<string, unknown>, now),
+    // Only cryptographically validated OIDC claims can attest verified email.
+    verified_email: claims.email_verified === true &&
+      typeof claims.email === 'string' && claims.email.toLowerCase() === dbUser.email?.toLowerCase()
+      ? claims.email.toLowerCase() : undefined,
   };
 
   const sid = await createSession(sessionData);

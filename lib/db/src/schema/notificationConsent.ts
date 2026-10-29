@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, primaryKey, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, primaryKey, serial, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 import { organizationsTable } from "./organizations";
 import { notificationOutboxTable } from "./notificationOutbox";
@@ -23,3 +23,13 @@ export const notificationEventSourcesTable=pgTable("notification_event_sources",
   sourceId:integer("source_id").notNull(),
   createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[index("notification_source_lookup_idx").on(t.sourceKind,t.sourceId)]);
+
+/** Append-only proof of explicit, account-owned choice; no email or child identifiers. */
+export const notificationPreferenceEventsTable=pgTable("notification_preference_events",{
+  id:serial("id").primaryKey(),
+  userId:varchar("user_id",{length:128}).notNull().references(()=>usersTable.id,{onDelete:"cascade"}),
+  organizationId:integer("organization_id").notNull().references(()=>organizationsTable.id,{onDelete:"cascade"}),
+  kind:varchar("kind",{length:40}).notNull(),
+  action:varchar("action",{length:12}).notNull(),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[index("notification_preference_events_user_idx").on(t.userId,t.organizationId,t.createdAt)]);
