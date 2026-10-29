@@ -388,7 +388,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             clearSupportStorage()
             clearToken()
             role = nil
-            summary = []; workspaces = []; materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
+            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; quizzes = []; quizSummaries = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
@@ -752,7 +752,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenExams = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1240,7 +1240,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             "questionCount": questionCount, "difficulty": difficulty
         ])
         let data = try await request("api/materials/\(materialId)/written-exams",
-            method: "POST", body: body, timeoutInterval: 120)
+            method: "POST", body: body, timeoutInterval: 85)
         let exam = try JSONDecoder().decode(NativeWrittenExam.self, from: data)
         writtenExams.insert(exam, at: 0)
         writtenExams = Array(writtenExams.prefix(30))
@@ -1260,7 +1260,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         let body = try JSONSerialization.data(withJSONObject: ["answers": answers])
         let data = try await request("api/written-exams/\(id)/attempts",
-            method: "POST", body: body, timeoutInterval: 120)
+            method: "POST", body: body, timeoutInterval: 85)
         return try JSONDecoder().decode(NativeWrittenExamResult.self, from: data)
     }
 
@@ -1546,7 +1546,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearSupportStorage()
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []
         guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
