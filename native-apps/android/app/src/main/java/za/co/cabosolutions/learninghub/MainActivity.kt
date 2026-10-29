@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private var supportBusy by mutableStateOf(false)
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
+    private var selectedWrittenExams by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
     private var selectedUploadFileName by mutableStateOf("")
@@ -164,6 +165,13 @@ class MainActivity : ComponentActivity() {
                         recordOutcome = { baseline, followup, reason -> recordSupportOutcome(baseline, followup, reason) },
                         reviewLearningDna = { state, note -> saveSupportLearningDna(state, note) }
                     )
+                    selectedWrittenExams -> NativeWrittenExamScreen(
+                        materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
+                        generate = { material, count, difficulty -> api.generateWrittenExam(material, count, difficulty) },
+                        open = { examId -> api.fetchWrittenExam(examId) },
+                        submit = { examId, answers -> api.submitWrittenExam(examId, answers) },
+                        close = { selectedWrittenExams = false }
+                    )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
                         attempt = attempt, busy = studyBusy, submitted = studySubmitted,
@@ -225,6 +233,7 @@ class MainActivity : ComponentActivity() {
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
+                        openWrittenExams = { selectedWrittenExams = true },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -1094,6 +1103,7 @@ internal fun NativeHome(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
+    openWrittenExams: () -> Unit = {},
     pickMaterial: () -> Unit,
     openSupportDraft: (NativeSupportDraft) -> Unit = {},
     sendSupportDraft: (NativeSupportDraft) -> Unit = {},
@@ -1282,7 +1292,7 @@ internal fun NativeHome(
                                 substituteSchoolTeacher = substituteSchoolTeacher,
                                 createAssessmentQuestion = createAssessmentQuestion, decideAssessmentQuestion = decideAssessmentQuestion,
                                 createAssessmentPaper = createAssessmentPaper, decideAssessmentPaper = decideAssessmentPaper,
-                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
+                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
                                 learnerJourneyAction = learnerJourneyAction
@@ -1694,6 +1704,7 @@ private fun RoleContent(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
+    openWrittenExams: () -> Unit = {},
     pickMaterial: () -> Unit,
     openSupportDraft: (NativeSupportDraft) -> Unit,
     sendSupportDraft: (NativeSupportDraft) -> Unit,
@@ -1807,6 +1818,19 @@ private fun RoleContent(
                                 Text(material.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text("Open reading", style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                             }
+                        }
+                    }
+                    item { Text("Written exams", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    item {
+                        OutlinedButton(onClick = openWrittenExams, enabled = !busy && !demoActive,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Create or take a written exam")
+                        }
+                    }
+                    if (data.writtenExams.isNotEmpty()) {
+                        item { Text("Your written exams", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                        items(data.writtenExams, key = { "written-exam:${it.id}" }) { exam ->
+                            NativeCard(exam.title, "${exam.questions.size} questions · ${exam.difficulty}")
                         }
                     }
                     item { Text("Practice", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
