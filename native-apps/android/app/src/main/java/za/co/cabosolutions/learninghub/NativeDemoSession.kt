@@ -1,0 +1,99 @@
+package za.co.cabosolutions.learninghub
+
+/** Ephemeral shared demo state. It is reset on entry and is never persisted. */
+internal object NativeDemoSession {
+    private var current = seed()
+
+    private fun seed(): SupportTicket {
+        val summary = SupportTicketSummary(
+            organizationId = NativeDemoData.DEMO_ORGANIZATION_ID,
+            id = 73031,
+            concept = "Adding unlike fractions",
+            status = "open",
+            version = 1,
+            updatedAt = "Today · 09:10"
+        )
+        return SupportTicket(
+            summary,
+            "I tried adding the denominators, but my answer did not match the example. What should I try next?",
+            "I added 1/3 + 1/4 and got 2/7.",
+            listOf(
+                SupportTicketEvent("created", "Learner requested help with unlike fractions.", "Today · 09:10"),
+                SupportTicketEvent("context", "Synthetic demo request. No learner record is connected.", "Today · 09:10")
+            )
+        )
+    }
+
+    fun reset() { current = seed() }
+    fun summary(): SupportTicketSummary = current.summary
+    fun ticket(summary: SupportTicketSummary): SupportTicket =
+        if (summary.id == current.summary.id && summary.organizationId == current.summary.organizationId) current
+        else NativeDemoData.ticket(summary)
+
+    fun createRequest(concept: String, question: String, attempted: String): SupportTicket {
+        current = current.copy(
+            summary = current.summary.copy(concept = concept.trim(), status = "open", version = 1),
+            question = question.trim(),
+            attempted = attempted.trim(),
+            history = listOf(SupportTicketEvent("created", "Synthetic learner requested educator support.", "Just now · demo"))
+        )
+        return current
+    }
+
+    fun reply(summary: SupportTicketSummary, body: String): SupportTicket {
+        require(summary.id == current.summary.id && summary.version == current.summary.version)
+        current = current.copy(
+            summary = current.summary.copy(version = current.summary.version + 1),
+            history = current.history + SupportTicketEvent("reply", body, "Just now · demo")
+        )
+        return current
+    }
+
+    fun triage(summary: SupportTicketSummary, reason: String): SupportTicket {
+        require(summary.id == current.summary.id && summary.version == current.summary.version && current.summary.status == "open")
+        current = current.copy(
+            summary = current.summary.copy(status = "triaged", version = current.summary.version + 1),
+            history = current.history + SupportTicketEvent("transition", reason, "Just now · demo")
+        )
+        return current
+    }
+
+    fun feedback(summary: SupportTicketSummary, value: String): SupportTicket {
+        require(summary.id == current.summary.id && summary.version == current.summary.version)
+        require(value in setOf("helpful", "needs_more_help"))
+        current = current.copy(
+            summary = current.summary.copy(
+                version = current.summary.version + 1,
+                feedback = value,
+                status = if (value == "needs_more_help") "in_progress" else current.summary.status
+            ),
+            history = current.history + SupportTicketEvent(
+                "feedback",
+                if (value == "helpful") "Learner understood the assistance." else "Learner requested further assistance.",
+                "Just now · demo"
+            )
+        )
+        return current
+    }
+
+    fun transition(summary: SupportTicketSummary, status: String, reason: String): SupportTicket {
+        require(summary.id == current.summary.id && summary.version == current.summary.version)
+        val allowed = when (current.summary.status) {
+            "open" -> setOf("triaged")
+            "triaged" -> setOf("assigned")
+            "assigned" -> setOf("in_progress", "triaged")
+            "in_progress" -> setOf("awaiting_learner", "follow_up_required", "triaged")
+            "awaiting_learner" -> setOf("in_progress", "follow_up_required")
+            "follow_up_required" -> setOf("in_progress", "resolved")
+            "resolved" -> setOf("closed", "in_progress")
+            "closed" -> setOf("in_progress")
+            else -> emptySet()
+        }
+        require(status in allowed && reason.trim().length >= 3)
+        current = current.copy(
+            summary = current.summary.copy(status = status, version = current.summary.version + 1),
+            history = current.history + SupportTicketEvent("transition", reason.trim(), "Just now · demo")
+        )
+        return current
+    }
+}

@@ -1,7 +1,9 @@
+import demoAdmissionsInboxRouter from "./demoAdmissionsInbox";
 import nativeAuthRouter from "./nativeAuth";
 import nativeParentRouter from "./nativeParent";
 import educationFrameworksRouter from "./educationFrameworks";
 import learnerSupportRouter from "./learnerSupport";
+import workerInsightsRouter from "./workerInsights";
 
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
@@ -38,11 +40,15 @@ import assessmentPapersRouter from "./assessmentPapers";
 import educationCommandRouter from "./educationCommand";
 import admissionEvidenceRouter from "./admissionEvidence";
 
+import lifelongPassportRouter from "./lifelongPassport";
+import passportTrustRouter from "./passportTrustRoutes";
+
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(educationFrameworksRouter);
 router.use(learnerSupportRouter);
+router.use(workerInsightsRouter);
 
 router.use(authRouter);
 router.use(nativeAuthRouter);
@@ -69,6 +75,7 @@ router.use(admissionsRouter);
 router.use(reportCardsRouter);
 router.use(demoShowcaseRouter);
 router.use(demoStatusRouter);
+router.use(demoAdmissionsInboxRouter);
 router.use(guardianVerificationRouter);
 router.use(reportIssuanceRouter);
 router.use(attendanceSyncRouter);
@@ -78,5 +85,7 @@ router.use(assessmentQuestionBankRouter);
 router.use(assessmentPapersRouter);
 router.use(educationCommandRouter);
 router.use(admissionEvidenceRouter);
+router.use(lifelongPassportRouter);
+router.use(passportTrustRouter);
 
 export default router;

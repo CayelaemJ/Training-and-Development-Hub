@@ -3,15 +3,45 @@ package za.co.cabosolutions.learninghub
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import java.security.SecureRandom
 import android.util.Base64
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+
+private const val MAX_MATERIAL_BYTES = 30L * 1024 * 1024
+private val materialContentTypes = mapOf(
+    "txt" to "text/plain", "md" to "text/markdown", "csv" to "text/csv",
+    "pdf" to "application/pdf",
+    "docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "webp" to "image/webp"
+)
 
 internal data class MaterialSummary(val id: Int, val title: String)
+internal data class LearnerJourneyIdentity(val displayName: String = "")
+internal data class LearnerJourneyEntry(val id: Int, val institutionName: String, val stage: String, val academicYear: Int, val note: String)
+internal data class LearnerJourneyMilestone(val id: Int, val title: String, val description: String, val kind: String, val year: Int)
+internal sealed class LearnerJourneyAction {
+    data class SaveIdentity(val displayName: String) : LearnerJourneyAction()
+    data class AddEntry(val institution: String, val stage: String, val year: Int, val note: String) : LearnerJourneyAction()
+    data class AddMilestone(val title: String, val description: String, val kind: String, val year: Int) : LearnerJourneyAction()
+    data class DeleteEntry(val id: Int) : LearnerJourneyAction()
+    data class DeleteMilestone(val id: Int) : LearnerJourneyAction()
+}
+internal data class SupportCourseOption(val organizationId: Int, val courseId: Int, val name: String)
+internal data class NativeSupportDraft(
+    val requestKey: String, val organizationId: Int, val courseId: Int,
+    val courseName: String, val concept: String, val question: String, val attempted: String
+)
 internal data class QuizSummary(val id: Int, val title: String, val questionCount: Int, val latestScore: Double?)
 internal data class QuizQuestion(val prompt: String, val options: List<String>)
 internal data class PracticeQuiz(val id: Int, val title: String, val questions: List<QuizQuestion>)
@@ -24,6 +54,26 @@ internal data class MaterialPage(val id: Int, val title: String, val text: Strin
 internal data class NativePortal(val role: String, val summary: List<String>, val areas: List<String>)
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
+)
+internal data class GuardianReview(val id: Int, val learnerId: String, val guardianId: String, val status: String)
+internal data class GuardianReviewWorkspace(val organizationId: Int, val reviews: List<GuardianReview>)
+internal data class ReportIssuanceRecord(
+    val id: Int, val learnerId: String, val academicYear: Int, val version: Int,
+    val status: String, val submittedBy: String, val reviewedBy: String?,
+    val contentHash: String, val issuedAt: String?
+)
+internal data class ReportIssuanceWorkspace(val organizationId: Int, val records: List<ReportIssuanceRecord>)
+internal data class IssuedReportSnapshot(
+    val grade: String, val average: Double?, val subjects: List<GuardianSubject>,
+    val attendanceRate: Int?, val presentDays: Int, val recordedDays: Int
+)
+internal data class IssuedSchoolReport(
+    val id: Int, val organizationId: Int, val academicYear: Int,
+    val contentHash: String, val snapshot: IssuedReportSnapshot, val learnerName: String? = null
+) { val key: String get() = "$organizationId:$id" }
+internal data class ReportIntegrityCheck(
+    val hashValid: Boolean?, val cryptographicallySigned: Boolean,
+    val signatureValid: Boolean, val issuerIdentityAccredited: Boolean
 )
 internal data class GuardianSubject(val name: String, val percentage: Double, val assessmentCount: Int)
 internal data class GuardianAcademicReport(
@@ -41,20 +91,60 @@ internal data class LearnerAcademicReport(
 ) { val id: String get() = "$organizationId:$year" }
 internal data class StaffWorkspace(
     val organizationId: Int, val courses: List<String>, val supportSummary: List<String>,
-    val tickets: List<String>, val notice: String?
+    val tickets: List<SupportTicketSummary>, val notice: String?
+)
+internal data class SupportTicketSummary(
+    val organizationId: Int,
+    val id: Int,
+    val concept: String,
+    val status: String,
+    val version: Int,
+    val updatedAt: String,
+    val assignedTo: String? = null,
+    val reviewAt: String? = null,
+    val feedback: String? = null
+)
+internal data class SupportEducator(val id: String, val name: String)
+internal data class SupportTicket(
+    val summary: SupportTicketSummary,
+    val question: String,
+    val attempted: String,
+    val history: List<SupportTicketEvent>,
+    val educators: List<SupportEducator> = emptyList(),
+    val publishedResults: List<SupportPublishedResult> = emptyList(),
+    val outcome: SupportOutcome? = null
+)
+internal data class SupportPublishedResult(val id: Int, val title: String, val marks: Double, val maxMarks: Double, val updatedAt: String)
+internal data class SupportOutcome(val baseline: Double, val followup: Double, val improvementPp: Double, val comparisonReason: String?)
+internal data class SupportTicketEvent(val kind: String, val body: String, val createdAt: String, val state: String? = null)
+internal data class SupportGuidanceDraft(
+    val explanation: String,
+    val questions: List<String>,
+    val practice: List<String>,
+    val source: String
 )
 internal data class NativeLearning(
     val portal: NativePortal,
     val materials: List<String>,
     val quizzes: List<String>,
     val guardians: List<GuardianInvite> = emptyList(),
+    val guardianReviewWorkspaces: List<GuardianReviewWorkspace> = emptyList(),
+    val reportIssuanceWorkspaces: List<ReportIssuanceWorkspace> = emptyList(),
+    val issuedReports: List<IssuedSchoolReport> = emptyList(),
+    val issuedReportIntegrity: Map<String, ReportIntegrityCheck> = emptyMap(),
     val parentGuidance: String = "",
     val parentReports: List<GuardianAcademicReport> = emptyList(),
     val parentReportNotice: String = "",
     val staff: List<StaffWorkspace> = emptyList(),
     val journey: List<String> = emptyList(),
+    val journeyIdentity: LearnerJourneyIdentity = LearnerJourneyIdentity(),
+    val journeyEntries: List<LearnerJourneyEntry> = emptyList(),
+    val journeyMilestones: List<LearnerJourneyMilestone> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
+    val learnerSupportTickets: List<SupportTicketSummary> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
+    val supportCourses: List<SupportCourseOption> = emptyList(),
+    val supportDrafts: List<NativeSupportDraft> = emptyList(),
     val quizEntries: List<QuizSummary> = emptyList(),
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
@@ -77,6 +167,201 @@ internal class NativeApi(private val context: Context) {
         return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
     fun testLoginAvailable(): Boolean = BuildConfig.ENABLE_TEST_LOGIN
+
+    private fun supportDraftOwner(): String {
+        val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
+        return Base64.encodeToString(MessageDigest.getInstance("SHA-256")
+            .digest(token.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+    }
+
+    suspend fun loadSupportDrafts(): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val owner = supportDraftOwner()
+            if (secrets.get("support_drafts_owner") != owner) {
+                secrets.put("support_drafts", null)
+                secrets.put("support_courses", null)
+                secrets.put("support_drafts_owner", owner)
+                return@withContext emptyList()
+            }
+            val saved = secrets.get("support_drafts") ?: return@withContext emptyList()
+            val rows = JSONArray(saved)
+            (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val key = row.optString("requestKey")
+                val orgId = row.optInt("organizationId")
+                val courseId = row.optInt("courseId")
+                val name = row.optString("courseName")
+                val concept = row.optString("concept")
+                val question = row.optString("question")
+                val attempted = row.optString("attempted")
+                if (key.isBlank() || orgId <= 0 || courseId <= 0 || name.isBlank() ||
+                    concept.length !in 2..160 || question.length !in 10..4000 || attempted.length !in 3..2000) null
+                else NativeSupportDraft(key, orgId, courseId, name, concept, question, attempted)
+            }.take(20)
+        }
+
+    suspend fun loadCachedSupportCourses(): List<SupportCourseOption> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val owner = try { supportDraftOwner() } catch (_: Exception) { return@withContext emptyList() }
+            if (secrets.get("support_drafts_owner") != owner) return@withContext emptyList()
+            val rows = try { JSONArray(secrets.get("support_courses") ?: return@withContext emptyList()) }
+                catch (_: Exception) { return@withContext emptyList() }
+            (0 until rows.length()).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val orgId = row.optInt("organizationId")
+                val courseId = row.optInt("courseId")
+                val name = row.optString("name").take(120)
+                if (orgId <= 0 || courseId <= 0 || name.isBlank()) null
+                else SupportCourseOption(orgId, courseId, name)
+            }.take(100)
+        }
+
+    suspend fun saveSupportDraft(draft: NativeSupportDraft): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(draft.requestKey.matches(Regex("[a-fA-F0-9-]{36}")) && draft.organizationId > 0 && draft.courseId > 0)
+            require(draft.concept.trim().length in 2..160 && draft.question.trim().length in 10..4000 &&
+                draft.attempted.trim().length in 3..2000)
+            val current = loadSupportDrafts().filterNot { it.requestKey == draft.requestKey }
+            val updated = (current + draft.copy(concept = draft.concept.trim(), question = draft.question.trim(),
+                attempted = draft.attempted.trim())).takeLast(20)
+            val rows = JSONArray()
+            updated.forEach { row -> rows.put(JSONObject()
+                .put("requestKey", row.requestKey).put("organizationId", row.organizationId)
+                .put("courseId", row.courseId).put("courseName", row.courseName)
+                .put("concept", row.concept).put("question", row.question).put("attempted", row.attempted)) }
+            secrets.put("support_drafts_owner", supportDraftOwner())
+            secrets.put("support_drafts", rows.toString())
+            updated
+        }
+
+    suspend fun deleteSupportDraft(requestKey: String): List<NativeSupportDraft> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val updated = loadSupportDrafts().filterNot { it.requestKey == requestKey }
+            val rows = JSONArray()
+            updated.forEach { row -> rows.put(JSONObject()
+                .put("requestKey", row.requestKey).put("organizationId", row.organizationId)
+                .put("courseId", row.courseId).put("courseName", row.courseName)
+                .put("concept", row.concept).put("question", row.question).put("attempted", row.attempted)) }
+            secrets.put("support_drafts", rows.toString())
+            updated
+        }
+
+    suspend fun clearSupportDrafts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        secrets.put("support_drafts", null)
+        secrets.put("support_courses", null)
+        secrets.put("support_drafts_owner", null)
+    }
+
+    suspend fun submitSupportDraft(draft: NativeSupportDraft): Int =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val response = request("/api/organizations/${draft.organizationId}/support", JSONObject()
+                .put("courseId", draft.courseId).put("concept", draft.concept)
+                .put("question", draft.question).put("attempted", draft.attempted)
+                .put("requestKey", draft.requestKey), auth = true)
+            response.getInt("id").also { require(it > 0) { "CABO returned an invalid support request." } }
+        }
+
+    suspend fun materialFileName(uri: Uri): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val displayName = context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            (displayName ?: uri.lastPathSegment ?: "study-material")
+                .replace('\\', '/')
+                .substringAfterLast('/')
+                .filterNot { it.isISOControl() }
+                .take(240)
+                .ifBlank { "study-material" }
+        }
+
+    suspend fun uploadMaterial(uri: Uri, title: String): MaterialSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val safeTitle = title.trim()
+            require(safeTitle.isNotEmpty() && safeTitle.length <= 200) {
+                "Enter a title of 1 to 200 characters."
+            }
+            val fileName = materialFileName(uri)
+            val extension = fileName.substringAfterLast('.', "").lowercase()
+            val contentType = materialContentTypes[extension]
+                ?: throw IllegalArgumentException("Choose a supported PDF, Office, text, CSV, PNG, JPEG or WebP file.")
+            val staged = File.createTempFile("cabo-material-", ".upload", context.cacheDir)
+            try {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: throw IllegalArgumentException("Could not open the selected document.")
+                var total = 0L
+                input.use { source -> FileOutputStream(staged).use { target ->
+                    val buffer = ByteArray(16 * 1024)
+                    while (true) {
+                        val count = source.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= MAX_MATERIAL_BYTES) { "Files must be 30 MB or smaller." }
+                        target.write(buffer, 0, count)
+                    }
+                } }
+                require(total > 0) { "The selected document is empty." }
+
+                val intent = request("/api/storage/uploads/request-url", JSONObject()
+                    .put("name", fileName)
+                    .put("size", total)
+                    .put("contentType", contentType)
+                    .put("allowAiReading", false), auth = true)
+                val targetUrl = URL(intent.getString("uploadURL"))
+                val targetUri = URI(targetUrl.toExternalForm())
+                val apiUrl = URL(origin)
+                require(targetUrl.protocol == "https" && targetUri.userInfo == null) {
+                    "CABO returned an invalid secure upload destination."
+                }
+                val sameApiHost = targetUrl.host.equals(apiUrl.host, ignoreCase = true)
+                val sameApiAuthority = sameApiHost &&
+                    (targetUrl.port.takeIf { it >= 0 } ?: targetUrl.defaultPort) ==
+                    (apiUrl.port.takeIf { it >= 0 } ?: apiUrl.defaultPort)
+                val nativeTestPath = sameApiAuthority &&
+                    targetUrl.path.matches(Regex("/api/storage/uploads/railway/[a-f0-9-]{36}"))
+                if (sameApiHost && !nativeTestPath) {
+                    throw IllegalStateException("CABO returned an unexpected upload destination.")
+                }
+                val upload = targetUrl.openConnection() as HttpURLConnection
+                upload.connectTimeout = 15_000
+                upload.readTimeout = 30_000
+                upload.instanceFollowRedirects = false
+                upload.requestMethod = "PUT"
+                upload.doOutput = true
+                upload.useCaches = false
+                upload.setRequestProperty("Content-Type", contentType)
+                // The isolated Render test fallback is an authenticated API route.
+                // Never send the CABO bearer token to external signed storage URLs.
+                if (nativeTestPath) {
+                    val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
+                    upload.setRequestProperty("Authorization", "Bearer $token")
+                }
+                upload.setFixedLengthStreamingMode(total)
+                try {
+                    FileInputStream(staged).use { source -> upload.outputStream.use { target ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val count = source.read(buffer)
+                            if (count < 0) break
+                            target.write(buffer, 0, count)
+                        }
+                    } }
+                    val status = upload.responseCode
+                    require(status in 200..299) { "The file upload was not accepted. Please retry." }
+                } finally {
+                    upload.disconnect()
+                }
+
+                val saved = request("/api/materials", JSONObject()
+                    .put("title", safeTitle)
+                    .put("objectPath", intent.getString("objectPath")), auth = true)
+                val id = saved.getInt("id")
+                val savedTitle = saved.getString("title")
+                require(id > 0 && savedTitle.isNotBlank()) { "CABO returned an invalid material record." }
+                MaterialSummary(id, savedTitle)
+            } finally {
+                staged.delete()
+            }
+        }
 
     // Explicitly enabled in private, disposable test builds only. The
     // password stays in memory for this single HTTPS request, not on disk.
@@ -138,7 +423,8 @@ internal class NativeApi(private val context: Context) {
             }
         } catch (_: Exception) { "Native sign-in could not complete. Please try again." }
     }
-    private fun request(route: String, body: JSONObject? = null, auth: Boolean = false, requestKey: String? = null): JSONObject {
+    private fun request(route: String, body: JSONObject? = null, method: String? = null,
+                        auth: Boolean = false, requestKey: String? = null): JSONObject {
         val url = URL(origin + route)
         val connection = url.openConnection() as HttpURLConnection
         connection.connectTimeout = 9000
@@ -151,8 +437,8 @@ internal class NativeApi(private val context: Context) {
             val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
             connection.setRequestProperty("Authorization", "Bearer $token")
         }
+        connection.requestMethod = method ?: if (body != null) "POST" else "GET"
         if (body != null) {
-            connection.requestMethod = "POST"
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
         }
@@ -164,7 +450,7 @@ internal class NativeApi(private val context: Context) {
                 throw IllegalStateException("CABO API HTTP $status")
             }
             val text = connection.inputStream.bufferedReader().use { it.readText() }
-            return JSONObject(text)
+            return if (text.isBlank()) JSONObject() else JSONObject(text)
         } finally { connection.disconnect() }
     }
     private fun getArray(route: String): JSONArray {
@@ -183,6 +469,29 @@ internal class NativeApi(private val context: Context) {
             return JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
         } finally { connection.disconnect() }
     }
+
+    private fun parseIssuedReport(row: JSONObject, organizationId: Int, learnerName: String? = null): IssuedSchoolReport? {
+        val id = row.optInt("id")
+        val year = row.optInt("academicYear", row.optInt("year"))
+        val hash = row.optString("contentHash")
+        val snapshot = row.optJSONObject("snapshot") ?: return null
+        val grade = snapshot.optString("grade")
+        if (id <= 0 || organizationId <= 0 || year !in 2000..2200 || hash.length !in 32..256 || grade.isBlank()) return null
+        val subjectsJson = snapshot.optJSONArray("subjects") ?: JSONArray()
+        val subjects = (0 until minOf(subjectsJson.length(), 100)).mapNotNull { i ->
+            subjectsJson.optJSONObject(i)?.let { subject ->
+                val name = subject.optString("name")
+                if (name.isBlank()) null else GuardianSubject(name.take(160), subject.optDouble("percentage"), subject.optInt("assessmentCount"))
+            }
+        }
+        val attendance = snapshot.optJSONObject("attendance") ?: JSONObject()
+        return IssuedSchoolReport(id, organizationId, year, hash.take(256), IssuedReportSnapshot(
+            grade.take(32), if (snapshot.isNull("average")) null else snapshot.optDouble("average"),
+            subjects, if (attendance.isNull("rate")) null else attendance.optInt("rate"),
+            attendance.optInt("presentDays"), attendance.optInt("recordedDays")
+        ), learnerName?.take(160))
+    }
+
     suspend fun dashboard(): NativeLearning = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val json = request("/api/portal/me", auth = true)
         val role = json.optString("role", "learner")
@@ -251,14 +560,65 @@ internal class NativeApi(private val context: Context) {
                 if (!hasSession()) throw error
                 emptyList()
             }
+            val issuedReports = reports
+                .distinctBy { "${it.learnerId}:${it.organizationId}" }
+                .take(12)
+                .flatMap { report ->
+                try {
+                    val rows = getArray("/api/guardian/issued-reports/${Uri.encode(report.learnerId)}?organizationId=${report.organizationId}")
+                    (0 until minOf(rows.length(), 50)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { parseIssuedReport(it, report.organizationId, report.learnerName) }
+                    }
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    emptyList()
+                }
+            }.distinctBy { it.key }.take(100)
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(),
                 guardians = relationships, parentGuidance = response.optString("guidance"),
-                parentReports = reports, parentReportNotice = notice
+                parentReports = reports, parentReportNotice = notice, issuedReports = issuedReports
             )
         }
 
         if (role in listOf("teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head")) {
+            val guardianReviews = orgIds.mapNotNull { orgId ->
+                try {
+                    val rows = getArray("/api/organizations/$orgId/guardian-reviews")
+                    val reviews = (0 until minOf(rows.length(), 200)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val learnerId = row.optString("learnerId")
+                            val guardianId = row.optString("guardianId"); val status = row.optString("status")
+                            if (id <= 0 || learnerId.isBlank() || guardianId.isBlank() || status.isBlank()) null
+                            else GuardianReview(id, learnerId.take(200), guardianId.take(200), status.take(32))
+                        }
+                    }
+                    GuardianReviewWorkspace(orgId, reviews)
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    null
+                }
+            }
+            val reportIssuance = orgIds.mapNotNull { orgId ->
+                try {
+                    val rows = getArray("/api/organizations/$orgId/report-issuance")
+                    val records = (0 until minOf(rows.length(), 100)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val learnerId = row.optString("learnerId")
+                            val hash = row.optString("contentHash"); val status = row.optString("status")
+                            if (id <= 0 || learnerId.isBlank() || hash.isBlank() || status.isBlank()) null
+                            else ReportIssuanceRecord(id, learnerId.take(200), row.optInt("academicYear"),
+                                row.optInt("version"), status.take(32), row.optString("submittedBy"),
+                                row.optString("reviewedBy").takeIf { it.isNotBlank() && it != "null" },
+                                hash.take(256), row.optString("issuedAt").takeIf { it.isNotBlank() && it != "null" })
+                        }
+                    }
+                    ReportIssuanceWorkspace(orgId, records)
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    null
+                }
+            }
             val workspace = orgIds.map { orgId ->
                 try {
                     val response = request("/api/organizations/$orgId/support/options", auth = true)
@@ -275,21 +635,28 @@ internal class NativeApi(private val context: Context) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    val ticketNames = try {
+                    val supportTickets = try {
                         val response = request("/api/organizations/$orgId/support", auth = true)
                         val tickets = response.optJSONArray("items") ?: JSONArray()
                         (0 until minOf(tickets.length(), 20)).mapNotNull { index ->
                             tickets.optJSONObject(index)?.let { row ->
-                                val topic = row.optString("concept").take(80)
-                                val state = row.optString("status").take(32)
-                                if (topic.isBlank()) null else "$topic · $state"
+                                val ticketId = row.optInt("id")
+                                val topic = row.optString("concept").take(160)
+                                if (ticketId <= 0 || topic.isBlank()) null else SupportTicketSummary(
+                                    organizationId = orgId,
+                                    id = ticketId,
+                                    concept = topic,
+                                    status = row.optString("status", "open").take(32),
+                                    version = row.optInt("version", 1).coerceAtLeast(1),
+                                    updatedAt = row.optString("updatedAt")
+                                )
                             }
                         }
                     } catch (error: Exception) {
                         if (!hasSession()) throw error
                         emptyList()
                     }
-                    StaffWorkspace(orgId, courseNames, stats, ticketNames, null)
+                    StaffWorkspace(orgId, courseNames, stats, supportTickets, null)
                 } catch (error: Exception) {
                     if (!hasSession()) throw error
                     StaffWorkspace(orgId, emptyList(), emptyList(), emptyList(),
@@ -297,7 +664,8 @@ internal class NativeApi(private val context: Context) {
                 }
             }
             return@withContext NativeLearning(
-                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace
+                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
+                guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance
             )
         }
 
@@ -357,35 +725,278 @@ internal class NativeApi(private val context: Context) {
                 null
             }
         }
+        val issuedReports = if (role == "learner") {
+            val rows = mutableListOf<IssuedSchoolReport>()
+            orgIds.take(5).forEach { orgId ->
+                try {
+                    val reports = getArray("/api/organizations/$orgId/report-issuance/me")
+                    (0 until minOf(reports.length(), 100 - rows.size)).forEach { i ->
+                        reports.optJSONObject(i)?.let { report ->
+                            parseIssuedReport(report, orgId)?.let(rows::add)
+                        }
+                    }
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                }
+            }
+            rows
+        } else emptyList()
+        var journeyIdentity = LearnerJourneyIdentity()
+        var journeyEntries = emptyList<LearnerJourneyEntry>()
+        var journeyMilestones = emptyList<LearnerJourneyMilestone>()
         val journey = try {
             val obj = request("/api/learner-journey/me", auth = true)
             val stages = obj.optJSONArray("journeys") ?: JSONArray()
             val milestones = obj.optJSONArray("milestones") ?: JSONArray()
+            journeyIdentity = LearnerJourneyIdentity(obj.optJSONObject("identity")?.optString("displayName", "")?.take(160) ?: "")
+            journeyEntries = (0 until minOf(stages.length(), 100)).mapNotNull { i ->
+                stages.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id"); val school = row.optString("institutionName")
+                    if (id <= 0 || school.isBlank()) null else LearnerJourneyEntry(id,
+                        school.take(160), row.optString("stage").take(32), row.optInt("academicYear"), row.optString("note").take(2000))
+                }
+            }
+            journeyMilestones = (0 until minOf(milestones.length(), 100)).mapNotNull { i ->
+                milestones.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id"); val title = row.optString("title"); val detail = row.optString("description")
+                    if (id <= 0 || title.isBlank() || detail.isBlank()) null else LearnerJourneyMilestone(
+                        id, title.take(160), detail.take(4000), row.optString("kind").take(32), row.optInt("year"))
+                }
+            }
             listOf("Learning stages: ${stages.length()}", "Milestones: ${milestones.length()}")
         } catch (error: Exception) {
             if (!hasSession()) throw error
             emptyList()
         }
-        val learnerHelp = orgIds.take(3).flatMap { orgId ->
+        val supportCourses = if (role == "learner") orgIds.take(12).flatMap { orgId ->
+            try {
+                val response = request("/api/organizations/$orgId/support/options", auth = true)
+                val courses = response.optJSONArray("courses") ?: JSONArray()
+                (0 until courses.length()).mapNotNull { i -> courses.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id")
+                    val name = row.optString("name").trim().take(120)
+                    if (id > 0 && name.isNotBlank()) SupportCourseOption(orgId, id, name) else null
+                } }
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                emptyList()
+            }
+        }.take(100) else emptyList()
+        val cachedCourses = JSONArray()
+        supportCourses.forEach { course -> cachedCourses.put(JSONObject()
+            .put("organizationId", course.organizationId).put("courseId", course.courseId)
+            .put("name", course.name)) }
+        secrets.put("support_drafts_owner", supportDraftOwner())
+        secrets.put("support_courses", cachedCourses.toString())
+        val learnerSupportTickets = if (role == "learner") orgIds.take(3).flatMap { orgId ->
             try {
                 val response = request("/api/organizations/$orgId/support", auth = true)
                 val tickets = response.optJSONArray("items") ?: JSONArray()
                 (0 until minOf(tickets.length(), 15)).mapNotNull { i ->
                     tickets.optJSONObject(i)?.let { row ->
-                        val concept = row.optString("concept").take(80)
-                        if (concept.isBlank()) null else "$concept · ${row.optString("status").take(32)}"
+                        val id = row.optInt("id"); val courseId = row.optInt("courseId")
+                        val concept = row.optString("concept").trim(); val status = row.optString("status")
+                        val version = row.optInt("version"); val updated = row.optString("updatedAt")
+                        if (id <= 0 || courseId <= 0 || concept.isBlank() || status.isBlank() || version <= 0) null
+                        else SupportTicketSummary(orgId, id, concept.take(160), status.take(32), version,
+                            updated.take(40), reviewAt = row.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" },
+                            feedback = row.optString("feedback").takeIf { it.isNotBlank() && it != "null" })
                     }
                 }
             } catch (error: Exception) {
                 if (!hasSession()) throw error
                 emptyList()
             }
-        }.take(20)
+        }.take(30) else emptyList()
+        val learnerHelp = learnerSupportTickets.map { "${it.concept} · ${it.status.replace('_', ' ')}" }
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            materialEntries = materialEntries, quizEntries = quizEntries,
-            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
+            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
+            journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
+            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports)
     }
+
+    suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        request("/api/learner-journey/me", JSONObject().put("displayName", displayName.trim().take(160)), method = "PUT", auth = true)
+    }
+
+    suspend fun addJourneyEntry(institutionName: String, stage: String, academicYear: Int, note: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            request("/api/learner-journey/entries", JSONObject().put("institutionName", institutionName.trim())
+                .put("stage", stage).put("academicYear", academicYear).put("note", note.take(2000)), auth = true)
+        }
+
+    suspend fun addJourneyMilestone(title: String, description: String, kind: String, year: Int) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            request("/api/learner-journey/milestones", JSONObject().put("title", title.trim())
+                .put("description", description.trim()).put("kind", kind).put("year", year), auth = true)
+        }
+
+    suspend fun deleteJourneyItem(path: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(path.matches(Regex("/api/learner-journey/(entries|milestones)/[1-9][0-9]*")))
+        request(path, method = "DELETE", auth = true)
+    }
+
+    suspend fun fetchSupportTicket(summary: SupportTicketSummary): SupportTicket =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(summary.organizationId > 0 && summary.id > 0)
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}", auth = true
+            )
+            val ticket = json.getJSONObject("ticket")
+            require(ticket.optInt("id") == summary.id &&
+                ticket.optInt("organizationId") == summary.organizationId)
+            val canonical = summary.copy(
+                status = ticket.optString("status", summary.status).take(32),
+                version = ticket.optInt("version", summary.version).coerceAtLeast(1),
+                updatedAt = ticket.optString("updatedAt", summary.updatedAt),
+                assignedTo = ticket.optString("assignedTo").takeIf { it.isNotBlank() && it != "null" },
+                reviewAt = ticket.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" },
+                feedback = ticket.optString("feedback").takeIf { it.isNotBlank() && it != "null" }
+            )
+            val events = json.optJSONArray("history") ?: JSONArray()
+            val educatorsJson = json.optJSONArray("educators") ?: JSONArray()
+            val educators = (0 until minOf(educatorsJson.length(), 100)).mapNotNull { i ->
+                educatorsJson.optJSONObject(i)?.let { row ->
+                    val id = row.optString("id"); val name = listOf(row.optString("firstName"), row.optString("lastName"))
+                        .filter { it.isNotBlank() && it != "null" }.joinToString(" ")
+                    if (id.isBlank() || id == "null") null else SupportEducator(id, name.ifBlank { "School educator" })
+                }
+            }
+            val history = (0 until minOf(events.length(), 500)).mapNotNull { index ->
+                events.optJSONObject(index)?.let { event ->
+                    val body = event.optString("body").take(4000)
+                    if (body.isBlank()) null else SupportTicketEvent(
+                        kind = event.optString("kind", "update").take(32),
+                        body = body,
+                        createdAt = event.optString("createdAt").take(40),
+                        state = event.optJSONObject("metadata")?.optString("state")?.takeIf { it.isNotBlank() && it != "null" }
+                    )
+                }
+            }
+            val publishedJson = json.optJSONArray("publishedResults") ?: JSONArray()
+            val publishedResults = (0 until minOf(publishedJson.length(), 100)).mapNotNull { i ->
+                publishedJson.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id"); val title = row.optString("title").trim()
+                    val max = row.optDouble("maxMarks", -1.0); val marks = row.optDouble("marks", -1.0)
+                    if (id <= 0 || title.isBlank() || max <= 0 || marks < 0) null
+                    else SupportPublishedResult(id, title.take(200), marks, max, row.optString("updatedAt").take(40))
+                }
+            }
+            val outcome = ticket.optJSONObject("outcome")?.let { row ->
+                val before = row.optDouble("baseline", Double.NaN)
+                val after = row.optDouble("followup", Double.NaN)
+                val change = row.optDouble("improvementPp", Double.NaN)
+                if (before.isFinite() && after.isFinite() && change.isFinite())
+                    SupportOutcome(before, after, change, row.optString("comparisonReason").takeIf { it.isNotBlank() && it != "null" })
+                else null
+            }
+            SupportTicket(
+                summary = canonical,
+                question = ticket.optString("question").take(4000),
+                attempted = ticket.optString("attempted").take(2000),
+                history = history, educators = educators, publishedResults = publishedResults, outcome = outcome
+            )
+        }
+
+    suspend fun assignSupportTicket(ticket: SupportTicket, staffId: String): SupportTicketSummary =
+        sendSupportAction(ticket.summary, JSONObject().put("kind", "assign").put("staffId", staffId))
+
+    suspend fun scheduleSupportPractice(ticket: SupportTicket, body: String, reviewAt: String): SupportTicketSummary {
+        require(body.trim().length in 5..4000 && reviewAt.length in 20..40)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "practice")
+            .put("body", body.trim()).put("reviewAt", reviewAt))
+    }
+
+    suspend fun submitLearnerSupportFeedback(ticket: SupportTicket, feedback: String): SupportTicketSummary {
+        require(feedback in setOf("helpful", "needs_more_help"))
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "feedback").put("feedback", feedback))
+    }
+
+    suspend fun transitionSupportTicket(ticket: SupportTicket, status: String, reason: String): SupportTicketSummary {
+        require(status in setOf("triaged", "assigned", "in_progress", "awaiting_learner", "follow_up_required", "resolved", "closed"))
+        require(reason.trim().length in 3..1000)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "transition")
+            .put("status", status).put("reason", reason.trim()))
+    }
+
+    suspend fun recordSupportOutcome(ticket: SupportTicket, baselineId: Int, followupId: Int, reason: String): SupportTicketSummary {
+        require(baselineId > 0 && followupId > 0 && baselineId != followupId && reason.trim().length in 20..2000)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "outcome")
+            .put("baselineGradeId", baselineId).put("followupGradeId", followupId).put("comparisonReason", reason.trim()))
+    }
+
+    suspend fun saveLearningDna(ticket: SupportTicket, state: String, body: String): SupportTicketSummary {
+        require(state in setOf("demonstrated", "needs_practice", "not_attempted") && body.trim().length in 20..2000)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "learning_dna")
+            .put("state", state).put("body", body.trim()))
+    }
+
+    private suspend fun sendSupportAction(summary: SupportTicketSummary, action: JSONObject): SupportTicketSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val response = request("/api/organizations/${summary.organizationId}/support/${summary.id}/actions",
+                JSONObject().put("version", summary.version).put("action", action), auth = true)
+            require(response.optInt("id") == summary.id && response.optInt("version") == summary.version + 1)
+            summary.copy(status = response.optString("status", summary.status).take(32),
+                version = response.optInt("version"), updatedAt = response.optString("updatedAt", summary.updatedAt),
+                assignedTo = response.optString("assignedTo").takeIf { it.isNotBlank() && it != "null" },
+                reviewAt = response.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" })
+        }
+
+    suspend fun requestSupportGuidance(summary: SupportTicketSummary): SupportGuidanceDraft =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}/guidance-draft",
+                JSONObject(), auth = true
+            )
+            fun strings(key: String): List<String> {
+                val values = json.optJSONArray(key) ?: JSONArray()
+                return (0 until values.length()).mapNotNull { i ->
+                    values.optString(i).takeIf { it.isNotBlank() }?.take(300)
+                }.take(4)
+            }
+            SupportGuidanceDraft(
+                explanation = json.optString("explanation").take(2000),
+                questions = strings("questions"),
+                practice = strings("practice"),
+                source = json.optString("source", "non_ai_template").take(32)
+            )
+        }
+
+    suspend fun replyToSupportTicket(summary: SupportTicketSummary, body: String): SupportTicketSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(body.trim().length in 2..4000)
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}/actions",
+                JSONObject().put("version", summary.version).put(
+                    "action", JSONObject().put("kind", "reply").put("body", body.trim())
+                ), auth = true
+            )
+            require(json.optInt("id") == summary.id)
+            summary.copy(
+                status = json.optString("status", summary.status).take(32),
+                version = json.optInt("version", summary.version + 1).coerceAtLeast(1),
+                updatedAt = json.optString("updatedAt", summary.updatedAt)
+            )
+        }
+
+    suspend fun triageSupportTicket(summary: SupportTicketSummary, reason: String): SupportTicketSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(reason.trim().length in 3..1000)
+            val json = request(
+                "/api/organizations/${summary.organizationId}/support/${summary.id}/actions",
+                JSONObject().put("version", summary.version).put(
+                    "action", JSONObject().put("kind", "transition")
+                        .put("status", "triaged").put("reason", reason.trim())
+                ), auth = true
+            )
+            require(json.optInt("id") == summary.id)
+            summary.copy(
+                status = json.optString("status", "triaged").take(32),
+                version = json.optInt("version", summary.version + 1).coerceAtLeast(1),
+                updatedAt = json.optString("updatedAt", summary.updatedAt)
+            )
+        }
 
     suspend fun fetchQuiz(id: Int): PracticeQuiz =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -449,6 +1060,41 @@ internal class NativeApi(private val context: Context) {
             require(invitationId > 0)
             request("/api/guardian-relationships/$invitationId/decision",
                 JSONObject().put("decision", if (accept) "accepted" else "declined"), auth = true)
+        }
+
+    suspend fun reviewGuardianRelationship(organizationId: Int, relationshipId: Int, decision: String): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && relationshipId > 0 && decision in setOf("verified", "revoked"))
+            request("/api/organizations/$organizationId/guardian-reviews/$relationshipId",
+                JSONObject().put("decision", decision).put("evidenceReviewed", true), auth = true)
+        }
+
+    suspend fun submitSchoolReport(organizationId: Int, learnerId: String, academicYear: Int): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val learner = learnerId.trim()
+            require(organizationId > 0 && learner.isNotEmpty() && learner.length <= 200 && academicYear in 2000..2200)
+            request("/api/organizations/$organizationId/report-issuance",
+                JSONObject().put("learnerId", learner).put("academicYear", academicYear), auth = true)
+        }
+
+    suspend fun decideSchoolReport(organizationId: Int, reportId: Int, action: String, reason: String): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val cleanReason = reason.trim()
+            require(organizationId > 0 && reportId > 0 && action in setOf("approve", "reject", "issue", "revoke") && cleanReason.length <= 1000)
+            require(action !in setOf("reject", "revoke") || cleanReason.isNotEmpty())
+            request("/api/organizations/$organizationId/report-issuance/$reportId/decision",
+                JSONObject().put("action", action).put("reason", cleanReason), auth = true)
+        }
+
+    suspend fun verifyIssuedReport(report: IssuedSchoolReport): ReportIntegrityCheck =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(report.id > 0 && report.organizationId > 0)
+            val result = request("/api/organizations/${report.organizationId}/report-issuance/${report.id}/integrity", auth = true)
+            ReportIntegrityCheck(
+                if (result.isNull("hashValid")) null else result.optBoolean("hashValid"),
+                result.optBoolean("cryptographicallySigned"), result.optBoolean("signatureValid"),
+                result.optBoolean("issuerIdentityAccredited")
+            )
         }
 
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

@@ -17,9 +17,14 @@ targets:
       - path: NativeSession.swift
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift
+      - path: NativeMaterialUploadView.swift
+      - path: NativeSupportRequestView.swift
+      - path: NativeStaffSupportView.swift
+      - path: NativeLearnerJourneyView.swift
       - path: NativeGuardianReport.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
+        CABO_API_ORIGIN: https://cabo-learning-hub-pilot.onrender.com

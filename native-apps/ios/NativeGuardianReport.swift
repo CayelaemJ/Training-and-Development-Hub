@@ -47,3 +47,32 @@ struct NativeLearnerReport: Decodable, Identifiable {
     var organizationId: Int = 0
     var id: String { String(organizationId) + ":" + String(year) }
 }
+
+struct NativeIssuedReportSnapshot: Decodable {
+    let grade: String
+    let average: Double?
+    let subjects: [NativeReportSubject]
+    let attendance: NativeReportAttendance
+}
+
+struct NativeIssuedSchoolReport: Decodable, Identifiable {
+    let reportId: Int
+    let organizationId: Int
+    let academicYear: Int
+    let contentHash: String
+    let snapshot: NativeIssuedReportSnapshot
+    var learnerName: String? = nil
+    var id: String { "\(organizationId):\(reportId)" }
+    var key: String { id }
+    enum CodingKeys: String, CodingKey {
+        case reportId = "id", organizationId, academicYear, contentHash, snapshot, learnerName
+    }
+}
+
+struct NativeReportIntegrityCheck: Decodable {
+    let hashValid: Bool?
+    let cryptographicallySigned: Bool
+    let signatureValid: Bool
+    let issuerIdentityAccredited: Bool
+    let warning: String?
+}

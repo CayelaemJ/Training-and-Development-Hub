@@ -1,9 +1,9 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, guardianRelationshipsTable, guardianVerificationEventsTable,
   verifiedEnrollmentsTable, usersTable } from "@workspace/db";
-import { parentMobileView } from "../lib/parentMobilePolicy";
+import { parentMobileView, approvedNativeParentLearnerIds } from "../lib/parentMobilePolicy";
 import { nativeAuthEnabled } from "../lib/nativeAuthPolicy";
 import { canReadChildReport } from "../lib/guardianPolicy";
 import { gather } from "./reportCards";
@@ -13,7 +13,11 @@ import { getSession, getSessionId } from "../lib/auth";
 // no unverified child's names, school identifiers, assessment marks or contact data.
 // Device size has NO bearing on permission to view learner data.
 const router: IRouter = Router();
-router.get("/native/mobile/parent", async (req, res) => {
+async function parentOverview(req:Request,res:Response) {
+  const selectedOrg=req.params.orgId===undefined?null:
+    z.coerce.number().int().positive().safeParse(req.params.orgId);
+  if(selectedOrg!==null&&!selectedOrg.success){res.sendStatus(400);return;}
+
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Referrer-Policy", "no-referrer");
   if (!nativeAuthEnabled(process.env)) { res.sendStatus(404); return; }
@@ -38,30 +42,67 @@ router.get("/native/mobile/parent", async (req, res) => {
   const candidateIds = relationships
     .filter(r => r.status === "verified").map(r => r.learnerId);
   const eligible = candidateIds.length
-    ? await db.select({ learnerId: verifiedEnrollmentsTable.learnerId })
+    ? await db.select({
+        learnerId: verifiedEnrollmentsTable.learnerId,
+        organizationId: verifiedEnrollmentsTable.organizationId,
+      })
         .from(verifiedEnrollmentsTable)
         .where(and(
           inArray(verifiedEnrollmentsTable.learnerId, candidateIds),
-          eq(verifiedEnrollmentsTable.status, "active")
-        ))
+          eq(verifiedEnrollmentsTable.status, "active"),
+          ...(selectedOrg?.success?
+            [eq(verifiedEnrollmentsTable.organizationId,selectedOrg.data)]:[])
+        )).limit(500)
     : [];
-  const activeIds = new Set(eligible.map(r => r.learnerId));
-  const nameIds = [...new Set(candidateIds.filter(id => activeIds.has(id)))];
+  const relationshipIds = relationships
+    .filter(r => r.status === "verified").map(r => r.id);
+  const organizationIds = [...new Set(eligible.map(r => r.organizationId))];
+  // All matching review events are sorted newest first. Truncated/missing
+  // evidence fails closed; a revoked latest review never grants a learner name.
+  const reviews = relationshipIds.length && organizationIds.length
+    ? await db.select({
+        relationshipId: guardianVerificationEventsTable.relationshipId,
+        organizationId: guardianVerificationEventsTable.organizationId,
+        decision: guardianVerificationEventsTable.decision,
+      }).from(guardianVerificationEventsTable)
+        .where(and(
+          inArray(guardianVerificationEventsTable.relationshipId, relationshipIds),
+          inArray(guardianVerificationEventsTable.organizationId, organizationIds),
+        ))
+        .orderBy(desc(guardianVerificationEventsTable.createdAt),
+                 desc(guardianVerificationEventsTable.id))
+        .limit(3000)
+    : [];
+  const latestDecisions = new Map<string, string>();
+  for (const review of reviews) {
+    const key = review.relationshipId + ":" + review.organizationId;
+    if (!latestDecisions.has(key)) latestDecisions.set(key, review.decision);
+  }
+  const approvedIds = approvedNativeParentLearnerIds(relationships, eligible, latestDecisions);
+  const nameIds = [...approvedIds];
   const names = nameIds.length
     ? await db.select({ id: usersTable.id, firstName: usersTable.firstName })
         .from(usersTable).where(inArray(usersTable.id, nameIds))
     : [];
   const byId = new Map(names.map(u => [u.id, u.firstName]));
   res.json({
-    relationships: relationships.map(r => parentMobileView(
-      r, activeIds, byId
+    relationships: (selectedOrg?.success?
+      relationships.filter(r=>approvedIds.has(r.learnerId)):relationships)
+      .map(r => parentMobileView(
+      r, approvedIds, byId
     )),
     guidance: "Accepting an invitation is not proof of guardianship. School verification is required before viewing a child's progress.",
   });
-});
+}
+router.get("/native/mobile/parent",parentOverview);
+router.get("/organizations/:orgId/native/mobile/parent",parentOverview);
 // Guardian reports use the SAME server-side lawful access checks as web
 // report cards. A pending/accepted invitation never reveals grades or identity.
-router.get("/native/mobile/parent/reports", async (req, res) => {
+async function parentReports(req:Request,res:Response) {
+  const selectedOrg=req.params.orgId===undefined?null:
+    z.coerce.number().int().positive().safeParse(req.params.orgId);
+  if(selectedOrg!==null&&!selectedOrg.success){res.sendStatus(400);return;}
+
   res.setHeader("Cache-Control", "private, no-store");
   if (!nativeAuthEnabled(process.env)) { res.sendStatus(404); return; }
   if (!req.get("authorization")?.startsWith("Bearer ") || !req.isAuthenticated()) {
@@ -97,7 +138,9 @@ router.get("/native/mobile/parent/reports", async (req, res) => {
     }).from(verifiedEnrollmentsTable).where(and(
       eq(verifiedEnrollmentsTable.learnerId, relation.learnerId),
       eq(verifiedEnrollmentsTable.status, "active"),
-      eq(verifiedEnrollmentsTable.academicYear, year)
+      eq(verifiedEnrollmentsTable.academicYear, year),
+      ...(selectedOrg?.success?
+        [eq(verifiedEnrollmentsTable.organizationId,selectedOrg.data)]:[])
     )).limit(8);
     for (const { organizationId } of enrolments) {
       const [event] = await db.select({decision: guardianVerificationEventsTable.decision})
@@ -128,5 +171,7 @@ router.get("/native/mobile/parent/reports", async (req, res) => {
     year, reports,
     guidance: "Draft progress only. Verified school guardianship and active enrolment are required. These are not officially issued report cards."
   });
-});
+}
+router.get("/native/mobile/parent/reports",parentReports);
+router.get("/organizations/:orgId/native/mobile/parent/reports",parentReports);
 export default router;

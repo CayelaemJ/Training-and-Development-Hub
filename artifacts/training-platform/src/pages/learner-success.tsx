@@ -595,7 +595,7 @@ export default function LearnerSuccessPage() {
                           })
                         }
                       >
-                        Assign practice & checkpoint
+                        Assign practice &amp; checkpoint
                       </button>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <label className="text-sm">

@@ -1,5 +1,8 @@
 # CABO Connected Hub — sprint delivery and production gates
 
+> **CABO platform context:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md). This document covers a specific technical/workflow area; its existence does not certify release readiness, country-specific compliance or official institutional integration. Follow [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md) for verified status and [messaging rules](GO_TO_MARKET_MESSAGING.md) for external claims.
+
+
 This branch adds a responsive 12-module institution workspace and tenant-scoped `hub_records` registry. It builds on the existing learner development plan, academic exams, attendance, sports, career applications and school governance routes rather than replacing them.
 
 | Stream | Existing platform | This sprint | Still required for a genuinely complete product |
@@ -29,4 +32,4 @@ This branch adds a responsive 12-module institution workspace and tenant-scoped 
 
 Versioned schema migrations, environment isolation, integration and browser tests with genuinely distinct users, validated school/university workflows, verified guardians, POPIA legal review for children, approved assessment instruments, accessibility, incident response, signing keys for credential issuance and fully configured storage/backups.
 
-Railway's existing testing environment uses a dedicated Postgres and CI; this branch is NOT automatically deployed or merged. End-to-end platform readiness must be measured against acceptance tests, not the presence of modules in the navigation.
+Render's isolated native-test preview uses its dedicated Neon database and CI; this branch is NOT automatically deployed or merged. End-to-end platform readiness must be measured against acceptance tests, not the presence of modules in the navigation.

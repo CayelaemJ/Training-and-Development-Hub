@@ -9,6 +9,25 @@ const pos=z.coerce.number().int().positive();
 router.get("/career/capabilities",(_req,res)=>res.json({applicationsEnabled:careerApplicationsEnabled(process.env),passportDisclosureEnabled:false,developmentEvidenceEnabled:true}));
 function who(req:any,res:any):string|null{if(!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null}return req.user.id}
 async function role(org:number,user:string){if(isPlatformSuperadmin(user))return "owner";const [m]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org),eq(organizationMembersTable.userId,user))).limit(1);return m?.role}
+// Scoped learner attendance summary. The country clearance middleware validates
+// this specific school, and the query independently binds to the signed-in learner.
+// Do not expose teacher notes, student IDs or other schools' attendance.
+router.get("/organizations/:orgId/attendance/me",async(req,res)=>{
+ const user=who(req,res);if(!user)return;
+ const org=pos.safeParse(req.params.orgId);
+ if(!org.success){res.sendStatus(400);return}
+ const rows=await db.select({
+   day:schoolAttendanceTable.day,
+   status:schoolAttendanceTable.status,
+ }).from(schoolAttendanceTable)
+   .where(and(eq(schoolAttendanceTable.organizationId,org.data),
+              eq(schoolAttendanceTable.learnerId,user)))
+   .orderBy(desc(schoolAttendanceTable.day)).limit(180);
+ res.setHeader("Cache-Control","private, no-store");
+ res.setHeader("Referrer-Policy","no-referrer");
+ res.json({organizationId:org.data,attendance:rows});
+});
+
 router.get("/school/attendance/me",async(req,res)=>{const u=who(req,res);if(!u)return;res.setHeader("Cache-Control","no-store");res.json(await db.select().from(schoolAttendanceTable).where(eq(schoolAttendanceTable.learnerId,u)).orderBy(desc(schoolAttendanceTable.day)).limit(180))});
 router.post("/organizations/:orgId/attendance",async(req,res)=>{
  const u=who(req,res);if(!u)return;const org=pos.safeParse(req.params.orgId),body=z.object({learnerId:z.string().min(1),day:z.iso.date(),status:z.enum(["present","absent","late","excused"]),note:z.string().max(1000).default("")}).safeParse(req.body);

@@ -5,10 +5,15 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { privilegedMfaGuard } from "./middlewares/privilegedMfaGuard";
 import router from "./routes";
+import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
 import { logger } from "./lib/logger";
-import {permittedBrowserOrigin} from "./lib/originPolicy";
+import {permittedBrowserOrigin, permittedMutationOrigin} from "./lib/originPolicy";
 import { apiRateLimit } from "./middlewares/rateLimit";
+import { schoolDataReleaseMiddleware } from "./middlewares/schoolDataRelease";
+import { safeRequestCategory, safeErrorType, safeRequestReference } from "./lib/httpPrivacy";
+import { randomUUID } from "node:crypto";
 
 const app: Express = express();
 app.set("trust proxy", process.env.TRUST_PROXY_HOPS === "1" ? 1 : false);
@@ -21,7 +26,7 @@ app.use(
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          routeGroup: safeRequestCategory(req.url),
         };
       },
       res(res) {
@@ -34,13 +39,31 @@ app.use(
 );
 app.use((req,res,next)=>{res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("X-Frame-Options","DENY");next()});
 app.use(cors({credentials:true,origin:(origin,callback)=>callback(null,origin&&permittedBrowserOrigin(origin,process.env)?origin:false)}));
-app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedBrowserOrigin(req.headers.origin,process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
+app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedMutationOrigin({origin:req.headers.origin,referer:req.headers.referer,cookie:req.headers.cookie},process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
+// Reject abusive API traffic before cookie/session lookups and body parsing.
+// The limiter keys on req.originalUrl and req.ip, neither requires body or auth.
+app.use("/api", apiRateLimit);
 app.use(cookieParser());
+// Parse only this signed callback with byte-preserving verification first.
+// Keep the ordinary JSON middleware unchanged for all other API routes.
+app.use("/api/internal/qstash/material-preview", express.json({
+  limit: "1kb",
+  verify(req, _res, body) {
+    (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
+  },
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
-
-app.use("/api", apiRateLimit);
+// Requires explicit provider migration/MFA acceptance; otherwise existing workflows remain unchanged.
+app.use("/api", privilegedMfaGuard);
+// Explicit rollout flag. Remains off on established Render services until
+// both migrations, per-school clearance evidence and blocked-route client
+// migrations have passed synthetic staging end-to-end tests.
+if (process.env.CABO_COUNTRY_PILOT_ENFORCEMENT === "true") {
+  app.use("/api", schoolDataReleaseMiddleware);
+}
+app.use("/api", qstashMaterialPreviewRouter);
 app.use("/api", router);
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if(error?.type === 'entity.too.large'){res.status(413).json({error:'Choose a file of 30 MB or less, or split it into smaller parts.'});return;}
@@ -48,7 +71,21 @@ app.use((error: any, _req: express.Request, res: express.Response, next: express
   next(error);
 });
 
-// Optional single-origin Railway deployment: deliver the built React SPA from the API server.
+// Final API error boundary: do not emit untrusted error messages, stacks,
+// SQL text, learner identifiers or credentials in API responses or logs.
+// This is not a substitute for external alert delivery or tracing.
+app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) { next(error); return; }
+  const requestId = safeRequestReference((req as express.Request & {id?: unknown}).id) ?? randomUUID();
+  req.log.error({
+    requestId, errorType: safeErrorType(error), method: req.method,
+    routeGroup: safeRequestCategory(req.originalUrl), statusCode: 500,
+  }, "Unhandled request failure");
+  res.setHeader("Cache-Control", "no-store");
+  res.status(500).json({ error: "This request could not be completed.", reference: requestId });
+});
+
+// Optional single-origin deployment: deliver the built React SPA from the API server.
 // Keep /api separate so unknown API requests do not receive HTML.
 const uiDist = path.resolve(process.cwd(), process.env.FRONTEND_DIST_DIR || "artifacts/training-platform/dist/public");
 if (fs.existsSync(path.join(uiDist, "index.html"))) {

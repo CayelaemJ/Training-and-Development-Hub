@@ -1,0 +1,427 @@
+package za.co.cabosolutions.learninghub
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+@Composable
+internal fun NativeDemoSupportRequestScreen(
+    busy: Boolean,
+    message: String?,
+    submit: (String, String, String) -> Unit,
+    close: () -> Unit
+) {
+    var concept by remember { mutableStateOf("Adding unlike fractions") }
+    var question by remember { mutableStateOf("") }
+    var attempted by remember { mutableStateOf("") }
+    Scaffold(topBar = {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = close, enabled = !busy) { Text("Back") }
+                Text("Ask for learning help", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("A useful question starts with what you tried", style = MaterialTheme.typography.titleMedium)
+                    Text("This is a local demo request. It will appear in the educator's synthetic support queue and will not be sent anywhere.")
+                }
+            }
+            OutlinedTextField(value = concept, onValueChange = { concept = it.take(160) },
+                label = { Text("Topic") }, modifier = Modifier.fillMaxWidth(), enabled = !busy)
+            OutlinedTextField(value = question, onValueChange = { question = it.take(4000) },
+                label = { Text("What do you need help with?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 4, maxLines = 8)
+            OutlinedTextField(value = attempted, onValueChange = { attempted = it.take(2000) },
+                label = { Text("What have you tried?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 3, maxLines = 6)
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Button(onClick = { submit(concept, question, attempted) },
+                enabled = !busy && concept.trim().length >= 2 && question.trim().length >= 10 && attempted.trim().length >= 3,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                Text("Send demo request")
+            }
+        }
+    }
+}
+
+@Composable
+internal fun NativeSupportDraftScreen(
+    courses: List<SupportCourseOption>,
+    initial: NativeSupportDraft?,
+    busy: Boolean,
+    message: String?,
+    save: (NativeSupportDraft) -> Unit,
+    submit: (NativeSupportDraft) -> Unit,
+    close: () -> Unit
+) {
+    var selectedCourse by remember(initial?.courseId, courses) {
+        mutableStateOf(courses.firstOrNull { it.courseId == initial?.courseId }
+            ?: initial?.let { SupportCourseOption(it.organizationId, it.courseId, it.courseName) }
+            ?: courses.firstOrNull())
+    }
+    var menuExpanded by remember { mutableStateOf(false) }
+    var concept by remember(initial?.requestKey) { mutableStateOf(initial?.concept.orEmpty()) }
+    var question by remember(initial?.requestKey) { mutableStateOf(initial?.question.orEmpty()) }
+    var attempted by remember(initial?.requestKey) { mutableStateOf(initial?.attempted.orEmpty()) }
+    val requestKey = remember(initial?.requestKey) { initial?.requestKey ?: java.util.UUID.randomUUID().toString() }
+    val valid = selectedCourse != null && concept.trim().length >= 2 &&
+        question.trim().length >= 10 && attempted.trim().length >= 3
+    fun draft(): NativeSupportDraft? = selectedCourse?.let { course -> NativeSupportDraft(
+        requestKey = requestKey,
+        organizationId = course.organizationId, courseId = course.courseId, courseName = course.name,
+        concept = concept.trim(), question = question.trim(), attempted = attempted.trim()
+    ) }
+    Scaffold(topBar = {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = close, enabled = !busy) { Text("Back") }
+                Text(if (initial == null) "Ask for learning help" else "Edit saved draft",
+                    style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Your question goes to your enrolled school", style = MaterialTheme.typography.titleMedium)
+                    Text("Save it privately on this device, or send it now. An unsent draft stays encrypted and can be retried when you are online.")
+                }
+            }
+            Text("Subject", style = MaterialTheme.typography.labelLarge)
+            androidx.compose.foundation.layout.Box {
+                OutlinedButton(onClick = { menuExpanded = true }, enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    Text(selectedCourse?.name ?: "Choose an enrolled subject", modifier = Modifier.weight(1f))
+                    Text("⌄")
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    courses.forEach { course -> DropdownMenuItem(
+                        text = { Text(course.name) },
+                        onClick = { selectedCourse = course; menuExpanded = false }
+                    ) }
+                }
+            }
+            OutlinedTextField(value = concept, onValueChange = { concept = it.take(160) },
+                label = { Text("Topic") }, modifier = Modifier.fillMaxWidth(), enabled = !busy)
+            OutlinedTextField(value = question, onValueChange = { question = it.take(4000) },
+                label = { Text("What do you need help with?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 4, maxLines = 8)
+            OutlinedTextField(value = attempted, onValueChange = { attempted = it.take(2000) },
+                label = { Text("What have you tried?") }, modifier = Modifier.fillMaxWidth(),
+                enabled = !busy, minLines = 3, maxLines = 6)
+            message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            OutlinedButton(onClick = { draft()?.let(save) }, enabled = !busy && valid,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save securely on this device") }
+            Button(onClick = { draft()?.let(submit) }, enabled = !busy && valid,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Send to my educator") }
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun NativeSupportTicketScreen(
+    ticket: SupportTicket?,
+    canManageSupport: Boolean,
+    reply: String,
+    onReply: (String) -> Unit,
+    triageReason: String,
+    onTriageReason: (String) -> Unit,
+    guidance: SupportGuidanceDraft?,
+    busy: Boolean,
+    message: String?,
+    requestGuidance: () -> Unit,
+    useGuidance: () -> Unit,
+    sendReply: () -> Unit,
+    triage: () -> Unit,
+    assign: (String) -> Unit,
+    schedulePractice: (String, String) -> Unit,
+    close: () -> Unit,
+    isLearnerOwner: Boolean = false,
+    submitFeedback: (String) -> Unit = {},
+    transition: (String, String) -> Unit = { _, _ -> },
+    recordOutcome: (Int, Int, String) -> Unit = { _, _, _ -> },
+    reviewLearningDna: (String, String) -> Unit = { _, _ -> }
+) {
+    var selectedEducator by remember(ticket?.summary?.assignedTo) { mutableStateOf(ticket?.summary?.assignedTo.orEmpty()) }
+    var practice by remember { mutableStateOf("") }
+    var statusReason by remember { mutableStateOf("") }
+    var comparisonReason by remember { mutableStateOf("") }
+    var dnaNote by remember { mutableStateOf("") }
+    var dnaState by remember { mutableStateOf("needs_practice") }
+    var baselineId by remember(ticket?.summary?.id) { mutableStateOf<Int?>(null) }
+    var followupId by remember(ticket?.summary?.id) { mutableStateOf<Int?>(null) }
+    var chooseReviewDate by remember { mutableStateOf(false) }
+    var selectedReviewDate by remember {
+        mutableStateOf(java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 1); set(java.util.Calendar.HOUR_OF_DAY, 13); set(java.util.Calendar.MINUTE, 0)
+        }.timeInMillis)
+    }
+    val reviewDatePicker = rememberDatePickerState(initialSelectedDateMillis = selectedReviewDate)
+    if (chooseReviewDate) {
+        DatePickerDialog(
+            onDismissRequest = { chooseReviewDate = false },
+            confirmButton = { TextButton(onClick = { reviewDatePicker.selectedDateMillis?.let { selectedReviewDate = it }; chooseReviewDate = false }) { Text("Choose date") } },
+            dismissButton = { TextButton(onClick = { chooseReviewDate = false }) { Text("Cancel") } }
+        ) { DatePicker(state = reviewDatePicker) }
+    }
+    Scaffold(topBar = {
+        Surface(color = MaterialTheme.colorScheme.primaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = close, enabled = !busy) { Text("Back to requests") }
+                Text("Learner support", style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (ticket == null) {
+                Text(message ?: "Loading this authorised support request…")
+                return@Column
+            }
+            Text(ticket.summary.concept, style = MaterialTheme.typography.headlineSmall)
+            Text("Status: ${ticket.summary.status.replace('_', ' ')}")
+            ticket.outcome?.let { outcome ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Published learning evidence", style = MaterialTheme.typography.titleMedium)
+                        Text("${outcome.baseline.formatOneDecimal()}% → ${outcome.followup.formatOneDecimal()}% · ${outcome.improvementPp.formatOneDecimal()} percentage points")
+                        outcome.comparisonReason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        Text("An educator reviewed comparable published assessments. Progress is observed, not proof of cause.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            if (isLearnerOwner) {
+                Text("Your school support request", style = MaterialTheme.typography.bodyMedium)
+                if (ticket.summary.feedback == null && ticket.summary.status !in listOf("resolved", "closed")) {
+                    Text("After reviewing your educator’s reply, tell them whether it helped.")
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { submitFeedback("helpful") }, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("I understood the help") }
+                        OutlinedButton(onClick = { submitFeedback("needs_more_help") }, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("I still need help") }
+                    }
+                } else if (ticket.summary.feedback != null) {
+                    Text(if (ticket.summary.feedback == "helpful") "You confirmed this helped." else "You requested more help.")
+                }
+                ticket.summary.reviewAt?.let { Text("Next practice review: $it") }
+            }
+            Text("School workspace ${ticket.summary.organizationId} · request ${ticket.summary.id}",
+                style = MaterialTheme.typography.bodySmall)
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Learner question", style = MaterialTheme.typography.titleMedium)
+                    Text(ticket.question)
+                    Text("What they tried", style = MaterialTheme.typography.titleMedium)
+                    Text(ticket.attempted)
+                }
+            }
+            if (ticket.summary.status !in listOf("resolved", "closed") && canManageSupport) {
+                Text("Assignment and practice", style = MaterialTheme.typography.titleMedium)
+                if (ticket.educators.isNotEmpty()) {
+                    Box {
+                        var expanded by remember { mutableStateOf(false) }
+                        OutlinedButton(onClick = { expanded = true }, enabled = !busy) {
+                            Text(ticket.educators.firstOrNull { it.id == selectedEducator }?.name ?: "Choose an authorised educator")
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            ticket.educators.forEach { educator ->
+                                DropdownMenuItem(text = { Text(educator.name) }, onClick = { selectedEducator = educator.id; expanded = false })
+                            }
+                        }
+                    }
+                    Button(onClick = { assign(selectedEducator) }, enabled = !busy && selectedEducator.isNotBlank() && selectedEducator != ticket.summary.assignedTo,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Assign authorised educator") }
+                }
+                OutlinedTextField(value = practice, onValueChange = { practice = it.take(4000) },
+                    label = { Text("Practice activity") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 2, maxLines = 5)
+                OutlinedButton(onClick = { chooseReviewDate = true }, enabled = !busy) {
+                    Text("Review checkpoint: ${java.text.SimpleDateFormat("EEE, d MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(selectedReviewDate))}")
+                }
+                Button(onClick = {
+                    val reviewAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date(selectedReviewDate + 12 * 60 * 60 * 1000L))
+                    schedulePractice(practice, reviewAt)
+                }, enabled = !busy && practice.trim().length >= 5,
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Assign practice and checkpoint") }
+            }
+            if (canManageSupport) {
+                val statusTargets = when (ticket.summary.status) {
+                    "triaged" -> listOf("assigned")
+                    "assigned" -> listOf("in_progress", "triaged")
+                    "in_progress" -> listOf("awaiting_learner", "follow_up_required", "triaged")
+                    "awaiting_learner" -> listOf("in_progress", "follow_up_required")
+                    "follow_up_required" -> listOf("in_progress", "resolved")
+                    "resolved" -> listOf("closed", "in_progress")
+                    "closed" -> listOf("in_progress")
+                    else -> emptyList()
+                }
+                if (ticket.summary.status == "open" || statusTargets.isNotEmpty()) {
+                    Text("Support status", style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(value = statusReason, onValueChange = { statusReason = it.take(1000) },
+                        label = { Text("Why is this changing?") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 2, maxLines = 4)
+                    if (ticket.summary.status == "open") {
+                        Button(onClick = { transition("triaged", statusReason) }, enabled = !busy && statusReason.trim().length >= 3,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Mark as triaged") }
+                    } else statusTargets.forEach { target ->
+                        val evidenceReady = target != "resolved" || ticket.outcome != null
+                        val learnerAcknowledged = target != "closed" || ticket.summary.feedback == "helpful"
+                        val assignmentReady = target != "assigned" || ticket.summary.assignedTo != null
+                        val checkpointReady = target != "follow_up_required" || ticket.summary.reviewAt != null
+                        OutlinedButton(onClick = { transition(target, statusReason) },
+                            enabled = !busy && statusReason.trim().length >= 3 && evidenceReady && learnerAcknowledged && assignmentReady && checkpointReady,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Move to ${target.replace('_', ' ')}")
+                        }
+                    }
+                }
+                Text("Reply to learner", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = reply,
+                    onValueChange = onReply,
+                    label = { Text("Write a response") },
+                    supportingText = { Text("Review and edit any suggested text before sending.") },
+                    modifier = Modifier.fillMaxWidth(), enabled = !busy,
+                    minLines = 4, maxLines = 10
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = requestGuidance, enabled = !busy,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Draft learning guidance") }
+                    Button(onClick = sendReply,
+                        enabled = !busy && reply.trim().length in 2..4000,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Send reply") }
+                }
+                if (ticket.summary.status == "follow_up_required" && ticket.publishedResults.size >= 2) {
+                    Text("Evidence and Learning DNA", style = MaterialTheme.typography.titleMedium)
+                    NativeSupportResultPicker("Initial published result", baselineId, ticket.publishedResults) { baselineId = it }
+                    NativeSupportResultPicker("Follow-up published result", followupId, ticket.publishedResults) { followupId = it }
+                    OutlinedTextField(value = comparisonReason, onValueChange = { comparisonReason = it.take(2000) },
+                        label = { Text("Why are these results comparable?") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 3, maxLines = 6)
+                    Button(onClick = { baselineId?.let { before -> followupId?.let { after -> recordOutcome(before, after, comparisonReason) } } },
+                        enabled = !busy && baselineId != null && followupId != null && baselineId != followupId && comparisonReason.trim().length >= 20,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Record comparable evidence") }
+                    var dnaExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { dnaExpanded = true }, enabled = !busy) { Text("Learning DNA · ${dnaState.replace('_', ' ')}") }
+                        DropdownMenu(expanded = dnaExpanded, onDismissRequest = { dnaExpanded = false }) {
+                            listOf("needs_practice", "demonstrated", "not_attempted").forEach { state ->
+                                DropdownMenuItem(text = { Text(state.replace('_', ' ')) }, onClick = { dnaState = state; dnaExpanded = false })
+                            }
+                        }
+                    }
+                    OutlinedTextField(value = dnaNote, onValueChange = { dnaNote = it.take(2000) },
+                        label = { Text("Educator concept review") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 3, maxLines = 6)
+                    Button(onClick = { reviewLearningDna(dnaState, dnaNote) }, enabled = !busy && dnaNote.trim().length >= 20,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Save Learning DNA review") }
+                }
+            }
+            if (isLearnerOwner) {
+                val learnerTarget = when (ticket.summary.status) {
+                    "awaiting_learner", "resolved", "closed" -> "in_progress"
+                    else -> null
+                }
+                if (learnerTarget != null) {
+                    OutlinedButton(onClick = { transition(learnerTarget, "I still need more help with this topic.") }, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("I still need more help") }
+                }
+                if (ticket.summary.status == "resolved" && ticket.summary.feedback == "helpful") {
+                    Button(onClick = { transition("closed", "I understand the support provided.") }, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Close this support request") }
+                }
+            }
+            guidance?.let { draft ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Suggested draft · ${if (draft.source == "ai_draft") "AI, review required" else "CABO template"}",
+                            style = MaterialTheme.typography.titleMedium)
+                        Text(draft.explanation)
+                        draft.questions.forEach { Text("Think about: $it") }
+                        draft.practice.forEach { Text("Practice: $it") }
+                        OutlinedButton(onClick = useGuidance, enabled = !busy,
+                            modifier = Modifier.heightIn(min = 48.dp)) { Text("Add draft to reply") }
+                    }
+                }
+            }
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text("Request history", style = MaterialTheme.typography.titleMedium)
+            if (ticket.history.isEmpty()) Text("No updates have been recorded yet.")
+            ticket.history.forEach { event ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(event.kind.replace('_', ' '), style = MaterialTheme.typography.labelLarge)
+                        event.state?.let { Text("Learning DNA · ${it.replace('_', ' ')}", style = MaterialTheme.typography.bodySmall) }
+                        Text(event.body)
+                        if (event.createdAt.isNotBlank())
+                            Text(event.createdAt, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeSupportResultPicker(
+    label: String,
+    selectedId: Int?,
+    results: List<SupportPublishedResult>,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by remember(label, selectedId) { mutableStateOf(false) }
+    val selected = results.firstOrNull { it.id == selectedId }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text(selected?.let { "$label · ${it.title} · ${it.marks}/${it.maxMarks}" } ?: label)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            results.forEach { result ->
+                DropdownMenuItem(
+                    text = { Text("${result.title} · ${result.marks}/${result.maxMarks}") },
+                    onClick = { onSelect(result.id); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+private fun Double.formatOneDecimal(): String =
+    String.format(java.util.Locale.getDefault(), "%.1f", this)

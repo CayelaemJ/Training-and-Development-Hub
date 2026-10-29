@@ -1,5 +1,9 @@
 # CABO National Education-to-Talent Architecture
 
+> **Product identity:** CABO Learning Hub is a [Connected Education and Lifelong Development Platform](PLATFORM_IDENTITY.md), not merely an LMS. This document is a **target architecture**, not evidence of accredited national interoperability, government recognition or live cross-border data sharing. Institution authority, privacy and independently verified integrations remain mandatory.
+
+
+
 ## Strategic objective
 One lifelong CABO person identity, many time-bounded verified education enrolments, and explicit purpose-limited disclosure grants. Data remains attributable to its institutional source; an institution never unilaterally edits another institution's certified results.
 

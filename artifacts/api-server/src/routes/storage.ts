@@ -2,17 +2,23 @@ import { Readable } from 'stream';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { materialReadingEnabled } from '../lib/materialCache';
-import { and,eq,sql } from 'drizzle-orm';
+import { and,eq,sql,gte } from 'drizzle-orm';
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from '@workspace/api-zod';
-import { db, uploadIntentsTable, materialUploadBlobsTable } from '@workspace/db';
+import { db, uploadIntentsTable, materialUploadBlobsTable, studyMaterialsTable } from '@workspace/db';
 import { Router, type IRouter, type Request, type Response } from 'express';
 
 import { ObjectPermission } from '../lib/objectAcl';
-import { validateMaterial, MaterialReadError, MAX_FILE_BYTES } from '../lib/uploadPolicy';
+import { validateMaterial, validateDeclaredMaterialType, MaterialReadError, MAX_FILE_BYTES } from '../lib/uploadPolicy';
 import { railwayUploadUrl } from '../lib/railwayUploadUrl';
+import { oidcRequestOrigin } from '../lib/originPolicy';
+import { validateMaterialSignature } from '../lib/uploadPolicy';
+import {
+  blobUploadStatus, MAX_BLOB_FILE_BYTES, newBlobObjectPath, savePrivateBlob,
+  privateBlobDownload, isBlobMissing, isBlobObjectPath,
+} from '../lib/privateBlob';
 import {
   ObjectNotFoundError,
   ObjectStorageService,
@@ -20,6 +26,26 @@ import {
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+const MAX_BLOB_USER_BYTES = 48 * 1024 * 1024;
+const MAX_BLOB_RECORDED_BYTES = 512 * 1024 * 1024;
+/** Budget on persisted and recent pending uploads; storage provider enforces its free cap. */
+async function withinBlobBudget(userId:string,additional:number):Promise<boolean>{
+  const activeSince = new Date(Date.now() - 15 * 60_000);
+  const [userMaterials,userIntents,allMaterials,allIntents] = await Promise.all([
+    db.select({bytes:sql<string>`COALESCE(SUM(${studyMaterialsTable.sizeBytes}),0)::text`})
+      .from(studyMaterialsTable).where(eq(studyMaterialsTable.userId,userId)),
+    db.select({bytes:sql<string>`COALESCE(SUM(${uploadIntentsTable.sizeBytes}),0)::text`,items:sql<string>`COUNT(*)::text`})
+      .from(uploadIntentsTable).where(and(eq(uploadIntentsTable.userId,userId),gte(uploadIntentsTable.createdAt,activeSince))),
+    db.select({bytes:sql<string>`COALESCE(SUM(${studyMaterialsTable.sizeBytes}),0)::text`}).from(studyMaterialsTable),
+    db.select({bytes:sql<string>`COALESCE(SUM(${uploadIntentsTable.sizeBytes}),0)::text`})
+      .from(uploadIntentsTable).where(gte(uploadIntentsTable.createdAt,activeSince)),
+  ]);
+  const owned = Number(userMaterials[0]?.bytes||0)+Number(userIntents[0]?.bytes||0);
+  const overall = Number(allMaterials[0]?.bytes||0)+Number(allIntents[0]?.bytes||0);
+  return Number(userIntents[0]?.items||0)<5 &&
+    owned+additional<=MAX_BLOB_USER_BYTES && overall+additional<=MAX_BLOB_RECORDED_BYTES;
+}
+
 
 function hasAuthenticatedSession(
   req: Request,
@@ -63,19 +89,35 @@ router.post(
     try {
       const { name, size, contentType } = parsed.data;
       validateMaterial(name, size);
+      validateDeclaredMaterialType(name, contentType);
       const allowAiReading = req.body.allowAiReading === true;
+      const blobStatus = blobUploadStatus();
+      if (blobStatus === 'invalid') {
+        res.status(503).json({error:'Private document storage is not approved or configured.'}); return;
+      }
       const railwayFallback = (process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === 'testing';
-      const objectPath = railwayFallback ? `/railway-uploads/${randomUUID()}` : '';
-      // Return an absolute same-origin URL: the API response schema requires a URL, not a relative path.
-      // The request host keeps demo uploads on the same origin so session cookies accompany the PUT.
       const host = req.get('host');
-      if (railwayFallback && (!host || !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(host))) {
+      const origin = blobStatus === 'enabled' ? oidcRequestOrigin(host,process.env) : null;
+      if (blobStatus === 'enabled' && !origin) {
+        res.status(400).json({error:'Upload origin not approved.'}); return;
+      }
+      if (blobStatus === 'enabled' && size > MAX_BLOB_FILE_BYTES) {
+        res.status(413).json({error:'Private uploads are limited to 8 MB during the pilot.'}); return;
+      }
+      if (blobStatus === 'enabled' && !(await withinBlobBudget(req.user.id,size))) {
+        res.status(429).json({error:'Private document storage allowance is reached. Finish or remove existing uploads.'}); return;
+      }
+      const objectPath = blobStatus === 'enabled' ? newBlobObjectPath() :
+        railwayFallback ? '/railway-uploads/' + randomUUID() : '';
+      if (blobStatus === 'disabled' && railwayFallback && (!host || !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(host))) {
         res.status(400).json({error:'Invalid upload host'}); return;
       }
-      const uploadURL = railwayFallback
-        ? railwayUploadUrl(host!, objectPath)
+      const uploadURL = blobStatus === 'enabled'
+        ? origin + '/api/storage/uploads/blob/' + objectPath.split('/').pop()
+        : railwayFallback ? railwayUploadUrl(host!, objectPath)
         : await objectStorageService.getObjectEntityUploadURL();
-      const finalObjectPath = railwayFallback ? objectPath : objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const finalObjectPath = blobStatus === 'enabled' || railwayFallback
+        ? objectPath : objectStorageService.normalizeObjectEntityPath(uploadURL);
       await db.insert(uploadIntentsTable).values({
         objectPath: finalObjectPath,
         userId: req.user.id,
@@ -117,6 +159,61 @@ router.put('/storage/uploads/railway/:id',express.raw({type:'*/*',limit:MAX_FILE
  if(Date.now()-intent.createdAt.getTime()>15*60_000){res.status(410).json({error:'Upload expired; request a new URL'});return}
  await db.insert(materialUploadBlobsTable).values({objectPath,userId:req.user.id,bytes}).onConflictDoNothing();
  res.sendStatus(204);
+});
+
+/**
+ * Authenticated same-origin upload for the existing client PUT contract.
+ * The app verifies intent, bytes, format and ownership before private storage.
+ */
+router.put('/storage/uploads/blob/:id',express.raw({type:'*/*',limit:MAX_BLOB_FILE_BYTES}),async(req,res)=>{
+  if (!hasAuthenticatedSession(req)) {res.sendStatus(401);return;}
+  if (blobUploadStatus() !== 'enabled') {res.status(503).json({error:'Private uploads are disabled.'});return;}
+  const id=req.params.id;
+  if (typeof id !== 'string' || !isBlobObjectPath('/blob-uploads/'+id)) {res.sendStatus(400);return;}
+  const objectPath='/blob-uploads/'+id;
+  const [intent]=await db.select().from(uploadIntentsTable).where(and(
+    eq(uploadIntentsTable.objectPath,objectPath),eq(uploadIntentsTable.userId,req.user.id),
+  )).limit(1);
+  if (!intent) {res.sendStatus(404);return;}
+  if (Date.now()-intent.createdAt.getTime()>15*60_000) {res.status(410).json({error:'Upload expired.'});return;}
+  const bytes=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);
+  if (bytes.length!==intent.sizeBytes || bytes.length===0 || bytes.length>MAX_BLOB_FILE_BYTES) {
+    res.status(400).json({error:'Upload size mismatch.'});return;
+  }
+  try {
+    validateDeclaredMaterialType(intent.fileName,req.get('content-type') || 'application/octet-stream');
+    validateMaterialSignature(intent.fileName,bytes);
+    await savePrivateBlob(objectPath,bytes,intent.contentType);
+    res.sendStatus(204);
+  } catch(error) {
+    if (error instanceof MaterialReadError) {res.status(415).json({error:error.message});return;}
+    req.log.warn({errorType:error instanceof Error?error.name:'Unknown'},'Private upload failed');
+    res.status(503).json({error:'Upload unavailable or already received. Please request a fresh upload URL.'});
+  }
+});
+
+/** Short-lived private read URL after an owner-scoped DB lookup. */
+router.get('/storage/objects/blob/:id',async(req,res)=>{
+  if (!hasAuthenticatedSession(req)) {res.sendStatus(401);return;}
+  const id=req.params.id;
+  if(typeof id!=='string'||!isBlobObjectPath('/blob-uploads/'+id)){res.sendStatus(404);return;}
+  const objectPath='/blob-uploads/'+id;
+  const [material]=await db.select({
+    id:studyMaterialsTable.id,fileName:studyMaterialsTable.fileName,
+  }).from(studyMaterialsTable).where(and(
+    eq(studyMaterialsTable.objectPath,objectPath),eq(studyMaterialsTable.userId,req.user.id),
+  )).limit(1);
+  if(!material){res.sendStatus(404);return;}
+  try {
+    const signed=await privateBlobDownload(objectPath,material.fileName);
+    res.setHeader('Cache-Control','private, no-store');
+    res.setHeader('Referrer-Policy','no-referrer');
+    res.redirect(302,signed.url);
+  } catch(error) {
+    if(isBlobMissing(error)){res.sendStatus(404);return;}
+    req.log.warn({materialId:material.id},'Private download signing unavailable');
+    res.status(503).json({error:'Document download temporarily unavailable.'});
+  }
 });
 
 /**

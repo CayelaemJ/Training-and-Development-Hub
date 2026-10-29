@@ -190,7 +190,7 @@ function AppShell({ user }: { user: any }) {
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
-      <Link href="/" className="brand"><Mark /><span>Training & Development Hub</span></Link>
+      <Link href="/" className="brand"><Mark /><span>Training &amp; Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
         <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
@@ -279,7 +279,7 @@ function GrowthSnapshot() {
       <div><strong>{evidenceTotal}</strong><span>Portfolio entries</span></div>
       <div><strong>{data?.pendingAccessRequests??0}</strong><span>Permission requests</span></div>
     </div>}
-    <div className="growth-actions"><Link href="/potential">Develop my potential <ArrowUpRight size={15}/></Link><Link href="/institution-records">School & guardian records <ArrowUpRight size={15}/></Link></div>
+    <div className="growth-actions"><Link href="/potential">Develop my potential <ArrowUpRight size={15}/></Link><Link href="/institution-records">School &amp; guardian records <ArrowUpRight size={15}/></Link></div>
   </section>;
 }
 function DashboardPage() {

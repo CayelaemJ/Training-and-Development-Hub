@@ -1,12 +1,78 @@
 version: 2.1
-# One job, one install, no production secrets or automatic merges.
+# Regular verification runs on all branches; staging deployment is opt-in.
+parameters:
+  deploy_django_staging:
+    type: boolean
+    default: false
+
 jobs:
+  django_worker:
+    docker:
+      # Pywrangler runs the Pyodide interpreter via Node during packaging.
+      - image: cimg/python:3.12-node
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Django Python Worker checks (isolated, no real learner data)
+          command: |
+            cd services/cloudflare-django-worker
+            python -m pip install "Django>=5.2,<6.0"
+            python -m compileall -q .
+            DJANGO_WORKER_TOKEN=long-test-only-token DJANGO_SECRET_KEY=local-only-test-secret python -m django test --settings=cabo_worker.settings
+      - run:
+          name: Verify Cloudflare Django packaging (no deployment)
+          command: |
+            cd services/cloudflare-django-worker
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            uvx --from workers-py==1.17.9 pywrangler sync
+            npx --yes wrangler@4.151.3 deploy --dry-run --outdir /tmp/cabo-django-worker-bundle
+
+
+  deploy_django_staging:
+    docker:
+      - image: cimg/python:3.12-node
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Deploy Django Worker only with approved staging secrets
+          command: |
+            set -euo pipefail
+            if [ "${CLOUDFLARE_ACCOUNT_ID:-}" != "46ab7ae69c9bc2b2fe4595a6abbbe59c" ]; then
+              echo "Refusing unexpected Cloudflare account"; exit 2
+            fi
+            if [ "${CABO_DJANGO_WORKER_URL:-}" != "https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev" ]; then
+              echo "Refusing unexpected staging destination"; exit 2
+            fi
+            : "${CLOUDFLARE_API_TOKEN:?A scoped Cloudflare Workers deployment token is required}"
+            : "${DJANGO_SECRET_KEY:?Django signing secret is required}"
+            : "${DJANGO_WORKER_TOKEN:?Worker-to-API authentication secret is required}"
+            python - <<'PY'
+            import json,os
+            assert len(os.environ["DJANGO_SECRET_KEY"]) >= 32
+            assert len(os.environ["DJANGO_WORKER_TOKEN"]) >= 32
+            path="/tmp/cabo-django-ci-secrets.json"
+            fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(fd,"w") as f:
+                json.dump({name:os.environ[name] for name in ("DJANGO_SECRET_KEY","DJANGO_WORKER_TOKEN")},f)
+            PY
+            trap 'rm -f /tmp/cabo-django-ci-secrets.json' EXIT
+            cd services/cloudflare-django-worker
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            uvx --from workers-py==1.17.9 pywrangler deploy --secrets-file /tmp/cabo-django-ci-secrets.json
+      - run:
+          name: Smoke-test live Cloudflare staging (only synthetic metrics)
+          command: node scripts/test-django-worker-staging.mjs
   verify:
     docker:
       - image: node:24-bookworm
     resource_class: small
     steps:
       - checkout
+      - run:
+          name: Scan tracked files for high-confidence secrets and test detection
+          command: node --test scripts/security/scan-secrets.test.mjs && node scripts/security/scan-secrets.mjs
       - run:
           name: Install pinned workspace tooling
           command: |
@@ -18,6 +84,8 @@ jobs:
             node --test artifacts/api-server/src/tests/*.test.mjs
             node scripts/test-learner-support.mjs
             node scripts/test-uploads.mjs
+            node scripts/test-passport.mjs
+            node scripts/test-demo-admissions.mjs
       - run:
           name: Typecheck and build all workspaces
           command: pnpm run build
@@ -31,9 +99,82 @@ jobs:
             mkdir -p test-results/browser
             CABO_UI_SCREENSHOT=test-results/browser/learner-dna-mobile.png node scripts/run-learner-success-browser.mjs
             node scripts/run-learner-success-browser.mjs --pwa
+            node scripts/run-learner-success-browser.mjs --admissions
       - store_artifacts:
           path: test-results
+  security_suite:
+    docker:
+      - image: cimg/go:1.24
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Install Python runtime and prerequisites
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y python3 python3-pip python3-venv curl
+            python3 -m venv "$HOME/security-venv"
+            echo 'export PATH="$HOME/security-venv/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Semgrep, Gitleaks, Trivy, optional Nuclei and Schemathesis
+          command: bash .circleci/security.sh
+          no_output_timeout: 15m
+      - store_artifacts:
+          path: security-reports
+          destination: security-reports
+  zap_baseline:
+    docker:
+      - image: cimg/base:stable
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Require explicitly approved staging target
+          command: |
+            if [ "${SECURITY_ZAP_APPROVED:-}" != "YES_STAGING_ONLY" ] || [ -z "${SECURITY_ZAP_TARGET_URL:-}" ]; then
+              echo "ZAP baseline skipped until a staging target is explicitly approved."
+              circleci-agent step halt
+            fi
+            case "$SECURITY_ZAP_TARGET_URL" in
+              https://*staging*|https://*test*|https://*preview*) ;;
+              *) echo "Refusing target without staging/test/preview hostname"; exit 2;;
+            esac
+      - setup_remote_docker
+      - run:
+          name: Passive OWASP ZAP baseline
+          command: |
+            docker run --rm ghcr.io/zaproxy/zaproxy:stable \
+              zap-baseline.py -t "$SECURITY_ZAP_TARGET_URL" -m 1 -I
+          no_output_timeout: 15m
+
 workflows:
+  # This workflow cannot run unless a maintainer triggers a pipeline on main
+  # with deploy_django_staging=true AND an authorised CircleCI context.
+  django_staging_deploy:
+    when: << pipeline.parameters.deploy_django_staging >>
+    jobs:
+      - django_worker
+      - verify
+      - security_suite
+      - deploy_django_staging:
+          requires:
+            - django_worker
+            - verify
+            - security_suite
+          context: cabo-cloudflare-staging
+          filters:
+            branches:
+              only: main
+
   release_checks:
     jobs:
       - verify
+      - django_worker
+
+  security_audit:
+    jobs:
+      - zap_baseline:
+          filters:
+            branches:
+              only: main
+      - security_suite

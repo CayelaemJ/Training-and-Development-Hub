@@ -1,9 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
+import { redisConfigStatus, takeDistributedRateLimit, type RateLimitRule } from "../lib/redisRateLimit";
 
 /**
- * Defensive per-IP fixed-window limiter. No unauthenticated route can bypass this
- * middleware. Set TRUST_PROXY_HOPS=1 ONLY when the ingress removes client-supplied
- * X-Forwarded-For values. A shared edge/Redis limiter is required for replicas.
+ * When Upstash Redis is configured, all API replicas share the same atomic
+ * limiter. Without Redis, the bounded in-memory limiter is for single-replica
+ * development and demos only. Incomplete config/outage fails closed (503).
  */
 const buckets = new Map<string, { count: number; resetAt: number }>();
 const MAX_BUCKETS = 50000;
@@ -28,33 +29,62 @@ const sweep = setInterval(() => {
 }, 5 * 60_000);
 sweep.unref();
 
-export function apiRateLimit(req: Request, res: Response, next: NextFunction): void {
-  const path = req.originalUrl.split("?", 1)[0].toLowerCase();
-  if (path === "/api/health") return next();
-
-  const ip = String(req.ip || req.socket.remoteAddress || "unknown");
-  const limits: Array<[string, number, number]> = [["all", 240, 60_000]];
-  if (/\/(?:login|test-login|auth|callback|reset-password|forgot-password)(?:\/|$)/.test(path)) {
+function rulesFor(req: Request): RateLimitRule[] {
+  const url = req.originalUrl.split("?", 1)[0].toLowerCase();
+  const limits: RateLimitRule[] = [["all", 240, 60_000]];
+  if (/\/(?:login|test-login|auth|callback|reset-password|forgot-password)(?:\/|$)/.test(url)) {
     limits.push(["authentication", 12, 10 * 60_000]);
   }
-  if (/\/(?:storage|upload|material)(?:s|\/|-|$)/.test(path)) {
+  if (/\/(?:storage|upload|material)(?:s|\/|-|$)/.test(url)) {
     limits.push(["uploads", 24, 10 * 60_000]);
   }
-  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\/|-|$)/.test(path)) {
+  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\/|-|$)/.test(url)) {
     limits.push(["generation", 30, 10 * 60_000]);
   }
   if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
     limits.push(["mutations", 90, 60_000]);
   }
+  return limits;
+}
+
+function rejectLimit(res: Response, retryAfter: number): void {
+  res.setHeader("Retry-After", String(retryAfter));
+  res.setHeader("Cache-Control", "no-store");
+  res.status(429).json({ error: "Too many requests. Please try again later." });
+}
+
+export function apiRateLimit(req: Request, res: Response, next: NextFunction): void {
+  const path = req.originalUrl.split("?", 1)[0].toLowerCase();
+  if (path === "/api/healthz" || path === "/api/readyz" || path === "/api/health") {
+    return next();
+  }
+  const ip = String(req.ip || req.socket.remoteAddress || "unknown");
+  const limits = rulesFor(req);
+  const redis = redisConfigStatus();
+
+  if (redis !== "disabled") {
+    // Never silently fall back to per-process limits on a multi-replica service.
+    if (redis === "invalid") {
+      res.status(503).json({ error: "Request protection is unavailable." });
+      return;
+    }
+    void takeDistributedRateLimit(limits, ip)
+      .then(decision => {
+        if (!decision.allowed) return rejectLimit(res, decision.retryAfter);
+        next();
+      })
+      .catch(() => {
+        // Do not log Redis URLs, authentication tokens, IP addresses or the body.
+        res.setHeader("Cache-Control", "no-store");
+        res.status(503).json({ error: "Request protection is temporarily unavailable." });
+      });
+    return;
+  }
 
   const at = Date.now();
   for (const [scope, max, windowMs] of limits) {
     const result = take(scope + ":" + ip, max, windowMs, at);
-    if (!result.allowed) {
-      res.setHeader("Retry-After", String(result.retryAfter));
-      res.status(429).json({ error: "Too many requests. Please try again later." });
-      return;
-    }
+    if (!result.allowed) return rejectLimit(res, result.retryAfter);
   }
   next();
 }

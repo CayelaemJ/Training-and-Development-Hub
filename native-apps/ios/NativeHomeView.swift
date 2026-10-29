@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // Fully native role-based SwiftUI. Uses NavigationView for iOS 15 support,
 // a sidebar + content pane on iPad and a single touch-first view on iPhone.
@@ -8,8 +9,16 @@ struct NativeHomeView: View {
     @State private var testPassword = ""
     @State private var selectedQuiz: NativeQuizSummary?
     @State private var selectedMaterial: NativeMaterialSummary?
+    @State private var selectedStaffTicket: NativeStaffSupportTicket?
+    @State private var showSupportRequests = false
+    @State private var showLearnerJourney = false
+    @State private var uploadSelection: NativeMaterialUploadSelection?
+    @State private var showMaterialImporter = false
+    @State private var materialImportError: String?
+    @State private var reviewedGuardianEvidence: Set<Int> = []
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
+    private let gold = Color(red: 201.0 / 255.0, green: 168.0 / 255.0, blue: 76.0 / 255.0)
 
     private var isEducator: Bool {
         guard let role = session.role else { return false }
@@ -52,7 +61,9 @@ struct NativeHomeView: View {
             if current == nil {
                 selectedQuiz = nil
                 selectedMaterial = nil
+                selectedStaffTicket = nil
                 testPassword = ""
+                reviewedGuardianEvidence = []
             }
         }
         .sheet(item: $selectedQuiz) { quiz in
@@ -61,6 +72,45 @@ struct NativeHomeView: View {
         .sheet(item: $selectedMaterial) { material in
             NativeMaterialView(session: session, item: material)
         }
+        .sheet(item: $selectedStaffTicket) { ticket in
+            NativeStaffSupportView(session: session, ticket: ticket)
+        }
+        .sheet(item: $uploadSelection) { selection in
+            NativeMaterialUploadView(session: session, selection: selection)
+        }
+        .sheet(isPresented: $showSupportRequests) {
+            NativeSupportRequestView(session: session)
+        }
+        .sheet(isPresented: $showLearnerJourney) {
+            NativeLearnerJourneyView(session: session)
+        }
+        .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
+            switch result {
+            case .success(let url):
+                let baseName = url.deletingPathExtension().lastPathComponent
+                    .replacingOccurrences(of: "[_-]+", with: " ", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                uploadSelection = NativeMaterialUploadSelection(
+                    url: url,
+                    suggestedTitle: String((baseName.isEmpty ? "Study material" : baseName).prefix(200))
+                )
+            case .failure:
+                materialImportError = "CABO could not open that file. Choose a supported study document and try again."
+            }
+        }
+        .alert("File not selected", isPresented: Binding(
+            get: { materialImportError != nil },
+            set: { if !$0 { materialImportError = nil } }
+        )) {
+            Button("OK", role: .cancel) { materialImportError = nil }
+        } message: {
+            Text(materialImportError ?? "")
+        }
+    }
+
+    private var materialUploadTypes: [UTType] {
+        ["pdf", "txt", "md", "csv", "docx", "pptx", "xlsx", "png", "jpg", "jpeg", "webp"]
+            .compactMap { UTType(filenameExtension: $0) }
     }
 
     private var mainScroll: some View {
@@ -79,7 +129,23 @@ struct NativeHomeView: View {
 
     private var sessionControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("CABO").font(.title.bold()).foregroundColor(clay)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("CABO")
+                        .font(.system(size: 29, weight: .bold, design: .serif))
+                        .tracking(2).foregroundColor(clay)
+                    Text("SOLUTIONS")
+                        .font(.system(size: 8, weight: .medium, design: .monospaced))
+                        .tracking(2.2).foregroundColor(gold)
+                }
+                Rectangle().fill(Color(UIColor.separator)).frame(width: 1, height: 34)
+                Text("Training &\nDevelopment Hub")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color(UIColor.label))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("CABO Solutions, Training and Development Hub")
             Text(session.status).font(.subheadline).foregroundColor(.secondary)
             if session.busy { ProgressView("Connecting…") }
             if session.role == nil {
@@ -233,11 +299,26 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
+        title("School-issued reports")
+        if session.issuedReports.isEmpty {
+            infoTile("No issued reports available", "A verified guardian can view a school's issued report after the school publishes it.", system: "doc.text.magnifyingglass")
+        }
+        ForEach(session.issuedReports) { report in
+            NativeIssuedReportCard(session: session, report: report)
+        }
     }
 
     @ViewBuilder
     private var educatorContent: some View {
         title("Teaching & learner support")
+        if session.role == "teacher" {
+            Button { showMaterialImporter = true } label: {
+                Label("Share study material", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(session.busy)
+        }
         if session.staffSchools.isEmpty {
             infoTile("No school assignments", "Your administrator can set up your assigned classes.", system: "person.crop.rectangle")
         }
@@ -255,10 +336,20 @@ struct NativeHomeView: View {
                     Text("Learning support").font(.headline).padding(.top, 8)
                     ForEach(school.support, id: \.self) { item in Text(item) }
                 }
-                if !school.tickets.isEmpty {
+                if !school.ticketSummaries.isEmpty {
                     Text("Learner help requests").font(.headline).padding(.top, 8)
-                    ForEach(school.tickets, id: \.self) { ticket in
-                        Label(ticket, systemImage: "person.crop.circle.badge.questionmark")
+                    ForEach(school.ticketSummaries) { ticket in
+                        Button { selectedStaffTicket = ticket } label: {
+                            HStack(spacing: 10) {
+                                Label(ticket.concept, systemImage: "person.crop.circle.badge.questionmark")
+                                Spacer(minLength: 8)
+                                Text(ticket.status.replacingOccurrences(of: "_", with: " "))
+                                    .font(.caption).foregroundColor(.secondary)
+                                Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -266,13 +357,72 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
-        Text("Teacher marking and support actions are being developed after device authentication tests.")
+        ForEach(session.guardianReviewWorkspaces) { workspace in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Family access review · school \(workspace.organizationId)")
+                    .font(.headline).accessibilityAddTraits(.isHeader)
+                Text("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.")
+                    .font(.footnote).foregroundColor(.secondary)
+                if workspace.reviews.isEmpty {
+                    Text("No family reviews awaiting action.")
+                        .font(.subheadline).foregroundColor(.secondary)
+                }
+                ForEach(workspace.reviews) { review in
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text("Guardian relationship \(review.id)").font(.subheadline.bold())
+                        Text("Learner \(review.learnerId) · guardian \(review.guardianId)")
+                            .font(.caption).foregroundColor(.secondary)
+                        Text("\(review.status.replacingOccurrences(of: "_", with: " ")) · school review required")
+                            .font(.caption).foregroundColor(.secondary)
+                        Toggle("I independently reviewed legal authority",
+                               isOn: Binding(
+                                get: { reviewedGuardianEvidence.contains(review.id) },
+                                set: { value in
+                                    if value { reviewedGuardianEvidence.insert(review.id) }
+                                    else { reviewedGuardianEvidence.remove(review.id) }
+                                }))
+                            .font(.footnote).disabled(session.busy)
+                        if review.status == "accepted" {
+                            Button("Verify guardian access") {
+                                Task { await session.reviewGuardianRelationship(
+                                    organizationId: workspace.organizationId, relationshipId: review.id,
+                                    decision: "verified", evidenceReviewed: reviewedGuardianEvidence.contains(review.id)) }
+                            }
+                            .buttonStyle(.borderedProminent).disabled(session.busy || !reviewedGuardianEvidence.contains(review.id))
+                        } else if review.status == "verified" {
+                            Button("Revoke guardian access", role: .destructive) {
+                                Task { await session.reviewGuardianRelationship(
+                                    organizationId: workspace.organizationId, relationshipId: review.id,
+                                    decision: "revoked", evidenceReviewed: reviewedGuardianEvidence.contains(review.id)) }
+                            }
+                            .buttonStyle(.bordered).disabled(session.busy || !reviewedGuardianEvidence.contains(review.id))
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        ForEach(session.reportIssuanceWorkspaces) { workspace in
+            NativeReportIssuanceSection(session: session, workspace: workspace)
+        }
+        Text("Actions are limited by your server-assigned school and course permissions.")
             .font(.footnote).foregroundColor(.secondary)
     }
 
     @ViewBuilder
     private var learnerContent: some View {
         title("My learning journey")
+        Button { showLearnerJourney = true } label: {
+            Label("Manage my private learning journey", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
         ForEach(session.summary + session.journey, id: \.self) { item in
             infoTile(item, "Current CABO learning progress", system: "chart.bar")
         }
@@ -316,9 +466,22 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
+        title("School-issued reports")
+        if session.issuedReports.isEmpty {
+            infoTile("No issued reports yet", "A school-issued report appears here after the institution completes its review.", system: "doc.text.magnifyingglass")
+        }
+        ForEach(session.issuedReports) { report in
+            NativeIssuedReportCard(session: session, report: report)
+        }
         title("Study materials")
+        Button { showMaterialImporter = true } label: {
+            Label("Add material from this device", systemImage: "square.and.arrow.up")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
         if session.materials.isEmpty {
-            infoTile("No materials available", "Ask your educator or upload through the web edition.", system: "book")
+            infoTile("No materials available", "Ask your educator to share study materials with you.", system: "book")
         }
         ForEach(session.materialSummaries) { material in
             Button {
@@ -369,11 +532,34 @@ struct NativeHomeView: View {
             .accessibilityHint("Opens a CABO practice assessment to complete and submit")
         }
         title("My learning support")
+        Button { showSupportRequests = true } label: {
+            Label("Ask for help or manage drafts", systemImage: "questionmark.bubble")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
         if session.learnerHelp.isEmpty {
             infoTile("No requests yet", "You can ask your educator for additional help.", system: "person.2")
         }
-        ForEach(session.learnerHelp, id: \.self) { ticket in
-            infoTile(ticket, "My support request", system: "person.2")
+        ForEach(session.learnerHelp) { ticket in
+            Button { selectedStaffTicket = ticket } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2").foregroundColor(clay)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ticket.concept).font(.headline).foregroundColor(.primary)
+                        Text("\(ticket.status.replacingOccurrences(of: "_", with: " ")) · Request #\(ticket.id)")
+                            .font(.subheadline).foregroundColor(.secondary)
+                        if ticket.feedback != nil { Text("Your response has been recorded.").font(.footnote).foregroundColor(.secondary) }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundColor(.secondary)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(session.busy)
         }
     }
 
@@ -390,7 +576,7 @@ struct NativeHomeView: View {
     }
 
     private func title(_ value: String) -> some View {
-        Text(value).font(.title2.bold()).padding(.top, 4)
+        Text(value).font(.system(.title2, design: .serif).bold()).padding(.top, 4)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -408,3 +594,159 @@ struct NativeHomeView: View {
         .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }
+
+private struct NativeReportIssuanceSection: View {
+    @ObservedObject var session: NativeSession
+    let workspace: NativeReportIssuanceWorkspace
+    @State private var learnerId = ""
+    @State private var academicYear = Calendar.current.component(.year, from: Date())
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("School report workflow · school \(workspace.organizationId)")
+                .font(.headline).accessibilityAddTraits(.isHeader)
+            Text("Reports are snapshots of published assessments. Approval must come from a different authorised school administrator. The server checks content integrity before issue.")
+                .font(.footnote).foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Prepare a report").font(.subheadline.bold())
+                TextField("Enrolled learner account ID", text: $learnerId)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder).disabled(session.busy)
+                TextField("Academic year", value: $academicYear, format: .number)
+                    .keyboardType(.numberPad).textFieldStyle(.roundedBorder).disabled(session.busy)
+                Button("Submit report for review") {
+                    Task { await session.submitSchoolReport(organizationId: workspace.organizationId,
+                        learnerId: learnerId, academicYear: academicYear) }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(session.busy || learnerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !(2000...2200).contains(academicYear))
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+
+            if workspace.records.isEmpty {
+                Text("No report versions. Submitted school reports will appear here for independent review.")
+                    .font(.subheadline).foregroundColor(.secondary)
+            }
+            ForEach(workspace.records) { record in
+                NativeReportIssuanceRow(session: session, organizationId: workspace.organizationId, record: record)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct NativeReportIssuanceRow: View {
+    @ObservedObject var session: NativeSession
+    let organizationId: Int
+    let record: NativeReportIssuanceRecord
+    @State private var reason = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Learner \(record.learnerId)").font(.subheadline.bold())
+            Text("\(record.academicYear) · version \(record.version) · \(record.status.replacingOccurrences(of: "_", with: " "))")
+                .font(.caption).foregroundColor(.secondary)
+            Text("SHA-256 \(String(record.contentHash.prefix(24)))…")
+                .font(.caption.monospaced()).foregroundColor(.secondary).textSelection(.enabled)
+            if record.reviewedBy != nil {
+                Label("Independent reviewer recorded", systemImage: "person.2")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            if ["submitted", "issued"].contains(record.status) {
+                TextField("Reason for rejection or revocation", text: $reason)
+                    .textFieldStyle(.roundedBorder).disabled(session.busy)
+            }
+            HStack {
+                switch record.status {
+                case "submitted":
+                    Button("Reject", role: .destructive) { decide("reject") }
+                        .buttonStyle(.bordered).disabled(session.busy || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Approve") { decide("approve") }
+                        .buttonStyle(.borderedProminent).disabled(session.busy)
+                case "approved":
+                    Button("Issue report") { decide("issue") }
+                        .buttonStyle(.borderedProminent).disabled(session.busy)
+                case "issued":
+                    Button("Revoke", role: .destructive) { decide("revoke") }
+                        .buttonStyle(.bordered).disabled(session.busy || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                default:
+                    EmptyView()
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func decide(_ action: String) {
+        Task {
+            await session.decideSchoolReport(organizationId: organizationId, reportId: record.id,
+                                             action: action, reason: reason)
+        }
+    }
+}
+
+private struct NativeIssuedReportCard: View {
+    @ObservedObject var session: NativeSession
+    let report: NativeIssuedSchoolReport
+
+    private var integrityMessage: String? {
+        guard let check = session.issuedReportIntegrity[report.key] else { return nil }
+        if check.hashValid == nil { return "Legacy digest · stored content cannot be verified." }
+        if check.hashValid == false { return "Warning · report content hash mismatch." }
+        if check.signatureValid { return "Signature verified. Issuer accreditation is not asserted." }
+        if check.cryptographicallySigned { return "Signature present but not trusted or not valid." }
+        return "Content integrity checked. No cryptographic signature configured."
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let learnerName = report.learnerName?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !learnerName.isEmpty {
+                Text("\(learnerName)'s report")
+                    .font(.headline)
+            }
+            Text("Grade \(report.snapshot.grade) · \(report.academicYear)")
+                .font(.title3.bold()).accessibilityAddTraits(.isHeader)
+            if let average = report.snapshot.average {
+                Text("Published average · \(average.formatted())%")
+                    .font(.headline)
+            }
+            ForEach(report.snapshot.subjects) { subject in
+                HStack {
+                    Text(subject.name)
+                    Spacer(minLength: 8)
+                    Text("\(subject.percentage.formatted())%")
+                        .fontWeight(.semibold).monospacedDigit()
+                }
+                .font(.subheadline)
+            }
+            if let attendanceRate = report.snapshot.attendance.rate {
+                Text("Attendance · \(attendanceRate)% · \(report.snapshot.attendance.presentDays) of \(report.snapshot.attendance.recordedDays) days")
+                    .font(.subheadline)
+            }
+            Text("School-issued pilot record · not a digitally signed or accredited certificate.")
+                .font(.footnote).foregroundColor(.secondary)
+            Text("SHA-256 \(report.contentHash)")
+                .font(.caption.monospaced()).foregroundColor(.secondary).textSelection(.enabled)
+            Button(session.issuedReportIntegrity[report.key] == nil ? "Check report integrity" : "Check integrity again") {
+                Task { await session.verifyIssuedReport(report) }
+            }
+            .buttonStyle(.bordered).disabled(session.busy)
+            if let integrityMessage {
+                Text(integrityMessage)
+                    .font(.footnote)
+                    .foregroundColor(session.issuedReportIntegrity[report.key]?.hashValid == false ? .red : .secondary)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+

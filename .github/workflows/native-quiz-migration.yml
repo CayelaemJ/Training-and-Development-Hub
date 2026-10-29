@@ -32,7 +32,7 @@ jobs:
       PGDATABASE: cabo_test
       PGPASSWORD: test-only-local-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Create an isolated OLD quiz_attempts shape
         run: |
           psql -v ON_ERROR_STOP=1 <<'SQL'
