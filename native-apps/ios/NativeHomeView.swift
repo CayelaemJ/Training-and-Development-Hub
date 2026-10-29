@@ -9,6 +9,8 @@ struct NativeHomeView: View {
     @State private var testPassword = ""
     @State private var selectedQuiz: NativeQuizSummary?
     @State private var selectedMaterial: NativeMaterialSummary?
+    @State private var selectedStaffTicket: NativeStaffSupportTicket?
+    @State private var showSupportRequests = false
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
@@ -56,6 +58,7 @@ struct NativeHomeView: View {
             if current == nil {
                 selectedQuiz = nil
                 selectedMaterial = nil
+                selectedStaffTicket = nil
                 testPassword = ""
             }
         }
@@ -65,8 +68,14 @@ struct NativeHomeView: View {
         .sheet(item: $selectedMaterial) { material in
             NativeMaterialView(session: session, item: material)
         }
+        .sheet(item: $selectedStaffTicket) { ticket in
+            NativeStaffSupportView(session: session, ticket: ticket)
+        }
         .sheet(item: $uploadSelection) { selection in
             NativeMaterialUploadView(session: session, selection: selection)
+        }
+        .sheet(isPresented: $showSupportRequests) {
+            NativeSupportRequestView(session: session)
         }
         .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
             switch result {
@@ -297,10 +306,20 @@ struct NativeHomeView: View {
                     Text("Learning support").font(.headline).padding(.top, 8)
                     ForEach(school.support, id: \.self) { item in Text(item) }
                 }
-                if !school.tickets.isEmpty {
+                if !school.ticketSummaries.isEmpty {
                     Text("Learner help requests").font(.headline).padding(.top, 8)
-                    ForEach(school.tickets, id: \.self) { ticket in
-                        Label(ticket, systemImage: "person.crop.circle.badge.questionmark")
+                    ForEach(school.ticketSummaries) { ticket in
+                        Button { selectedStaffTicket = ticket } label: {
+                            HStack(spacing: 10) {
+                                Label(ticket.concept, systemImage: "person.crop.circle.badge.questionmark")
+                                Spacer(minLength: 8)
+                                Text(ticket.status.replacingOccurrences(of: "_", with: " "))
+                                    .font(.caption).foregroundColor(.secondary)
+                                Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -308,7 +327,7 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
-        Text("Teacher marking and support actions are being developed after device authentication tests.")
+        Text("Actions are limited by your server-assigned school and course permissions.")
             .font(.footnote).foregroundColor(.secondary)
     }
 
@@ -417,6 +436,12 @@ struct NativeHomeView: View {
             .accessibilityHint("Opens a CABO practice assessment to complete and submit")
         }
         title("My learning support")
+        Button { showSupportRequests = true } label: {
+            Label("Ask for help or manage drafts", systemImage: "questionmark.bubble")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
         if session.learnerHelp.isEmpty {
             infoTile("No requests yet", "You can ask your educator for additional help.", system: "person.2")
         }
