@@ -3,6 +3,7 @@ package za.co.cabosolutions.learninghub
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -13,6 +14,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -148,9 +153,11 @@ internal fun NativeSupportDraftScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun NativeSupportTicketScreen(
     ticket: SupportTicket?,
+    canManageSupport: Boolean,
     reply: String,
     onReply: (String) -> Unit,
     triageReason: String,
@@ -162,8 +169,26 @@ internal fun NativeSupportTicketScreen(
     useGuidance: () -> Unit,
     sendReply: () -> Unit,
     triage: () -> Unit,
+    assign: (String) -> Unit,
+    schedulePractice: (String, String) -> Unit,
     close: () -> Unit
 ) {
+    var selectedEducator by remember(ticket?.summary?.assignedTo) { mutableStateOf(ticket?.summary?.assignedTo.orEmpty()) }
+    var practice by remember { mutableStateOf("") }
+    var chooseReviewDate by remember { mutableStateOf(false) }
+    var selectedReviewDate by remember {
+        mutableStateOf(java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 1); set(java.util.Calendar.HOUR_OF_DAY, 13); set(java.util.Calendar.MINUTE, 0)
+        }.timeInMillis)
+    }
+    val reviewDatePicker = rememberDatePickerState(initialSelectedDateMillis = selectedReviewDate)
+    if (chooseReviewDate) {
+        DatePickerDialog(
+            onDismissRequest = { chooseReviewDate = false },
+            confirmButton = { TextButton(onClick = { reviewDatePicker.selectedDateMillis?.let { selectedReviewDate = it }; chooseReviewDate = false }) { Text("Choose date") } },
+            dismissButton = { TextButton(onClick = { chooseReviewDate = false }) { Text("Cancel") } }
+        ) { DatePicker(state = reviewDatePicker) }
+    }
     Scaffold(topBar = {
         Surface(color = MaterialTheme.colorScheme.primaryContainer) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -193,7 +218,7 @@ internal fun NativeSupportTicketScreen(
                     Text(ticket.attempted)
                 }
             }
-            if (ticket.summary.status == "open") {
+            if (ticket.summary.status == "open" && canManageSupport) {
                 OutlinedTextField(
                     value = triageReason,
                     onValueChange = onTriageReason,
@@ -205,21 +230,53 @@ internal fun NativeSupportTicketScreen(
                 Button(onClick = triage, enabled = !busy && triageReason.trim().length >= 3,
                     modifier = Modifier.heightIn(min = 48.dp)) { Text("Mark as triaged") }
             }
-            Text("Reply to learner", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                value = reply,
-                onValueChange = onReply,
-                label = { Text("Write a response") },
-                supportingText = { Text("Review and edit any suggested text before sending.") },
-                modifier = Modifier.fillMaxWidth(), enabled = !busy,
-                minLines = 4, maxLines = 10
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = requestGuidance, enabled = !busy,
-                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Draft learning guidance") }
-                Button(onClick = sendReply,
-                    enabled = !busy && reply.trim().length in 2..4000,
-                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Send reply") }
+            if (ticket.summary.status !in listOf("resolved", "closed") && canManageSupport) {
+                Text("Assignment and practice", style = MaterialTheme.typography.titleMedium)
+                if (ticket.educators.isNotEmpty()) {
+                    Box {
+                        var expanded by remember { mutableStateOf(false) }
+                        OutlinedButton(onClick = { expanded = true }, enabled = !busy) {
+                            Text(ticket.educators.firstOrNull { it.id == selectedEducator }?.name ?: "Choose an authorised educator")
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            ticket.educators.forEach { educator ->
+                                DropdownMenuItem(text = { Text(educator.name) }, onClick = { selectedEducator = educator.id; expanded = false })
+                            }
+                        }
+                    }
+                    Button(onClick = { assign(selectedEducator) }, enabled = !busy && selectedEducator.isNotBlank() && selectedEducator != ticket.summary.assignedTo,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Assign authorised educator") }
+                }
+                OutlinedTextField(value = practice, onValueChange = { practice = it.take(4000) },
+                    label = { Text("Practice activity") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 2, maxLines = 5)
+                OutlinedButton(onClick = { chooseReviewDate = true }, enabled = !busy) {
+                    Text("Review checkpoint: ${java.text.SimpleDateFormat("EEE, d MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(selectedReviewDate))}")
+                }
+                Button(onClick = {
+                    val reviewAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date(selectedReviewDate + 12 * 60 * 60 * 1000L))
+                    schedulePractice(practice, reviewAt)
+                }, enabled = !busy && practice.trim().length >= 5,
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Assign practice and checkpoint") }
+            }
+            if (canManageSupport) {
+                Text("Reply to learner", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = reply,
+                    onValueChange = onReply,
+                    label = { Text("Write a response") },
+                    supportingText = { Text("Review and edit any suggested text before sending.") },
+                    modifier = Modifier.fillMaxWidth(), enabled = !busy,
+                    minLines = 4, maxLines = 10
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = requestGuidance, enabled = !busy,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Draft learning guidance") }
+                    Button(onClick = sendReply,
+                        enabled = !busy && reply.trim().length in 2..4000,
+                        modifier = Modifier.heightIn(min = 48.dp)) { Text("Send reply") }
+                }
             }
             guidance?.let { draft ->
                 ElevatedCard(Modifier.fillMaxWidth()) {

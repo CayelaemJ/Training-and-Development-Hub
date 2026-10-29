@@ -5,6 +5,7 @@ import * as oidc from 'openid-client';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import {configuredPrincipals} from '../lib/testPrincipals';
 import { oidcRequestOrigin, safeReturnPath } from '../lib/originPolicy';
+import { trustedMfaFromOidcClaims } from '../lib/mfaAssurance';
 
 import {
   clearSession,
@@ -198,6 +199,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
     expires_at: tokens.expiresIn() ? now + tokens.expiresIn()! : claims.exp,
+    trusted_mfa: trustedMfaFromOidcClaims(claims as unknown as Record<string, unknown>, now),
   };
 
   const sid = await createSession(sessionData);

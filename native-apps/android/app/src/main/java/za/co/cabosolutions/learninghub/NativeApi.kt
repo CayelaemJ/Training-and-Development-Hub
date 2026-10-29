@@ -79,13 +79,17 @@ internal data class SupportTicketSummary(
     val concept: String,
     val status: String,
     val version: Int,
-    val updatedAt: String
+    val updatedAt: String,
+    val assignedTo: String? = null,
+    val reviewAt: String? = null
 )
+internal data class SupportEducator(val id: String, val name: String)
 internal data class SupportTicket(
     val summary: SupportTicketSummary,
     val question: String,
     val attempted: String,
-    val history: List<SupportTicketEvent>
+    val history: List<SupportTicketEvent>,
+    val educators: List<SupportEducator> = emptyList()
 )
 internal data class SupportTicketEvent(val kind: String, val body: String, val createdAt: String)
 internal data class SupportGuidanceDraft(
@@ -718,9 +722,19 @@ internal class NativeApi(private val context: Context) {
             val canonical = summary.copy(
                 status = ticket.optString("status", summary.status).take(32),
                 version = ticket.optInt("version", summary.version).coerceAtLeast(1),
-                updatedAt = ticket.optString("updatedAt", summary.updatedAt)
+                updatedAt = ticket.optString("updatedAt", summary.updatedAt),
+                assignedTo = ticket.optString("assignedTo").takeIf { it.isNotBlank() && it != "null" },
+                reviewAt = ticket.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" }
             )
             val events = json.optJSONArray("history") ?: JSONArray()
+            val educatorsJson = json.optJSONArray("educators") ?: JSONArray()
+            val educators = (0 until minOf(educatorsJson.length(), 100)).mapNotNull { i ->
+                educatorsJson.optJSONObject(i)?.let { row ->
+                    val id = row.optString("id"); val name = listOf(row.optString("firstName"), row.optString("lastName"))
+                        .filter { it.isNotBlank() && it != "null" }.joinToString(" ")
+                    if (id.isBlank() || id == "null") null else SupportEducator(id, name.ifBlank { "School educator" })
+                }
+            }
             val history = (0 until minOf(events.length(), 500)).mapNotNull { index ->
                 events.optJSONObject(index)?.let { event ->
                     val body = event.optString("body").take(4000)
@@ -735,8 +749,28 @@ internal class NativeApi(private val context: Context) {
                 summary = canonical,
                 question = ticket.optString("question").take(4000),
                 attempted = ticket.optString("attempted").take(2000),
-                history = history
+                history = history, educators = educators
             )
+        }
+
+    suspend fun assignSupportTicket(ticket: SupportTicket, staffId: String): SupportTicketSummary =
+        sendSupportAction(ticket.summary, JSONObject().put("kind", "assign").put("staffId", staffId))
+
+    suspend fun scheduleSupportPractice(ticket: SupportTicket, body: String, reviewAt: String): SupportTicketSummary {
+        require(body.trim().length in 5..4000 && reviewAt.length in 20..40)
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "practice")
+            .put("body", body.trim()).put("reviewAt", reviewAt))
+    }
+
+    private suspend fun sendSupportAction(summary: SupportTicketSummary, action: JSONObject): SupportTicketSummary =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val response = request("/api/organizations/${summary.organizationId}/support/${summary.id}/actions",
+                JSONObject().put("version", summary.version).put("action", action), auth = true)
+            require(response.optInt("id") == summary.id && response.optInt("version") == summary.version + 1)
+            summary.copy(status = response.optString("status", summary.status).take(32),
+                version = response.optInt("version"), updatedAt = response.optString("updatedAt", summary.updatedAt),
+                assignedTo = response.optString("assignedTo").takeIf { it.isNotBlank() && it != "null" },
+                reviewAt = response.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" })
         }
 
     suspend fun requestSupportGuidance(summary: SupportTicketSummary): SupportGuidanceDraft =
