@@ -199,6 +199,7 @@ internal data class NativeLearning(
     val writtenExams: List<WrittenExam> = emptyList(),
     val writtenAssignments: List<WrittenExamAssignment> = emptyList(),
     val examManagementWorkspaces: List<ExamManagementWorkspace> = emptyList(),
+    val canManageExamAssignments: Boolean = false,
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
     val learnerReportNotice: String = "",
@@ -548,6 +549,14 @@ internal class NativeApi(private val context: Context) {
         ), learnerName?.take(160))
     }
 
+    private fun hasManagerOrganizationMembership(): Boolean = try {
+        val rows = getArray("/api/organizations")
+        (0 until minOf(rows.length(), 100)).any { i ->
+            val row = rows.optJSONObject(i)
+            row?.optString("role") in setOf("owner", "admin")
+        }
+    } catch (_: Exception) { false }
+
     private fun loadAssessmentWorkspaces(): List<AssessmentWorkspace> {
         val memberships = try { getArray("/api/organizations") } catch (error: Exception) {
             if (!hasSession()) throw error
@@ -840,6 +849,7 @@ internal class NativeApi(private val context: Context) {
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
                 guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance,
+                canManageExamAssignments = hasManagerOrganizationMembership(),
                 schoolOperations = loadSchoolOperations(),
                 assessmentWorkspaces = loadAssessmentWorkspaces()
             )
@@ -1021,7 +1031,8 @@ internal class NativeApi(private val context: Context) {
             learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries, writtenExams = writtenExams, writtenAssignments = writtenAssignments, examManagementWorkspaces = examManagementWorkspaces,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports,
-            schoolOperations = loadSchoolOperations())
+            schoolOperations = loadSchoolOperations(),
+            canManageExamAssignments = hasManagerOrganizationMembership())
     }
 
     suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
