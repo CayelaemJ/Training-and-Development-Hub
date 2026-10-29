@@ -24,9 +24,8 @@ jobs:
           name: Verify Cloudflare Django packaging (no deployment)
           command: |
             cd services/cloudflare-django-worker
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.local/bin:$PATH"
-            uvx --from workers-py pywrangler sync
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            uvx --from workers-py==1.17.9 pywrangler sync
             npx --yes wrangler@4.151.3 deploy --dry-run --outdir /tmp/cabo-django-worker-bundle
 
 
@@ -60,9 +59,8 @@ jobs:
             PY
             trap 'rm -f /tmp/cabo-django-ci-secrets.json' EXIT
             cd services/cloudflare-django-worker
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.local/bin:$PATH"
-            uvx --from workers-py pywrangler deploy --secrets-file /tmp/cabo-django-ci-secrets.json
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            uvx --from workers-py==1.17.9 pywrangler deploy --secrets-file /tmp/cabo-django-ci-secrets.json
       - run:
           name: Smoke-test live Cloudflare staging (only synthetic metrics)
           command: node scripts/test-django-worker-staging.mjs
