@@ -239,12 +239,13 @@ class MainActivity : ComponentActivity() {
                         message = learnerPassportMessage,
                         refresh = { loadLearnerPassport() },
                         share = {
-                            val data = learnerPassport ?: return@NativeLearnerPassportScreen
-                            val send = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/json"
-                                putExtra(Intent.EXTRA_TEXT, data.json)
+                            learnerPassport?.let { passport ->
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/json"
+                                    putExtra(Intent.EXTRA_TEXT, passport.json)
+                                }
+                                startActivity(Intent.createChooser(send, "Export learner passport"))
                             }
-                            startActivity(Intent.createChooser(send, "Export learner passport"))
                         },
                         close = { closeLearnerPassport() }
                     )
@@ -1236,7 +1237,8 @@ internal fun NativeHome(
     deleteSupportDraft: (NativeSupportDraft) -> Unit = {},
     offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
     offlineSupportCourses: List<SupportCourseOption> = emptyList(),
-    learnerJourneyAction: (LearnerJourneyAction) -> Unit = {}
+    learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
+    openLearnerPassport: () -> Unit = {}
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -2000,6 +2002,12 @@ private fun RoleContent(
                     item { Text("Your progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     data.journey.forEach { milestone -> item { NativeCard(milestone, "Learning journey") } }
                     item { LearnerJourneyPanel(data, busy, learnerJourneyAction) }
+                    item {
+                        OutlinedButton(onClick = openLearnerPassport, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Open my learner passport")
+                        }
+                    }
                     item {
                         OutlinedButton(onClick = openLearnerPassport, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
