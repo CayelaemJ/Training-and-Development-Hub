@@ -885,7 +885,7 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
-        val examManagementWorkspaces = if (role in setOf("owner", "admin", "superadmin")) loadExamManagementWorkspaces() else emptyList()
+        val examManagementWorkspaces = emptyList<ExamManagementWorkspace>()
         val writtenAssignments = if (role != "learner") emptyList() else try {
             getArray("/api/my-assignments").let { arr ->
                 (0 until arr.length()).mapNotNull { i ->
@@ -1314,6 +1314,9 @@ internal class NativeApi(private val context: Context) {
             questions.all { it.prompt.isNotBlank() && it.maxMarks in 1..25 }) { "Invalid written exam" }
         return WrittenExam(id, row.getString("title"), row.optString("difficulty", "intermediate"), questions)
     }
+
+    suspend fun fetchExamManagementWorkspaces(): List<ExamManagementWorkspace> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { loadExamManagementWorkspaces() }
 
     private suspend fun loadExamManagementWorkspaces(): List<ExamManagementWorkspace> {
         val memberships = try { getArray("/api/organizations") } catch (_: Exception) { return emptyList() }
