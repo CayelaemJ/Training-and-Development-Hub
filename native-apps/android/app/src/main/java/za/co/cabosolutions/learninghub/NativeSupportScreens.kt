@@ -173,10 +173,19 @@ internal fun NativeSupportTicketScreen(
     schedulePractice: (String, String) -> Unit,
     close: () -> Unit,
     isLearnerOwner: Boolean = false,
-    submitFeedback: (String) -> Unit = {}
+    submitFeedback: (String) -> Unit = {},
+    transition: (String, String) -> Unit = { _, _ -> },
+    recordOutcome: (Int, Int, String) -> Unit = { _, _, _ -> },
+    reviewLearningDna: (String, String) -> Unit = { _, _ -> }
 ) {
     var selectedEducator by remember(ticket?.summary?.assignedTo) { mutableStateOf(ticket?.summary?.assignedTo.orEmpty()) }
     var practice by remember { mutableStateOf("") }
+    var statusReason by remember { mutableStateOf("") }
+    var comparisonReason by remember { mutableStateOf("") }
+    var dnaNote by remember { mutableStateOf("") }
+    var dnaState by remember { mutableStateOf("needs_practice") }
+    var baselineId by remember(ticket?.summary?.id) { mutableStateOf<Int?>(null) }
+    var followupId by remember(ticket?.summary?.id) { mutableStateOf<Int?>(null) }
     var chooseReviewDate by remember { mutableStateOf(false) }
     var selectedReviewDate by remember {
         mutableStateOf(java.util.Calendar.getInstance().apply {
@@ -210,6 +219,16 @@ internal fun NativeSupportTicketScreen(
             }
             Text(ticket.summary.concept, style = MaterialTheme.typography.headlineSmall)
             Text("Status: ${ticket.summary.status.replace('_', ' ')}")
+            ticket.outcome?.let { outcome ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Published learning evidence", style = MaterialTheme.typography.titleMedium)
+                        Text("${outcome.baseline.formatOneDecimal()}% → ${outcome.followup.formatOneDecimal()}% · ${outcome.improvementPp.formatOneDecimal()} percentage points")
+                        outcome.comparisonReason?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        Text("An educator reviewed comparable published assessments. Progress is observed, not proof of cause.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             if (isLearnerOwner) {
                 Text("Your school support request", style = MaterialTheme.typography.bodyMedium)
                 if (ticket.summary.feedback == null && ticket.summary.status !in listOf("resolved", "closed")) {
@@ -234,18 +253,6 @@ internal fun NativeSupportTicketScreen(
                     Text("What they tried", style = MaterialTheme.typography.titleMedium)
                     Text(ticket.attempted)
                 }
-            }
-            if (ticket.summary.status == "open" && canManageSupport) {
-                OutlinedTextField(
-                    value = triageReason,
-                    onValueChange = onTriageReason,
-                    label = { Text("Triage note") },
-                    supportingText = { Text("This is added to the request history.") },
-                    modifier = Modifier.fillMaxWidth(), enabled = !busy,
-                    minLines = 2, maxLines = 4
-                )
-                Button(onClick = triage, enabled = !busy && triageReason.trim().length >= 3,
-                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Mark as triaged") }
             }
             if (ticket.summary.status !in listOf("resolved", "closed") && canManageSupport) {
                 Text("Assignment and practice", style = MaterialTheme.typography.titleMedium)
@@ -278,6 +285,35 @@ internal fun NativeSupportTicketScreen(
                     modifier = Modifier.heightIn(min = 48.dp)) { Text("Assign practice and checkpoint") }
             }
             if (canManageSupport) {
+                val statusTargets = when (ticket.summary.status) {
+                    "triaged" -> listOf("assigned")
+                    "assigned" -> listOf("in_progress", "triaged")
+                    "in_progress" -> listOf("awaiting_learner", "follow_up_required", "triaged")
+                    "awaiting_learner" -> listOf("in_progress", "follow_up_required")
+                    "follow_up_required" -> listOf("in_progress", "resolved")
+                    "resolved" -> listOf("closed", "in_progress")
+                    "closed" -> listOf("in_progress")
+                    else -> emptyList()
+                }
+                if (ticket.summary.status == "open" || statusTargets.isNotEmpty()) {
+                    Text("Support status", style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(value = statusReason, onValueChange = { statusReason = it.take(1000) },
+                        label = { Text("Why is this changing?") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 2, maxLines = 4)
+                    if (ticket.summary.status == "open") {
+                        Button(onClick = { transition("triaged", statusReason) }, enabled = !busy && statusReason.trim().length >= 3,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Mark as triaged") }
+                    } else statusTargets.forEach { target ->
+                        val evidenceReady = target != "resolved" || ticket.outcome != null
+                        val learnerAcknowledged = target != "closed" || ticket.summary.feedback == "helpful"
+                        val assignmentReady = target != "assigned" || ticket.summary.assignedTo != null
+                        val checkpointReady = target != "follow_up_required" || ticket.summary.reviewAt != null
+                        OutlinedButton(onClick = { transition(target, statusReason) },
+                            enabled = !busy && statusReason.trim().length >= 3 && evidenceReady && learnerAcknowledged && assignmentReady && checkpointReady,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Move to ${target.replace('_', ' ')}")
+                        }
+                    }
+                }
                 Text("Reply to learner", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = reply,
@@ -293,6 +329,43 @@ internal fun NativeSupportTicketScreen(
                     Button(onClick = sendReply,
                         enabled = !busy && reply.trim().length in 2..4000,
                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Send reply") }
+                }
+                if (ticket.summary.status == "follow_up_required" && ticket.publishedResults.size >= 2) {
+                    Text("Evidence and Learning DNA", style = MaterialTheme.typography.titleMedium)
+                    NativeSupportResultPicker("Initial published result", baselineId, ticket.publishedResults) { baselineId = it }
+                    NativeSupportResultPicker("Follow-up published result", followupId, ticket.publishedResults) { followupId = it }
+                    OutlinedTextField(value = comparisonReason, onValueChange = { comparisonReason = it.take(2000) },
+                        label = { Text("Why are these results comparable?") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 3, maxLines = 6)
+                    Button(onClick = { baselineId?.let { before -> followupId?.let { after -> recordOutcome(before, after, comparisonReason) } } },
+                        enabled = !busy && baselineId != null && followupId != null && baselineId != followupId && comparisonReason.trim().length >= 20,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Record comparable evidence") }
+                    var dnaExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { dnaExpanded = true }, enabled = !busy) { Text("Learning DNA · ${dnaState.replace('_', ' ')}") }
+                        DropdownMenu(expanded = dnaExpanded, onDismissRequest = { dnaExpanded = false }) {
+                            listOf("needs_practice", "demonstrated", "not_attempted").forEach { state ->
+                                DropdownMenuItem(text = { Text(state.replace('_', ' ')) }, onClick = { dnaState = state; dnaExpanded = false })
+                            }
+                        }
+                    }
+                    OutlinedTextField(value = dnaNote, onValueChange = { dnaNote = it.take(2000) },
+                        label = { Text("Educator concept review") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 3, maxLines = 6)
+                    Button(onClick = { reviewLearningDna(dnaState, dnaNote) }, enabled = !busy && dnaNote.trim().length >= 20,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Save Learning DNA review") }
+                }
+            }
+            if (isLearnerOwner) {
+                val learnerTarget = when (ticket.summary.status) {
+                    "awaiting_learner", "resolved", "closed" -> "in_progress"
+                    else -> null
+                }
+                if (learnerTarget != null) {
+                    OutlinedButton(onClick = { transition(learnerTarget, "I still need more help with this topic.") }, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("I still need more help") }
+                }
+                if (ticket.summary.status == "resolved" && ticket.summary.feedback == "helpful") {
+                    Button(onClick = { transition("closed", "I understand the support provided.") }, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Close this support request") }
                 }
             }
             guidance?.let { draft ->
@@ -315,6 +388,7 @@ internal fun NativeSupportTicketScreen(
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(event.kind.replace('_', ' '), style = MaterialTheme.typography.labelLarge)
+                        event.state?.let { Text("Learning DNA · ${it.replace('_', ' ')}", style = MaterialTheme.typography.bodySmall) }
                         Text(event.body)
                         if (event.createdAt.isNotBlank())
                             Text(event.createdAt, style = MaterialTheme.typography.bodySmall)
@@ -324,3 +398,30 @@ internal fun NativeSupportTicketScreen(
         }
     }
 }
+
+@Composable
+private fun NativeSupportResultPicker(
+    label: String,
+    selectedId: Int?,
+    results: List<SupportPublishedResult>,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by remember(label, selectedId) { mutableStateOf(false) }
+    val selected = results.firstOrNull { it.id == selectedId }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text(selected?.let { "$label · ${it.title} · ${it.marks}/${it.maxMarks}" } ?: label)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            results.forEach { result ->
+                DropdownMenuItem(
+                    text = { Text("${result.title} · ${result.marks}/${result.maxMarks}") },
+                    onClick = { onSelect(result.id); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+private fun Double.formatOneDecimal(): String =
+    String.format(java.util.Locale.getDefault(), "%.1f", this)

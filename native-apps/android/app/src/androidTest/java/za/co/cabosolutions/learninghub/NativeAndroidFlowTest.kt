@@ -144,7 +144,8 @@ class NativeAndroidSupportTest {
                     triage = { triageCount++ },
                     assign = {},
                     schedulePractice = { _, _ -> },
-                    close = {}
+                    close = {},
+                    transition = { status, _ -> if (status == "triaged") triageCount++ }
                 )
             }
         }
@@ -152,7 +153,8 @@ class NativeAndroidSupportTest {
         compose.onNodeWithText("Fractions").assertIsDisplayed()
         compose.onNodeWithText("How do I add unlike fractions?").assertIsDisplayed()
         compose.onNodeWithText("Send reply").assertIsNotEnabled()
-        compose.onNodeWithText("Mark as triaged").assertIsEnabled().performClick()
+        compose.onNodeWithText("Why is this changing?").performScrollTo().performTextInput("Reviewed by the assigned educator.")
+        compose.onNodeWithText("Mark as triaged").performScrollTo().assertIsEnabled().performClick()
         compose.onNodeWithText("Write a response").performScrollTo().performTextInput("Find a common denominator first.")
         compose.onNodeWithText("Send reply").performScrollTo().assertIsEnabled().performClick()
 
@@ -235,6 +237,54 @@ class NativeAndroidSupportTest {
 
         compose.onNodeWithText("I understood the help").performScrollTo().performClick()
         assertEquals("helpful", feedback)
+    }
+
+    @Test
+    fun educatorCanChoosePublishedResultsAndSaveSupportOutcome() {
+        var recorded: Triple<Int, Int, String>? = null
+        val ticket = SupportTicket(
+            SupportTicketSummary(3, 19, "Fractions", "follow_up_required", 4, ""),
+            "How do I add unlike fractions?", "I added the denominators.", emptyList(),
+            publishedResults = listOf(
+                SupportPublishedResult(101, "Baseline checkpoint", 4.0, 10.0, "2026-01-10"),
+                SupportPublishedResult(102, "Follow-up checkpoint", 8.0, 10.0, "2026-02-10")
+            )
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeSupportTicketScreen(
+                    ticket = ticket,
+                    canManageSupport = true,
+                    reply = "",
+                    onReply = {},
+                    triageReason = "",
+                    onTriageReason = {},
+                    guidance = null,
+                    busy = false,
+                    message = null,
+                    requestGuidance = {},
+                    useGuidance = {},
+                    sendReply = {},
+                    triage = {},
+                    assign = {},
+                    schedulePractice = { _, _ -> },
+                    close = {},
+                    recordOutcome = { before, after, reason -> recorded = Triple(before, after, reason) }
+                )
+            }
+        }
+
+        compose.onNodeWithText("Initial published result").performScrollTo().performClick()
+        compose.onNodeWithText("Baseline checkpoint · 4.0/10.0").performClick()
+        compose.onNodeWithText("Follow-up published result").performScrollTo().performClick()
+        compose.onNodeWithText("Follow-up checkpoint · 8.0/10.0").performClick()
+        compose.onNodeWithText("Why are these results comparable?").performScrollTo()
+            .performTextInput("Both assessments cover adding unlike fractions.")
+        compose.onNodeWithText("Record comparable evidence").performScrollTo().assertIsEnabled().performClick()
+
+        assertEquals(101, recorded?.first)
+        assertEquals(102, recorded?.second)
+        assertEquals("Both assessments cover adding unlike fractions.", recorded?.third)
     }
 
     @Test
