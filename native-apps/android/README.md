@@ -8,6 +8,8 @@ This is the native Kotlin and Jetpack Compose app. Open this folder as the proje
 
 The normal build opens secure browser-based sign-in and points to the configured CABO API. Demo mode and test-login controls are compiled out of this build.
 
+Signed-in learners can open the private Learner Passport from **Progress**. It loads only on request from the authenticated learner-passport API and offers an explicit JSON share action. When the server feature is disabled or unavailable, the app shows a retryable message. Synthetic demo records are never exported.
+
 The API origin is a build-time setting (`-PcaboApiOrigin=...`), not embedded in app screens. Render remains the current default/test host while the Cloudflare migration is in progress. Once the Cloudflare API endpoint is ready, build against its HTTPS origin; do not point native builds at the web UI or add a WebView wrapper.
 
 ## CABO role demo
