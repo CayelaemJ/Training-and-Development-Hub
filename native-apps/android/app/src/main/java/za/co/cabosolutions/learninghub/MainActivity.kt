@@ -198,6 +198,9 @@ class MainActivity : ComponentActivity() {
                         signInTest = { startTestSignIn() },
                         signOut = { signOut() },
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
+                        setNotificationPreference = { org, kind, enabled, acknowledged ->
+                            setNotificationPreference(org, kind, enabled, acknowledged)
+                        },
                         reviewGuardian = { organizationId, relationshipId, decision ->
                             reviewGuardianRelationship(organizationId, relationshipId, decision)
                         },
@@ -432,6 +435,38 @@ class MainActivity : ComponentActivity() {
                 status = "Could not update this guardian relationship. Refresh and check the school review requirements."
             } finally { busy = false }
             if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun setNotificationPreference(organizationId: Int, kind: String, enabled: Boolean, acknowledged: Boolean) {
+        if (busy || screen?.portal?.role != "parent") return
+        if (demoActive) {
+            if (enabled && !acknowledged) return
+            screen = screen?.let { current ->
+                current.copy(notificationPreferences = current.notificationPreferences.copy(
+                    schools = current.notificationPreferences.schools.map { school ->
+                        if (school.id != organizationId) school else school.copy(choices = school.choices.map { choice ->
+                            if (choice.kind == kind) choice.copy(enabled = enabled) else choice
+                        })
+                    }
+                ))
+            }
+            status = if (enabled) "Demo email preference saved on this device only."
+                else "Demo email preference turned off on this device only."
+            return
+        }
+        busy = true
+        lifecycleScope.launch {
+            try {
+                api.setNotificationPreference(organizationId, kind, enabled, acknowledged)
+                status = if (enabled) "Email preference confirmed." else "Email preference turned off."
+                busy = false
+                loadDashboard()
+            } catch (_: Exception) {
+                status = if (enabled) "Could not enable this preference. Verified sign-in and explicit consent are required."
+                    else "Could not turn this preference off. Check your connection and retry."
+                busy = false
+            }
         }
     }
 
@@ -1044,6 +1079,7 @@ internal fun NativeHome(
     signInTest: () -> Unit,
     signOut: () -> Unit,
     respondToInvite: (Int, Boolean) -> Unit,
+    setNotificationPreference: (Int, String, Boolean, Boolean) -> Unit = { _, _, _, _ -> },
     reviewGuardian: (Int, Int, String) -> Unit = { _, _, _ -> },
     submitSchoolReport: (Int, String, Int) -> Unit = { _, _, _ -> },
     decideSchoolReport: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
@@ -1239,6 +1275,7 @@ internal fun NativeHome(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
+                                setNotificationPreference = setNotificationPreference,
                                 reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
                                 decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
                                 publishSchoolNotice = publishSchoolNotice, recordSchoolAttendance = recordSchoolAttendance,
@@ -1256,6 +1293,7 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive,
                             respondToInvite = respondToInvite,
+                            setNotificationPreference = setNotificationPreference,
                             reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
                             decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
                                 publishSchoolNotice = publishSchoolNotice, recordSchoolAttendance = recordSchoolAttendance,
@@ -1507,6 +1545,86 @@ private fun SchoolOperationsCard(
 }
 
 @Composable
+internal fun NotificationPreferencesCard(
+    preferences: NotificationPreferences,
+    busy: Boolean,
+    update: (Int, String, Boolean, Boolean) -> Unit
+) {
+    var pending by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    var acknowledged by remember { mutableStateOf(false) }
+    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFEFA))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Email preferences", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Optional email updates about verified family access and assigned learner support. You can turn these off at any time.",
+                style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+            if (!preferences.enabled) {
+                Text("Preference controls are currently unavailable. You will not receive these optional updates.",
+                    style = MaterialTheme.typography.bodyMedium)
+            } else if (preferences.schools.isEmpty()) {
+                Text("No school email preferences are available for this account.", style = MaterialTheme.typography.bodyMedium)
+            } else preferences.schools.forEach { school ->
+                Text(school.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                school.choices.forEach { choice ->
+                    val label = when (choice.kind) {
+                        "guardian_review_requested" -> "Family access review requests"
+                        else -> "Updates to assigned learner support"
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        Switch(
+                            checked = choice.enabled,
+                            enabled = !busy && (choice.enabled || (preferences.optInAvailable && choice.canEnable)),
+                            onCheckedChange = { enabled ->
+                                if (!enabled && choice.enabled) update(school.id, choice.kind, false, false)
+                                else if (enabled && !choice.enabled) {
+                                    acknowledged = false
+                                    pending = school.id to choice.kind
+                                }
+                            },
+                            modifier = Modifier.testTag("notification-preference-${choice.kind}")
+                        )
+                    }
+                    if (!choice.enabled && !choice.canEnable) {
+                        Text("This former school preference can only be turned off.", style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF68736B))
+                    } else if (!preferences.optInAvailable && !choice.enabled) {
+                        Text("New opt-ins are temporarily unavailable.", style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF68736B))
+                    }
+                }
+            }
+        }
+    }
+    pending?.let { (organizationId, kind) ->
+        AlertDialog(
+            onDismissRequest = { pending = null; acknowledged = false },
+            title = { Text("Confirm optional email updates") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("I agree to receive this school-related email. I understand this is optional and can be turned off at any time.")
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Checkbox(checked = acknowledged, onCheckedChange = { acknowledged = it }, enabled = !busy,
+                            modifier = Modifier.testTag("notification-consent-acknowledgement"))
+                        Text("I agree to receive these emails.")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pending = null
+                    update(organizationId, kind, true, true)
+                    acknowledged = false
+                }, enabled = acknowledged && !busy) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pending = null; acknowledged = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
 private fun TestLoginControls(
     username: String, password: String, busy: Boolean,
     onUsername: (String) -> Unit, onPassword: (String) -> Unit,
@@ -1560,6 +1678,7 @@ private fun RoleContent(
     busy: Boolean,
     demoActive: Boolean,
     respondToInvite: (Int, Boolean) -> Unit,
+    setNotificationPreference: (Int, String, Boolean, Boolean) -> Unit,
     reviewGuardian: (Int, Int, String) -> Unit,
     submitSchoolReport: (Int, String, Int) -> Unit,
     decideSchoolReport: (Int, Int, String, String) -> Unit,
@@ -1771,6 +1890,7 @@ private fun RoleContent(
                             }
                         }
                     }
+                    item { NotificationPreferencesCard(data.notificationPreferences, busy, setNotificationPreference) }
                 }
                 "teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head" -> {
                     item { Text("Learner support queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }

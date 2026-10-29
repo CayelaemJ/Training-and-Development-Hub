@@ -16,7 +16,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | Assessment question bank | — | — | Teacher / school leaders | Admin | Android and iOS support institution-scoped, attributed question drafts, independent question review/publishing, paper drafts and independent review/publishing; invigilation, written responses and marking remain incomplete |
 | School intelligence | — | — | School leaders | Admin | Missing native workspace |
 | Report issuance and integrity | Draft previews and issued report snapshots | Verified previews and issued report snapshots | School leaders | Admin | Android and iOS support school submission/approval/issue/reject/revoke plus learner and verified-guardian issued report viewing and integrity checks; school analytics and wider administration remain missing |
-| Guardian Connect | — | Invitations | School verification | Admin | Android and iOS support invitations, protected reports, and the server-authorized school review action; institutional ownership and evidence must still be confirmed in end-to-end acceptance |
+| Guardian Connect | — | Invitations and optional notification consent | School verification | Admin | Android and iOS support invitations, protected reports, school review and institution-scoped email preference controls; the server enforces explicit guardian consent, recent verified sign-in, opt-in availability and always-available revocation |
 | Education reports | Learner preview | Verified reports | Assigned school scope | Admin | Learner/parent previews partial; reporting workflow missing |
 | University applications | Apply and track | — | — | Admin catalog | Missing native workspace |
 | School progression | — | — | School leadership | Admin | Missing native workspace |
@@ -55,6 +55,7 @@ A capability moves to complete only when all of these are true on both native pl
 
 ## Recent native additions
 
+- Parent notification preferences use the existing authenticated API on Android and iOS. Opt-in requires an explicit native confirmation and server-verified recent sign-in; opt-out remains available for active and former school consents. The API feature flags and authorization policy remain authoritative.
 - The native family-access review surfaces accepted and verified guardian relationships only when the existing school review endpoint authorizes the signed-in account. Both clients require an explicit reviewer confirmation before submitting a decision. The API remains authoritative for institution ownership, active enrollment, invitation acceptance, and revocation rules. No identity documents are collected by the native review flow.
 - Native school report issuance supports report submission, independent approval, issue, reject and revoke on both platforms. The server remains authoritative for school-manager access, two-person review, valid report transitions and snapshot integrity. Native school analytics and the wider report-administration tools remain incomplete.
 - Learners and verified guardians can now view issued report snapshots and request the existing server integrity check on Android and iOS. The UI states that a hash or configured signature does not establish institutional accreditation.

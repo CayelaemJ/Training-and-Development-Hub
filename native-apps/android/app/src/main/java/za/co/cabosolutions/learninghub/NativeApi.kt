@@ -56,6 +56,10 @@ internal data class SchoolAttendanceRecord(val day: String, val status: String)
 internal data class SchoolTimetableSlot(val id: Int, val day: Int, val startsAt: String, val endsAt: String,
     val grade: String, val group: String, val subject: String, val room: String, val teacherId: String, val status: String)
 internal data class SchoolAttendanceSummary(val year: Int, val records: Int, val counts: Map<String, Int>)
+internal data class NotificationPreferenceChoice(val kind: String, val enabled: Boolean, val canEnable: Boolean)
+internal data class NotificationPreferenceSchool(val id: Int, val name: String, val choices: List<NotificationPreferenceChoice>)
+internal data class NotificationPreferences(val enabled: Boolean, val optInAvailable: Boolean, val schools: List<NotificationPreferenceSchool>)
+
 internal data class AssessmentQuestion(
     val id: Int, val organizationId: Int, val grade: String, val subject: String, val curriculum: String,
     val stem: String, val answerGuide: String, val rubric: String, val sourceAttribution: String,
@@ -176,7 +180,8 @@ internal data class NativeLearning(
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
     val learnerReportNotice: String = "",
     val schoolOperations: List<SchoolOperationsWorkspace> = emptyList(),
-    val assessmentWorkspaces: List<AssessmentWorkspace> = emptyList()
+    val assessmentWorkspaces: List<AssessmentWorkspace> = emptyList(),
+    val notificationPreferences: NotificationPreferences = NotificationPreferences(false, false, emptyList())
 )
 
 internal class NativeApi(private val context: Context) {
@@ -648,6 +653,24 @@ internal class NativeApi(private val context: Context) {
         }
 
         if (role == "parent") {
+            val notificationPreferences = try {
+                val payload = request("/api/notifications/preferences", auth = true)
+                val rows = payload.optJSONArray("schools") ?: JSONArray()
+                val schools = (0 until minOf(rows.length(), 100)).mapNotNull { i ->
+                    val row = rows.optJSONObject(i) ?: return@mapNotNull null
+                    val id = row.optInt("id"); val name = row.optString("name")
+                    if (id <= 0 || name.isBlank()) return@mapNotNull null
+                    val choicesJson = row.optJSONArray("choices") ?: JSONArray()
+                    val choices = (0 until minOf(choicesJson.length(), 10)).mapNotNull { j ->
+                        val choice = choicesJson.optJSONObject(j) ?: return@mapNotNull null
+                        val kind = choice.optString("kind")
+                        if (kind !in setOf("guardian_review_requested", "learner_support_updated")) null
+                        else NotificationPreferenceChoice(kind, choice.optBoolean("enabled"), choice.optBoolean("canEnable"))
+                    }
+                    NotificationPreferenceSchool(id, name.take(200), choices)
+                }
+                NotificationPreferences(payload.optBoolean("enabled"), payload.optBoolean("optInAvailable"), schools)
+            } catch (_: Exception) { NotificationPreferences(false, false, emptyList()) }
             val response = request("/api/native/mobile/parent", auth = true)
             val arr = response.optJSONArray("relationships") ?: JSONArray()
             val relationships = (0 until arr.length()).mapNotNull { i ->
@@ -704,7 +727,8 @@ internal class NativeApi(private val context: Context) {
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(),
                 guardians = relationships, parentGuidance = response.optString("guidance"),
-                parentReports = reports, parentReportNotice = notice, issuedReports = issuedReports
+                parentReports = reports, parentReportNotice = notice, issuedReports = issuedReports,
+                notificationPreferences = notificationPreferences
             )
         }
 
@@ -1183,6 +1207,14 @@ internal class NativeApi(private val context: Context) {
             require(obj.getInt("id") == id && obj.getInt("offset") == offset &&
                 (next == null || next > offset)) { "Invalid reading position" }
             MaterialPage(id, obj.getString("title"), obj.getString("text"), offset, next)
+        }
+
+    suspend fun setNotificationPreference(organizationId: Int, kind: String, enabled: Boolean, acknowledged: Boolean) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && kind in setOf("guardian_review_requested", "learner_support_updated"))
+            request("/api/notifications/preferences/$organizationId/$kind",
+                JSONObject().put("enabled", enabled).put("acknowledged", acknowledged),
+                method = "PATCH", auth = true)
         }
 
     suspend fun respondToGuardianInvite(invitationId: Int, accept: Boolean): Unit =
