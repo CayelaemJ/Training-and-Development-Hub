@@ -457,6 +457,46 @@ class NativeAndroidReportIssuanceTest {
 }
 
 @RunWith(AndroidJUnit4::class)
+class NativeAndroidIssuedReportTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun learnerCanReadIssuedSnapshotAndRequestIntegrityVerification() {
+        var checkedReport: String? = null
+        val report = IssuedSchoolReport(31, 7, 2026, "c".repeat(64), IssuedReportSnapshot(
+            "Grade 8", 82.5, listOf(GuardianSubject("Mathematics", 82.5, 4)), 94, 47, 50
+        ))
+        val data = NativeLearning(
+            portal = NativePortal("learner", emptyList(), emptyList()),
+            materials = emptyList(), quizzes = emptyList(), issuedReports = listOf(report)
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeHome(
+                    status = "Connected securely to CABO", busy = false, data = data,
+                    signIn = {}, refresh = {}, demoEnabled = false, demoActive = false,
+                    demoRole = "learner", startDemo = {}, setDemoRole = {}, createSupportRequest = {},
+                    testLoginAvailable = false, testUsername = "", testPassword = "",
+                    onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
+                    respondToInvite = { _, _ -> }, openSupportTicket = {}, openQuiz = {},
+                    openMaterial = {}, pickMaterial = {},
+                    verifyIssuedReport = { checkedReport = it.key }
+                )
+            }
+        }
+        compose.onNodeWithText("Progress").performClick()
+        compose.onNodeWithTag("native-role-content").performScrollToNode(hasText("Published average · 82.5%"))
+        compose.onNodeWithText("Published average · 82.5%").assertIsDisplayed()
+        compose.onNodeWithText("School-issued pilot record · not a digitally signed or accredited certificate.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("native-role-content").performScrollToNode(hasText("Check report integrity"))
+        compose.onNodeWithText("Check report integrity").performClick()
+        assertEquals("7:31", checkedReport)
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
 class NativeAndroidDemoFlowTest {
     @get:Rule
     val compose = createComposeRule()

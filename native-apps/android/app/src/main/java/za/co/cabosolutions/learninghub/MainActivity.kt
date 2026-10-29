@@ -206,6 +206,7 @@ class MainActivity : ComponentActivity() {
                         decideSchoolReport = { organizationId, reportId, action, reason ->
                             decideSchoolReport(organizationId, reportId, action, reason)
                         },
+                        verifyIssuedReport = { verifyIssuedReport(it) },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
@@ -447,6 +448,28 @@ class MainActivity : ComponentActivity() {
                 status = "Report action failed. Check the two-reviewer rule, report status, integrity, and required reason."
             } finally { busy = false }
             if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun verifyIssuedReport(report: IssuedSchoolReport) {
+        if (busy || demoActive) return
+        busy = true
+        lifecycleScope.launch {
+            try {
+                val verification = api.verifyIssuedReport(report)
+                screen = screen?.let { current -> current.copy(
+                    issuedReportIntegrity = current.issuedReportIntegrity + (report.key to verification)
+                ) }
+                status = when {
+                    verification.hashValid == null -> "This report uses a legacy digest that cannot be verified."
+                    !verification.hashValid -> "Warning: the report content hash does not match."
+                    verification.signatureValid -> "Cryptographic signature verified. Issuer accreditation is not asserted."
+                    verification.cryptographicallySigned -> "A signature is present but is not trusted or did not validate."
+                    else -> "Report content integrity checked. No cryptographic signature is configured."
+                }
+            } catch (_: Exception) {
+                status = "Unable to verify this report right now. Check your connection and access."
+            } finally { busy = false }
         }
     }
 
@@ -931,6 +954,7 @@ internal fun NativeHome(
     reviewGuardian: (Int, Int, String) -> Unit = { _, _, _ -> },
     submitSchoolReport: (Int, String, Int) -> Unit = { _, _, _ -> },
     decideSchoolReport: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
+    verifyIssuedReport: (IssuedSchoolReport) -> Unit = {},
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
@@ -1116,7 +1140,7 @@ internal fun NativeHome(
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
-                                decideSchoolReport = decideSchoolReport,
+                                decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
@@ -1129,7 +1153,7 @@ internal fun NativeHome(
                             demoActive = demoActive,
                             respondToInvite = respondToInvite,
                             reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
-                            decideSchoolReport = decideSchoolReport,
+                            decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -1200,6 +1224,7 @@ private fun RoleContent(
     reviewGuardian: (Int, Int, String) -> Unit,
     submitSchoolReport: (Int, String, Int) -> Unit,
     decideSchoolReport: (Int, Int, String, String) -> Unit,
+    verifyIssuedReport: (IssuedSchoolReport) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -1326,6 +1351,11 @@ private fun RoleContent(
                             report.subjects, report.attendanceRate, report.presentDays, report.recordedDays,
                             "School-verified preview · not an official report card")
                     }
+                    item { Text("School-issued reports", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    if (data.issuedReports.isEmpty()) item { NativeCard("No issued reports available", "A verified guardian can view school-issued reports after the school publishes them.") }
+                    items(data.issuedReports, key = { "parent-issued:${it.key}" }) { report ->
+                        IssuedReportCard(report, data.issuedReportIntegrity[report.key], busy) { verifyIssuedReport(report) }
+                    }
                 }
                 "teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head" -> {
                     item { Text("Support outcomes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
@@ -1344,6 +1374,11 @@ private fun RoleContent(
                         ReportCard("My report", report.grade, report.year, report.average,
                             report.subjects, report.attendanceRate, report.presentDays, report.recordedDays,
                             "Learner preview · not an officially issued report card")
+                    }
+                    item { Text("School-issued reports", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    if (data.issuedReports.isEmpty()) item { NativeCard("No issued reports yet", "A school-issued report will appear here after the institution completes its review.") }
+                    items(data.issuedReports, key = { "learner-issued:${it.key}" }) { report ->
+                        IssuedReportCard(report, data.issuedReportIntegrity[report.key], busy) { verifyIssuedReport(report) }
                     }
                 }
             }
@@ -1670,6 +1705,49 @@ private fun ReportCard(
             }
             attendanceRate?.let { Text("Attendance  $it% · $presentDays of $recordedDays days") }
             Text(note, style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+        }
+    }
+}
+
+@Composable
+private fun IssuedReportCard(
+    report: IssuedSchoolReport,
+    integrity: ReportIntegrityCheck?,
+    busy: Boolean,
+    verify: () -> Unit
+) {
+    val learnerLabel = report.learnerName?.takeIf { it.isNotBlank() }?.let { "$it · " } ?: ""
+    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFEFA))) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("${learnerLabel}Grade ${report.snapshot.grade} · ${report.academicYear}",
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            report.snapshot.average?.let { Text("Published average · $it%", style = MaterialTheme.typography.headlineSmall, color = Color(0xFFC4673A)) }
+            report.snapshot.subjects.forEach { subject ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(subject.name, modifier = Modifier.weight(1f))
+                    Text("${subject.percentage}%", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            report.snapshot.attendanceRate?.let {
+                Text("Attendance · $it% · ${report.snapshot.presentDays} of ${report.snapshot.recordedDays} days")
+            }
+            Text("School-issued pilot record · not a digitally signed or accredited certificate.",
+                style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+            Text("SHA-256 ${report.contentHash}", style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF68736B))
+            OutlinedButton(onClick = verify, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text(if (integrity == null) "Check report integrity" else "Check integrity again")
+            }
+            integrity?.let { result ->
+                val message = when {
+                    result.hashValid == null -> "Legacy digest · cannot verify stored content."
+                    !result.hashValid -> "Warning · report content hash mismatch."
+                    result.signatureValid -> "Signature verified. Issuer accreditation is not asserted."
+                    result.cryptographicallySigned -> "Signature present but not trusted or not valid."
+                    else -> "Content integrity checked. No cryptographic signature configured."
+                }
+                Text(message, style = MaterialTheme.typography.bodySmall, color = if (result.hashValid == false) Color(0xFF9F302A) else Color(0xFF68736B))
+            }
         }
     }
 }

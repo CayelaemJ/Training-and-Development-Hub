@@ -299,6 +299,13 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
+        title("School-issued reports")
+        if session.issuedReports.isEmpty {
+            infoTile("No issued reports available", "A verified guardian can view a school's issued report after the school publishes it.", system: "doc.text.magnifyingglass")
+        }
+        ForEach(session.issuedReports) { report in
+            NativeIssuedReportCard(session: session, report: report)
+        }
     }
 
     @ViewBuilder
@@ -458,6 +465,13 @@ struct NativeHomeView: View {
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        title("School-issued reports")
+        if session.issuedReports.isEmpty {
+            infoTile("No issued reports yet", "A school-issued report appears here after the institution completes its review.", system: "doc.text.magnifyingglass")
+        }
+        ForEach(session.issuedReports) { report in
+            NativeIssuedReportCard(session: session, report: report)
         }
         title("Study materials")
         Button { showMaterialImporter = true } label: {
@@ -674,6 +688,65 @@ private struct NativeReportIssuanceRow: View {
             await session.decideSchoolReport(organizationId: organizationId, reportId: record.id,
                                              action: action, reason: reason)
         }
+    }
+}
+
+private struct NativeIssuedReportCard: View {
+    @ObservedObject var session: NativeSession
+    let report: NativeIssuedSchoolReport
+
+    private var integrityMessage: String? {
+        guard let check = session.issuedReportIntegrity[report.key] else { return nil }
+        if check.hashValid == nil { return "Legacy digest · stored content cannot be verified." }
+        if check.hashValid == false { return "Warning · report content hash mismatch." }
+        if check.signatureValid { return "Signature verified. Issuer accreditation is not asserted." }
+        if check.cryptographicallySigned { return "Signature present but not trusted or not valid." }
+        return "Content integrity checked. No cryptographic signature configured."
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let learnerName = report.learnerName?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !learnerName.isEmpty {
+                Text("\(learnerName)'s report")
+                    .font(.headline)
+            }
+            Text("Grade \(report.snapshot.grade) · \(report.academicYear)")
+                .font(.title3.bold()).accessibilityAddTraits(.isHeader)
+            if let average = report.snapshot.average {
+                Text("Published average · \(average.formatted())%")
+                    .font(.headline)
+            }
+            ForEach(report.snapshot.subjects) { subject in
+                HStack {
+                    Text(subject.name)
+                    Spacer(minLength: 8)
+                    Text("\(subject.percentage.formatted())%")
+                        .fontWeight(.semibold).monospacedDigit()
+                }
+                .font(.subheadline)
+            }
+            if let attendanceRate = report.snapshot.attendance.rate {
+                Text("Attendance · \(attendanceRate)% · \(report.snapshot.attendance.presentDays) of \(report.snapshot.attendance.recordedDays) days")
+                    .font(.subheadline)
+            }
+            Text("School-issued pilot record · not a digitally signed or accredited certificate.")
+                .font(.footnote).foregroundColor(.secondary)
+            Text("SHA-256 \(report.contentHash)")
+                .font(.caption.monospaced()).foregroundColor(.secondary).textSelection(.enabled)
+            Button(session.issuedReportIntegrity[report.key] == nil ? "Check report integrity" : "Check integrity again") {
+                Task { await session.verifyIssuedReport(report) }
+            }
+            .buttonStyle(.bordered).disabled(session.busy)
+            if let integrityMessage {
+                Text(integrityMessage)
+                    .font(.footnote)
+                    .foregroundColor(session.issuedReportIntegrity[report.key]?.hashValid == false ? .red : .secondary)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 

@@ -63,6 +63,18 @@ internal data class ReportIssuanceRecord(
     val contentHash: String, val issuedAt: String?
 )
 internal data class ReportIssuanceWorkspace(val organizationId: Int, val records: List<ReportIssuanceRecord>)
+internal data class IssuedReportSnapshot(
+    val grade: String, val average: Double?, val subjects: List<GuardianSubject>,
+    val attendanceRate: Int?, val presentDays: Int, val recordedDays: Int
+)
+internal data class IssuedSchoolReport(
+    val id: Int, val organizationId: Int, val academicYear: Int,
+    val contentHash: String, val snapshot: IssuedReportSnapshot, val learnerName: String? = null
+) { val key: String get() = "$organizationId:$id" }
+internal data class ReportIntegrityCheck(
+    val hashValid: Boolean?, val cryptographicallySigned: Boolean,
+    val signatureValid: Boolean, val issuerIdentityAccredited: Boolean
+)
 internal data class GuardianSubject(val name: String, val percentage: Double, val assessmentCount: Int)
 internal data class GuardianAcademicReport(
     val learnerId: String, val learnerName: String, val organizationId: Int,
@@ -118,6 +130,8 @@ internal data class NativeLearning(
     val guardians: List<GuardianInvite> = emptyList(),
     val guardianReviewWorkspaces: List<GuardianReviewWorkspace> = emptyList(),
     val reportIssuanceWorkspaces: List<ReportIssuanceWorkspace> = emptyList(),
+    val issuedReports: List<IssuedSchoolReport> = emptyList(),
+    val issuedReportIntegrity: Map<String, ReportIntegrityCheck> = emptyMap(),
     val parentGuidance: String = "",
     val parentReports: List<GuardianAcademicReport> = emptyList(),
     val parentReportNotice: String = "",
@@ -455,6 +469,29 @@ internal class NativeApi(private val context: Context) {
             return JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
         } finally { connection.disconnect() }
     }
+
+    private fun parseIssuedReport(row: JSONObject, organizationId: Int, learnerName: String? = null): IssuedSchoolReport? {
+        val id = row.optInt("id")
+        val year = row.optInt("academicYear", row.optInt("year"))
+        val hash = row.optString("contentHash")
+        val snapshot = row.optJSONObject("snapshot") ?: return null
+        val grade = snapshot.optString("grade")
+        if (id <= 0 || organizationId <= 0 || year !in 2000..2200 || hash.length !in 32..256 || grade.isBlank()) return null
+        val subjectsJson = snapshot.optJSONArray("subjects") ?: JSONArray()
+        val subjects = (0 until minOf(subjectsJson.length(), 100)).mapNotNull { i ->
+            subjectsJson.optJSONObject(i)?.let { subject ->
+                val name = subject.optString("name")
+                if (name.isBlank()) null else GuardianSubject(name.take(160), subject.optDouble("percentage"), subject.optInt("assessmentCount"))
+            }
+        }
+        val attendance = snapshot.optJSONObject("attendance") ?: JSONObject()
+        return IssuedSchoolReport(id, organizationId, year, hash.take(256), IssuedReportSnapshot(
+            grade.take(32), if (snapshot.isNull("average")) null else snapshot.optDouble("average"),
+            subjects, if (attendance.isNull("rate")) null else attendance.optInt("rate"),
+            attendance.optInt("presentDays"), attendance.optInt("recordedDays")
+        ), learnerName?.take(160))
+    }
+
     suspend fun dashboard(): NativeLearning = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val json = request("/api/portal/me", auth = true)
         val role = json.optString("role", "learner")
@@ -523,10 +560,24 @@ internal class NativeApi(private val context: Context) {
                 if (!hasSession()) throw error
                 emptyList()
             }
+            val issuedReports = reports
+                .distinctBy { "${it.learnerId}:${it.organizationId}" }
+                .take(12)
+                .flatMap { report ->
+                try {
+                    val rows = getArray("/api/guardian/issued-reports/${Uri.encode(report.learnerId)}?organizationId=${report.organizationId}")
+                    (0 until minOf(rows.length(), 50)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { parseIssuedReport(it, report.organizationId, report.learnerName) }
+                    }
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    emptyList()
+                }
+            }.distinctBy { it.key }.take(100)
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(),
                 guardians = relationships, parentGuidance = response.optString("guidance"),
-                parentReports = reports, parentReportNotice = notice
+                parentReports = reports, parentReportNotice = notice, issuedReports = issuedReports
             )
         }
 
@@ -674,6 +725,22 @@ internal class NativeApi(private val context: Context) {
                 null
             }
         }
+        val issuedReports = if (role == "learner") {
+            val rows = mutableListOf<IssuedSchoolReport>()
+            orgIds.take(5).forEach { orgId ->
+                try {
+                    val reports = getArray("/api/organizations/$orgId/report-issuance/me")
+                    (0 until minOf(reports.length(), 100 - rows.size)).forEach { i ->
+                        reports.optJSONObject(i)?.let { report ->
+                            parseIssuedReport(report, orgId)?.let(rows::add)
+                        }
+                    }
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                }
+            }
+            rows
+        } else emptyList()
         var journeyIdentity = LearnerJourneyIdentity()
         var journeyEntries = emptyList<LearnerJourneyEntry>()
         var journeyMilestones = emptyList<LearnerJourneyMilestone>()
@@ -746,7 +813,7 @@ internal class NativeApi(private val context: Context) {
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
             learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
-            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
+            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports)
     }
 
     suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -1017,6 +1084,17 @@ internal class NativeApi(private val context: Context) {
             require(action !in setOf("reject", "revoke") || cleanReason.isNotEmpty())
             request("/api/organizations/$organizationId/report-issuance/$reportId/decision",
                 JSONObject().put("action", action).put("reason", cleanReason), auth = true)
+        }
+
+    suspend fun verifyIssuedReport(report: IssuedSchoolReport): ReportIntegrityCheck =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(report.id > 0 && report.organizationId > 0)
+            val result = request("/api/organizations/${report.organizationId}/report-issuance/${report.id}/integrity", auth = true)
+            ReportIntegrityCheck(
+                if (result.isNull("hashValid")) null else result.optBoolean("hashValid"),
+                result.optBoolean("cryptographicallySigned"), result.optBoolean("signatureValid"),
+                result.optBoolean("issuerIdentityAccredited")
+            )
         }
 
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
