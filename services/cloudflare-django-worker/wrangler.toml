@@ -6,3 +6,6 @@ compatibility_flags = ["python_workers"]
 # No route or custom domain is attached. Deploy to isolated staging first.
 # Set DJANGO_SECRET_KEY and DJANGO_WORKER_TOKEN as Worker secrets.
 # This worker is not intended for direct browser use.
+# Confirmed account workers.dev subdomain: cabo-solutions-za.
+[vars]
+DJANGO_ALLOWED_HOST = "cabo-learning-django-insights.cabo-solutions-za.workers.dev"
