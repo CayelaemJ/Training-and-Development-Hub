@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { open, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { request as httpRequest } from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -31,11 +32,29 @@ async function unusedPort() {
   return selected;
 }
 async function request(endpoint, options = {}) {
-  return fetch(`http://127.0.0.1:${port}${endpoint}`, {
-    redirect: "error",
-    signal: AbortSignal.timeout(10_000),
-    ...options,
-    headers: { Host: host, "Content-Type": "application/json", ...(options.headers || {}) },
+  // Node fetch (Undici) can replace/normalise Host, which makes Django
+  // correctly reject a local workerd request as an untrusted host.
+  // Node's HTTP client preserves the explicit Host header byte-for-byte.
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({
+      hostname: "127.0.0.1",
+      port,
+      path: endpoint,
+      method: options.method ?? "GET",
+      headers: { Host: host, "Content-Type": "application/json", ...(options.headers ?? {}) },
+      signal: AbortSignal.timeout(10_000),
+    }, response => {
+      const chunks = [];
+      response.on("data", chunk => chunks.push(chunk));
+      response.on("error", reject);
+      response.on("end", () => {
+        const payload = Buffer.concat(chunks).toString("utf8");
+        resolve({ status: response.statusCode, json: async () => JSON.parse(payload) });
+      });
+    });
+    req.on("error", reject);
+    if (options.body !== undefined) req.write(options.body);
+    req.end();
   });
 }
 async function untilHealthy() {
