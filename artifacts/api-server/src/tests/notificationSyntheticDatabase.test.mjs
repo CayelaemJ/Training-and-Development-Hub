@@ -82,7 +82,7 @@ test("three review-only migrations preserve tenant, consent and audit database i
       ["guardian-alpha",11]);
     assert.deepEqual(a.rows.map(x=>x.action),["opt_out"]);
     await assert.rejects(pg.query("INSERT INTO notification_preference_events(user_id,organization_id,kind,action) VALUES($1,$2,$3,$4)",
-      ["guardian-alpha",11,"guardian_review_requested","expose_private_data"]),/check constraint/i);
+      ["guardian-alpha",11,"guardian_review_requested","invalid"]),/check constraint/i);
   });
   await t.test("outbox requires unique event, valid source and bounded states",async()=>{
     await pg.query("INSERT INTO notification_outbox(event_id,organization_id,recipient_user_id,recipient_ciphertext,kind) VALUES($1,$2,$3,$4,$5)",
