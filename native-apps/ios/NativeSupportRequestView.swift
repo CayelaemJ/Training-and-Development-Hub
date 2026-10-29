@@ -117,10 +117,8 @@ struct NativeSupportRequestView: View {
         guard let course = selectedCourse else { return }
         do {
             _ = try session.saveSupportDraft(course: course, concept: concept,
-                                            question: question, attempted: attempted)
-            if let editingDraftID {
-                try session.deleteSupportDraft(editingDraftID)
-            }
+                                            question: question, attempted: attempted,
+                                            replacing: editingDraftID)
             concept = ""
             question = ""
             attempted = ""
