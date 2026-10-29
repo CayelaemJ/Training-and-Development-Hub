@@ -787,8 +787,8 @@ class NativeAndroidWrittenExamTest {
         }
 
         compose.onNodeWithTag("assigned-written-exam-73032").assertIsDisplayed().performClick()
-        compose.onNodeWithText("CABO Demo School").assertIsDisplayed()
-        compose.onNodeWithText("Due 2026-11-10").assertIsDisplayed()
+        compose.onNodeWithText("CABO Demo School").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Due 2026-11-10").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("written-answer-0").performScrollTo()
             .performTextInput("One half is two quarters.")
         compose.onNodeWithTag("submit-written-exam").performScrollTo()
@@ -815,7 +815,7 @@ class NativeAndroidExamManagementTest {
             organizationId = 8,
             organizationName = "Cabo Learning School",
             groups = listOf(ManagedExamGroup(21, "Grade 8")),
-            assignments = emptyList(),
+            assignments = listOf(ManagedExamAssignment(38, 21, 10, null)),
             submissions = listOf(
                 ManagedExamSubmission(
                     id = 44, assignmentId = 38, userId = "learner-private-id", attemptId = 50,
