@@ -509,6 +509,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 .map { "\($0.key): \($0.value)" }.sorted()
             let nextWorkspaces = (decoded["cards"] as? [[String: Any]] ?? [])
                 .compactMap { $0["label"] as? String }
+            var nextCanManageExamAssignments = false
             if let membershipsData = try? await request("api/organizations"),
                let memberships = try? JSONDecoder().decode([NativeOrganizationMembership].self, from: membershipsData) {
                 nextCanManageExamAssignments = memberships.contains { ["owner", "admin"].contains($0.role) }
@@ -535,7 +536,6 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextWrittenExams: [NativeWrittenExam] = []
             var nextWrittenAssignments: [NativeWrittenExamAssignment] = []
             var nextExamManagementWorkspaces: [NativeExamManagementWorkspace] = []
-            var nextCanManageExamAssignments = false
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
