@@ -89,6 +89,21 @@ struct NativeStaffSupportView: View {
                         }
                         .disabled(busy || reply.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                     }
+                } else if session.role == "learner" {
+                    if activeTicket.feedback == nil && !["resolved", "closed"].contains(activeTicket.status) {
+                        Section("How did this help?") {
+                            Text("Your educator can follow up based on your response.")
+                                .font(.subheadline).foregroundColor(.secondary)
+                            Button("I understood the help") { Task { await respond("helpful") } }
+                                .disabled(busy)
+                            Button("I still need help") { Task { await respond("needs_more_help") } }
+                                .disabled(busy)
+                        }
+                    } else if let feedback = activeTicket.feedback {
+                        Section("Your response") {
+                            Text(feedback == "helpful" ? "You told your educator this helped." : "You asked your educator for more help.")
+                        }
+                    }
                 } else {
                     Section {
                         Text("Your account can review this request but cannot update it. Ask a teacher or assessor assigned to the course.")
@@ -135,7 +150,7 @@ struct NativeStaffSupportView: View {
     }
 
     private func reloadTicket() async {
-        guard canManage else { return }
+        guard canManage || session.role == "learner" else { return }
         do {
             let latest = try await session.loadStaffSupportTicket(activeTicket)
             activeTicket = latest
@@ -153,5 +168,14 @@ struct NativeStaffSupportView: View {
         busy = true; defer { busy = false }
         do { try await session.scheduleSupportPractice(activeTicket, body: practice, date: reviewDate); await reloadTicket(); message = "Practice and review checkpoint saved." }
         catch { message = "Could not save this checkpoint. Choose a future date and retry." }
+    }
+
+    private func respond(_ feedback: String) async {
+        busy = true; defer { busy = false }
+        do {
+            try await session.respondToSupportTicket(activeTicket, feedback: feedback)
+            await reloadTicket()
+            message = feedback == "helpful" ? "Thanks for letting your educator know." : "Your educator will see that you still need help."
+        } catch { message = "Could not send your response. Refresh this request and try again." }
     }
 }

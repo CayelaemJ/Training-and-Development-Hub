@@ -81,7 +81,8 @@ internal data class SupportTicketSummary(
     val version: Int,
     val updatedAt: String,
     val assignedTo: String? = null,
-    val reviewAt: String? = null
+    val reviewAt: String? = null,
+    val feedback: String? = null
 )
 internal data class SupportEducator(val id: String, val name: String)
 internal data class SupportTicket(
@@ -112,6 +113,7 @@ internal data class NativeLearning(
     val journeyEntries: List<LearnerJourneyEntry> = emptyList(),
     val journeyMilestones: List<LearnerJourneyMilestone> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
+    val learnerSupportTickets: List<SupportTicketSummary> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
     val supportCourses: List<SupportCourseOption> = emptyList(),
     val supportDrafts: List<NativeSupportDraft> = emptyList(),
@@ -667,24 +669,30 @@ internal class NativeApi(private val context: Context) {
             .put("name", course.name)) }
         secrets.put("support_drafts_owner", supportDraftOwner())
         secrets.put("support_courses", cachedCourses.toString())
-        val learnerHelp = orgIds.take(3).flatMap { orgId ->
+        val learnerSupportTickets = if (role == "learner") orgIds.take(3).flatMap { orgId ->
             try {
                 val response = request("/api/organizations/$orgId/support", auth = true)
                 val tickets = response.optJSONArray("items") ?: JSONArray()
                 (0 until minOf(tickets.length(), 15)).mapNotNull { i ->
                     tickets.optJSONObject(i)?.let { row ->
-                        val concept = row.optString("concept").take(80)
-                        if (concept.isBlank()) null else "$concept · ${row.optString("status").take(32)}"
+                        val id = row.optInt("id"); val courseId = row.optInt("courseId")
+                        val concept = row.optString("concept").trim(); val status = row.optString("status")
+                        val version = row.optInt("version"); val updated = row.optString("updatedAt")
+                        if (id <= 0 || courseId <= 0 || concept.isBlank() || status.isBlank() || version <= 0) null
+                        else SupportTicketSummary(orgId, id, concept.take(160), status.take(32), version,
+                            updated.take(40), reviewAt = row.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" },
+                            feedback = row.optString("feedback").takeIf { it.isNotBlank() && it != "null" })
                     }
                 }
             } catch (error: Exception) {
                 if (!hasSession()) throw error
                 emptyList()
             }
-        }.take(20)
+        }.take(30) else emptyList()
+        val learnerHelp = learnerSupportTickets.map { "${it.concept} · ${it.status.replace('_', ' ')}" }
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
+            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
     }
@@ -724,7 +732,8 @@ internal class NativeApi(private val context: Context) {
                 version = ticket.optInt("version", summary.version).coerceAtLeast(1),
                 updatedAt = ticket.optString("updatedAt", summary.updatedAt),
                 assignedTo = ticket.optString("assignedTo").takeIf { it.isNotBlank() && it != "null" },
-                reviewAt = ticket.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" }
+                reviewAt = ticket.optString("reviewAt").takeIf { it.isNotBlank() && it != "null" },
+                feedback = ticket.optString("feedback").takeIf { it.isNotBlank() && it != "null" }
             )
             val events = json.optJSONArray("history") ?: JSONArray()
             val educatorsJson = json.optJSONArray("educators") ?: JSONArray()
@@ -760,6 +769,11 @@ internal class NativeApi(private val context: Context) {
         require(body.trim().length in 5..4000 && reviewAt.length in 20..40)
         return sendSupportAction(ticket.summary, JSONObject().put("kind", "practice")
             .put("body", body.trim()).put("reviewAt", reviewAt))
+    }
+
+    suspend fun submitLearnerSupportFeedback(ticket: SupportTicket, feedback: String): SupportTicketSummary {
+        require(feedback in setOf("helpful", "needs_more_help"))
+        return sendSupportAction(ticket.summary, JSONObject().put("kind", "feedback").put("feedback", feedback))
     }
 
     private suspend fun sendSupportAction(summary: SupportTicketSummary, action: JSONObject): SupportTicketSummary =
