@@ -17,13 +17,8 @@ const host = "cabo-learning-django-insights-staging.cabo-solutions-za.workers.de
 const token = "synthetic-only-local-worker-token-0123456789";
 const started = Date.now();
 let child;
-let logTail = "";
 let port = 0;
-
-function log(message) {
-  // Keep output free of request contents, authentication and secrets.
-  logTail = (logTail + message).slice(-1500);
-}
+let ownsVarsFile = false;
 async function unusedPort() {
   const server = createServer();
   server.listen(0, "127.0.0.1");
@@ -61,6 +56,7 @@ async function untilHealthy() {
 try {
   // Exclusive creation; never overwrite an existing developer secrets file.
   const fh = await open(varsFile, "wx", 0o600);
+  ownsVarsFile = true;
   try {
     await fh.writeFile(
       `DJANGO_SECRET_KEY=synthetic-only-local-signing-key-0123456789\nDJANGO_WORKER_TOKEN=${token}\n`,
@@ -73,9 +69,7 @@ try {
     "--yes", "wrangler@4.151.3", "dev", "--local",
     "--port", String(port), "--ip", "127.0.0.1",
     "--show-interactive-dev-session", "false", "--log-level", "error",
-  ], { cwd, env: { ...process.env, CI: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-  child.stdout.on("data", data => log(String(data)));
-  child.stderr.on("data", data => log(String(data)));
+  ], { cwd, env: { ...process.env, CI: "1" }, detached: true, stdio: ["ignore", "ignore", "ignore"] });
   await untilHealthy();
   const data = JSON.stringify({ concepts: [
     { code: "fractions", masteryPercent: 45, evidenceCount: 5 },
@@ -108,10 +102,9 @@ try {
   // Do not include process logs: runtime logs can contain configuration details.
   process.exitCode = 1;
 } finally {
-  if (child) {
-    child.kill("SIGTERM");
-    // A child may already have exited, and npx can leave nested workerd
-    // processes that the CI runtime will terminate when its job exits.
+  if (child?.pid) {
+    // Kill the entire npm/worker process group, including spawned workerd.
+    try { process.kill(-child.pid, "SIGTERM"); } catch { /* already exited */ }
   }
-  await rm(varsFile, { force: true });
+  if (ownsVarsFile) await rm(varsFile, { force: true });
 }
