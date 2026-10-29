@@ -351,6 +351,8 @@ class NativeAndroidSupportTest {
         compose.onNodeWithText("Teacher").performClick()
         compose.onNodeWithText("Support").performClick()
         compose.onNodeWithText("Learner support queue").assertIsDisplayed()
+        compose.onNodeWithText("Support accountability").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Open requests").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Adding unlike fractions").performScrollTo().performClick()
         assertEquals(73031, openedTicket?.id)
 
