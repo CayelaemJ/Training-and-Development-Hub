@@ -167,13 +167,13 @@ class MainActivity : ComponentActivity() {
                     )
                     selectedWrittenExams -> NativeWrittenExamScreen(
                         materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
-                        generate = { material, count, difficulty ->
-                            if (demoActive) WrittenExam(73031, "CABO demo · ${material.title}", difficulty,
+                        generate = { materialId, count, difficulty ->
+                            if (demoActive) WrittenExam(73031, "CABO demo · ${screen?.materialEntries?.firstOrNull { it.id == materialId }?.title ?: "Study material"}", difficulty,
                                 List(count) { index -> WrittenExamQuestion(
                                     listOf("Explain one key idea from your study material.", "Give an example of how that idea can be used.") [index % 2],
                                     "short_answer", 5
                                 ) })
-                            else api.generateWrittenExam(material.id, count, difficulty)
+                            else api.generateWrittenExam(materialId, count, difficulty)
                         },
                         open = { examId ->
                             if (demoActive) throw IllegalStateException("Select a demo exam above.")
