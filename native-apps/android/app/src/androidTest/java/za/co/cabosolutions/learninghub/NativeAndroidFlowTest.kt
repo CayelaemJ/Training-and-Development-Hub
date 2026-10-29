@@ -486,15 +486,11 @@ class NativeAndroidIssuedReportTest {
             }
         }
         compose.onNodeWithText("Progress").performClick()
-        compose.onNodeWithTag("native-role-content")
-            .performScrollToNode(hasText("Published average · 82.5%"))
-        compose.onNodeWithText("Published average · 82.5%").assertIsDisplayed()
-        compose.onNodeWithTag("native-role-content")
-            .performScrollToNode(hasText("School-issued pilot record · not a digitally signed or accredited certificate."))
+        compose.onNodeWithTag("native-role-content").performScrollToNode(hasText("School-issued reports"))
+        compose.onNodeWithText("Published average · 82.5%").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("School-issued pilot record · not a digitally signed or accredited certificate.")
-            .assertIsDisplayed()
-        compose.onNodeWithTag("native-role-content").performScrollToNode(hasText("Check report integrity"))
-        compose.onNodeWithText("Check report integrity").performClick()
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Check report integrity").performScrollTo().performClick()
         assertEquals("7:31", checkedReport)
     }
 }
