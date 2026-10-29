@@ -25,8 +25,10 @@ struct NativeLearnerPassportView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(session.learnerPassportBusy)
                         Button {
-                            shareText = session.learnerPassportJSON
-                            sharePresented = shareText != nil
+                            if let json = session.learnerPassportJSON {
+                                shareText = json
+                                sharePresented = true
+                            }
                         } label: {
                             Label("Export JSON", systemImage: "square.and.arrow.up")
                                 .frame(maxWidth: .infinity, minHeight: 46)
