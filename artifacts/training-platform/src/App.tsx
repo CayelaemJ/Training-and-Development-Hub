@@ -41,7 +41,7 @@ import {
 } from '@workspace/api-client-react';
 import type { QuizDetail, QuizAttemptResult, StudyMaterial, QuizSummary } from '@workspace/api-client-react';
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, BrainCircuit, Check,
+  ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
   CheckCircle2, ChevronRight, CircleHelp, Clock3, FileText, FileUp, GraduationCap,
   LayoutDashboard, LoaderCircle, LogOut, Plus, RotateCcw, Search,
   Sparkles, Target, Trash2, X,
@@ -79,7 +79,7 @@ const navItems = [
   { href: '/question-bank', label: 'Assessment question bank', icon: FileText },
   { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
-  { href: '/notification-preferences', label: 'Notifications', icon: CircleHelp },
+  { href: '/notification-preferences', label: 'Notifications', icon: Bell },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
