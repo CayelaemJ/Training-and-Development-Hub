@@ -17,8 +17,42 @@ struct StaffSchool: Identifiable {
     let id: Int
     let subjects: [String]
     let support: [String]
-    let tickets: [String]
+    let ticketSummaries: [NativeStaffSupportTicket]
     let notice: String?
+}
+struct NativeStaffSupportTicket: Codable, Identifiable {
+    let id: Int
+    let organizationId: Int
+    let courseId: Int
+    let concept: String
+    let question: String
+    let attempted: String
+    let status: String
+    let version: Int
+}
+struct NativeSupportCourse: Codable, Identifiable, Hashable {
+    let organizationId: Int
+    let courseId: Int
+    let name: String
+    var id: String { "\(organizationId):\(courseId)" }
+}
+struct NativeSupportDraft: Codable, Identifiable {
+    let requestKey: String
+    let organizationId: Int
+    let courseId: Int
+    let courseName: String
+    let concept: String
+    let question: String
+    let attempted: String
+    var id: String { requestKey }
+}
+private struct NativeSupportDraftStore: Codable {
+    let ownerId: String
+    let drafts: [NativeSupportDraft]
+}
+private struct NativeSupportCourseStore: Codable {
+    let ownerId: String
+    let courses: [NativeSupportCourse]
 }
 
 @MainActor
@@ -42,6 +76,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var learnerHelp: [String] = []
     @Published var learnerReports: [NativeLearnerReport] = []
     @Published var learnerReportNotice = ""
+    @Published var supportCourses: [NativeSupportCourse] = []
+    @Published var supportDrafts: [NativeSupportDraft] = []
 
     // Test-login is a build-time opt-in, never enabled by a server response.
     var testLoginAvailable: Bool {
@@ -160,7 +196,13 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let code = (response as? HTTPURLResponse)?.statusCode else { throw NSError(domain: "CABO", code: 0) }
         if code == 401 {
+            clearSupportStorage()
             clearToken()
+            role = nil
+            summary = []; workspaces = []; materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
+            guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
+            guardianReports = []; learnerReports = []; guardianGuidance = ""
+            status = "Session expired. Sign in again."
             throw NSError(domain: "CABO", code: 401)
         }
         guard (200...299).contains(code) else { throw NSError(domain: "CABO", code: code) }
@@ -219,7 +261,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func restore() async {
-        if keychainToken() != nil { await refresh() }
+        if keychainToken() != nil {
+            supportDrafts = loadSupportDrafts()
+            supportCourses = loadSupportCourses()
+            await refresh()
+        }
     }
     func refresh() async {
         guard !busy else { return }
@@ -247,6 +293,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
+            var nextSupportCourses: [NativeSupportCourse] = []
+            var nextSupportDrafts = loadSupportDrafts()
 
             if verifiedRole == "superadmin" {
                 // Read-only registry via audited, server-authorized endpoint.
@@ -291,23 +339,34 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                            let summary = obj["summary"] as? [String: Int] {
                             support = summary.map { "\($0.key): \($0.value)" }.sorted()
                         }
-                        var ticketNames: [String] = []
+                        var supportTickets: [NativeStaffSupportTicket] = []
                         if let data = try? await request("api/organizations/\(org)/support"),
                            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            ticketNames = Array((obj["items"] as? [[String: Any]] ?? []).prefix(20))
+                            supportTickets = Array((obj["items"] as? [[String: Any]] ?? []).prefix(20))
                                 .compactMap { ticket in
-                                    guard let concept = ticket["concept"] as? String else { return nil }
-                                    return "\(String(concept.prefix(80))) · \(ticket["status"] as? String ?? "open")"
+                                    guard let id = ticket["id"] as? Int,
+                                          let ticketOrg = ticket["organizationId"] as? Int,
+                                          let courseId = ticket["courseId"] as? Int,
+                                          let concept = ticket["concept"] as? String,
+                                          let question = ticket["question"] as? String,
+                                          let attempted = ticket["attempted"] as? String,
+                                          let status = ticket["status"] as? String,
+                                          let version = ticket["version"] as? Int else { return nil }
+                                    return NativeStaffSupportTicket(id: id, organizationId: ticketOrg,
+                                        courseId: courseId, concept: String(concept.prefix(160)),
+                                        question: String(question.prefix(4000)), attempted: String(attempted.prefix(2000)),
+                                        status: String(status.prefix(32)), version: max(1, version))
                                 }
                         }
                         nextStaff.append(StaffSchool(
-                            id: org, subjects: courses, support: support, tickets: ticketNames, notice: nil
+                            id: org, subjects: courses, support: support,
+                            ticketSummaries: supportTickets, notice: nil
                         ))
                     } catch {
                         // Do not treat authorization failure as an empty classroom.
                         if keychainToken() == nil { throw error }
                         nextStaff.append(StaffSchool(
-                            id: org, subjects: [], support: [], tickets: [],
+                            id: org, subjects: [], support: [], ticketSummaries: [],
                             notice: "This school's learning-support module may not be enabled."
                         ))
                     }
@@ -353,7 +412,19 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                         nextLearnerReportNotice = "Some academic reports could not be loaded."
                     }
                 }
-                for org in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(3)) {
+                let learnerOrganizations = Array((decoded["organizationIds"] as? [Int] ?? []).prefix(12))
+                for org in learnerOrganizations {
+                    if let data = try? await request("api/organizations/\(org)/support/options"),
+                       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        nextSupportCourses += (obj["courses"] as? [[String: Any]] ?? []).compactMap { row in
+                            guard let courseId = row["id"] as? Int,
+                                  let name = row["name"] as? String,
+                                  courseId > 0, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+                            return NativeSupportCourse(organizationId: org, courseId: courseId, name: String(name.prefix(120)))
+                        }
+                    }
+                }
+                for org in learnerOrganizations.prefix(3) {
                     if let data = try? await request("api/organizations/\(org)/support"),
                        let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                         let items = Array((obj["items"] as? [[String: Any]] ?? []).prefix(15))
@@ -369,6 +440,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     let milestones = (obj["milestones"] as? [Any])?.count ?? 0
                     nextJourney = ["Learning stages: \(stages)", "Milestones: \(milestones)"]
                 }
+                if !nextSupportCourses.isEmpty { storeSupportCourses(nextSupportCourses) }
+                else { nextSupportCourses = loadSupportCourses() }
             }
             // One of the nested requests may have cleared credentials after a 401.
             guard keychainToken() != nil else { throw NSError(domain: "CABO", code: 401) }
@@ -385,18 +458,135 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             learnerHelp = Array(nextLearnerHelp.prefix(20))
             learnerReports = nextLearnerReports
             learnerReportNotice = nextLearnerReportNotice
+            supportCourses = nextSupportCourses
+            supportDrafts = nextSupportDrafts
             materials = nextMaterials
             materialSummaries = nextMaterialSummaries
             quizzes = nextQuizzes
             quizSummaries = nextQuizSummaries
             status = "Connected securely to CABO"
         } catch {
+            if keychainToken() == nil { clearSupportStorage() }
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
             guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+            supportDrafts = loadSupportDrafts()
+            supportCourses = loadSupportCourses()
             status = keychainToken() == nil
                 ? "Session expired. Sign in again."
                 : "Could not load CABO. Check your connection and retry."
         }
+    }
+
+    func saveSupportDraft(course: NativeSupportCourse, concept: String, question: String, attempted: String,
+                          replacing requestKey: String? = nil) throws -> NativeSupportDraft {
+        guard role == "learner", supportCourses.contains(course) else { throw NSError(domain: "CABO", code: 403) }
+        let cleanConcept = concept.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanAttempted = attempted.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (2...160).contains(cleanConcept.count), (10...4000).contains(cleanQuestion.count),
+              (3...2000).contains(cleanAttempted.count) else {
+            throw NSError(domain: "CABO", code: 400,
+                          userInfo: [NSLocalizedDescriptionKey: "Add a concept, a question, and what you have tried."])
+        }
+        let draft = NativeSupportDraft(requestKey: UUID().uuidString.lowercased(),
+            organizationId: course.organizationId, courseId: course.courseId, courseName: course.name,
+            concept: cleanConcept, question: cleanQuestion, attempted: cleanAttempted)
+        let updated = (loadSupportDrafts().filter {
+            $0.requestKey != draft.requestKey && $0.requestKey != requestKey
+        } + [draft]).suffix(20)
+        try storeSupportDrafts(Array(updated))
+        supportDrafts = Array(updated)
+        return draft
+    }
+
+    func deleteSupportDraft(_ requestKey: String) throws {
+        let updated = loadSupportDrafts().filter { $0.requestKey != requestKey }
+        try storeSupportDrafts(updated)
+        supportDrafts = updated
+    }
+
+    func sendSupportDraft(_ draft: NativeSupportDraft) async throws {
+        guard role == "learner", supportDrafts.contains(where: { $0.requestKey == draft.requestKey }) else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "courseId": draft.courseId, "concept": draft.concept, "question": draft.question,
+            "attempted": draft.attempted, "requestKey": draft.requestKey
+        ])
+        let data = try await request("api/organizations/\(draft.organizationId)/support",
+                                     method: "POST", body: body, idempotencyKey: draft.requestKey)
+        guard let ticket = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = ticket["id"] as? Int, id > 0,
+              ticket["requestKey"] as? String == draft.requestKey,
+              ticket["organizationId"] as? Int == draft.organizationId,
+              ticket["courseId"] as? Int == draft.courseId else {
+            throw NSError(domain: "CABO", code: 502,
+                          userInfo: [NSLocalizedDescriptionKey: "CABO could not confirm this support request."])
+        }
+        try deleteSupportDraft(draft.requestKey)
+        await refresh()
+    }
+
+    func replyToSupportTicket(_ ticket: NativeStaffSupportTicket, body: String) async throws {
+        try await sendStaffSupportAction(ticket, action: ["kind": "reply", "body": body])
+    }
+
+    func triageSupportTicket(_ ticket: NativeStaffSupportTicket, reason: String) async throws {
+        try await sendStaffSupportAction(ticket, action: ["kind": "transition", "status": "triaged", "reason": reason])
+    }
+
+    private func sendStaffSupportAction(_ ticket: NativeStaffSupportTicket, action: [String: Any]) async throws {
+        guard ["teacher", "assessor"].contains(role ?? "") else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        let body = try JSONSerialization.data(withJSONObject: ["version": ticket.version, "action": action])
+        let data = try await request("api/organizations/\(ticket.organizationId)/support/\(ticket.id)/actions",
+                                     method: "POST", body: body)
+        guard let updated = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              updated["id"] as? Int == ticket.id,
+              (updated["version"] as? Int ?? 0) == ticket.version + 1 else {
+            throw NSError(domain: "CABO", code: 409,
+                          userInfo: [NSLocalizedDescriptionKey: "This request changed. Refresh before trying again."])
+        }
+        await refresh()
+    }
+
+    private func supportOwnerId() -> String? {
+        guard let token = keychainToken() else { return nil }
+        return SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func loadSupportDrafts() -> [NativeSupportDraft] {
+        guard let owner = supportOwnerId(), let data = keychainData(account: "support_drafts"),
+              let store = try? JSONDecoder().decode(NativeSupportDraftStore.self, from: data),
+              store.ownerId == owner else { return [] }
+        return Array(store.drafts.suffix(20))
+    }
+
+    private func storeSupportDrafts(_ drafts: [NativeSupportDraft]) throws {
+        guard let owner = supportOwnerId() else { throw NSError(domain: "CABO", code: 401) }
+        let data = try JSONEncoder().encode(NativeSupportDraftStore(ownerId: owner, drafts: Array(drafts.suffix(20))))
+        try storeKeychainData(data, account: "support_drafts")
+    }
+
+    private func loadSupportCourses() -> [NativeSupportCourse] {
+        guard let owner = supportOwnerId(), let data = keychainData(account: "support_courses"),
+              let store = try? JSONDecoder().decode(NativeSupportCourseStore.self, from: data),
+              store.ownerId == owner else { return [] }
+        return Array(store.courses.prefix(100))
+    }
+
+    private func storeSupportCourses(_ courses: [NativeSupportCourse]) {
+        guard let owner = supportOwnerId(),
+              let data = try? JSONEncoder().encode(NativeSupportCourseStore(ownerId: owner, courses: Array(courses.prefix(100)))) else { return }
+        try? storeKeychainData(data, account: "support_courses")
+    }
+
+    private func clearSupportStorage() {
+        deleteKeychainData(account: "support_drafts")
+        deleteKeychainData(account: "support_courses")
+        supportDrafts = []
+        supportCourses = []
     }
 
     // Account-scoped, paged source text. Never cache private learner documents
@@ -573,6 +763,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             _ = try? await URLSession.shared.data(for: request)
         }
+        clearSupportStorage()
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
         guardians = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
@@ -593,6 +784,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         return String(data: data, encoding: .utf8)
     }
     private func storeToken(_ token: String) throws {
+        clearSupportStorage()
         clearToken()
         let attributes: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "za.co.cabosolutions.learninghub.native",
@@ -607,6 +799,37 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "za.co.cabosolutions.learninghub.native",
             kSecAttrAccount as String: "native_bearer"]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    private func keychainData(account: String) -> Data? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "za.co.cabosolutions.learninghub.native",
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return data
+    }
+
+    private func storeKeychainData(_ data: Data, account: String) throws {
+        deleteKeychainData(account: account)
+        let attributes: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "za.co.cabosolutions.learninghub.native",
+            kSecAttrAccount as String: account,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecValueData as String: data]
+        guard SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess else {
+            throw NSError(domain: "CABO", code: 500,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not securely save this draft on this device."])
+        }
+    }
+
+    private func deleteKeychainData(account: String) {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "za.co.cabosolutions.learninghub.native",
+            kSecAttrAccount as String: account]
         SecItemDelete(query as CFDictionary)
     }
 }
