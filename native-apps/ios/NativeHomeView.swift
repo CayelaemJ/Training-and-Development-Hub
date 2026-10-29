@@ -317,7 +317,7 @@ struct NativeHomeView: View {
     @ViewBuilder
     private var educatorContent: some View {
         title("Teaching & learner support")
-        if ["owner", "admin"].contains(session.role ?? "") {
+        if session.canManageExamAssignments {
             Button {
                 Task {
                     await session.refreshExamManagement()
@@ -328,7 +328,7 @@ struct NativeHomeView: View {
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(session.busy)
+            .disabled(session.busy || session.examManagementBusy)
             Text("School managers can assign their own written exams to learner groups and review submitted marking.")
                 .font(.footnote).foregroundColor(.secondary)
         }
