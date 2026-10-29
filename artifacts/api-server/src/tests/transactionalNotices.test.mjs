@@ -55,7 +55,7 @@ test("sends only approved generic text with hashed idempotency and no private ke
 test("duplicate reservation never resends email or consumes new quota",async()=>{
  let calls=0;
  const fetcher=async()=>{calls++;return Response.json({result:2})};
- assert.equal(await sendTransactionalNotice(message,fetcher,env),"accepted");
+ assert.equal(await sendTransactionalNotice(message,fetcher,env),"deduplicated");
  assert.equal(calls,1);
 });
 test("quota exhaustion and provider failures do not expose details",async()=>{
