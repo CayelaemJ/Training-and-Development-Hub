@@ -23,6 +23,7 @@ targets:
       - path: NativeSupportRequestView.swift
       - path: NativeStaffSupportView.swift
       - path: NativeLearnerJourneyView.swift
+      - path: NativeLearnerPassportView.swift
       - path: NativeGuardianReport.swift
     settings:
       base:

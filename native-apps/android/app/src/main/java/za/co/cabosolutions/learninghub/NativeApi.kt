@@ -1036,6 +1036,46 @@ internal class NativeApi(private val context: Context) {
             canManageExamAssignments = hasManagerOrganizationMembership())
     }
 
+    suspend fun fetchLearnerPassport(): LearnerPassport = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val payload = request("/api/learner-passport/me?download=true", auth = true)
+        val rows = payload.optJSONArray("items") ?: JSONArray()
+        val items = (0 until minOf(rows.length(), 100)).mapNotNull { index ->
+            val row = rows.optJSONObject(index) ?: return@mapNotNull null
+            val id = row.optInt("id")
+            if (id <= 0) return@mapNotNull null
+            val outcomeJson = row.optJSONObject("outcome")
+            val outcome = outcomeJson?.let {
+                LearnerPassportOutcome(it.optDouble("baseline"), it.optDouble("followup"), it.optDouble("improvementPp"))
+            }
+            LearnerPassportItem(
+                id = id,
+                concept = row.optString("concept").take(200),
+                status = row.optString("status").take(40),
+                createdAt = row.optString("createdAt").take(40),
+                updatedAt = row.optString("updatedAt").take(40),
+                outcome = outcome
+            )
+        }
+        val dnaRows = payload.optJSONArray("learningDNA") ?: JSONArray()
+        val dna = (0 until minOf(dnaRows.length(), 500)).mapNotNull { index ->
+            val row = dnaRows.optJSONObject(index) ?: return@mapNotNull null
+            val ticketId = row.optInt("ticketId")
+            val concept = row.optString("concept").take(200)
+            if (ticketId <= 0 || concept.isBlank()) null else LearnerPassportDna(
+                ticketId, row.optString("reviewedAt").take(40), row.optString("state").take(40),
+                concept, row.optInt("courseId").takeIf { it > 0 }
+            )
+        }
+        LearnerPassport(
+            asOf = payload.optString("asOf").take(40),
+            items = items,
+            learningDna = dna,
+            provenance = payload.optString("provenance").take(1000),
+            interpretation = payload.optString("interpretation").take(1000),
+            json = payload.toString(2)
+        )
+    }
+
     suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         request("/api/learner-journey/me", JSONObject().put("displayName", displayName.trim().take(160)), method = "PUT", auth = true)
     }

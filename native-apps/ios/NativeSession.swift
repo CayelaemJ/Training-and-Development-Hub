@@ -34,6 +34,37 @@ private struct NativeOrganizationMembership: Decodable {
     let role: String
 }
 
+struct NativeLearnerPassportOutcome: Decodable {
+    let baseline: Double
+    let followup: Double
+    let improvementPp: Double
+}
+struct NativeLearnerPassportItem: Decodable, Identifiable {
+    let id: Int
+    let concept: String
+    let status: String
+    let createdAt: String
+    let updatedAt: String
+    let outcome: NativeLearnerPassportOutcome?
+}
+struct NativeLearnerPassportDNA: Decodable, Identifiable {
+    let ticketId: Int
+    let reviewedAt: String
+    let state: String
+    let concept: String
+    let courseId: Int?
+    var id: String { "\(ticketId)-\(reviewedAt)" }
+}
+struct NativeLearnerPassport: Decodable {
+    let version: Int
+    let asOf: String
+    let items: [NativeLearnerPassportItem]
+    let learningDNA: [NativeLearnerPassportDNA]
+    let provenance: String
+    let interpretation: String
+}
+
+
 import Foundation
 import SwiftUI
 import AuthenticationServices
@@ -305,6 +336,10 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var learnerHelp: [NativeStaffSupportTicket] = []
     @Published var learnerReports: [NativeLearnerReport] = []
     @Published var learnerReportNotice = ""
+    @Published var learnerPassport: NativeLearnerPassport?
+    @Published var learnerPassportJSON: String?
+    @Published var learnerPassportNotice = ""
+    @Published var learnerPassportBusy = false
     @Published var supportCourses: [NativeSupportCourse] = []
     @Published var supportDrafts: [NativeSupportDraft] = []
 
@@ -430,6 +465,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             role = nil
             summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; quizzes = []; quizSummaries = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
+            learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
             status = "Session expired. Sign in again."
@@ -809,6 +845,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
+        learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""; learnerPassportBusy = false
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1524,6 +1561,23 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         _ = try await request("api/organizations/\(organizationId)/submissions/\(submissionId)/overrides",
             method: "POST", body: body)
         examManagementWorkspaces = await loadExamManagementWorkspaces()
+    }
+
+    func refreshLearnerPassport() async {
+        guard role == "learner", !learnerPassportBusy else { return }
+        learnerPassportBusy = true
+        learnerPassportNotice = ""
+        defer { learnerPassportBusy = false }
+        do {
+            let data = try await request("api/learner-passport/me?download=true")
+            let value = try JSONDecoder().decode(NativeLearnerPassport.self, from: data)
+            learnerPassport = value
+            learnerPassportJSON = String(data: data, encoding: .utf8)
+        } catch {
+            learnerPassport = nil
+            learnerPassportJSON = nil
+            learnerPassportNotice = "Learner passport is unavailable for this account right now. Refresh to try again."
+        }
     }
 
     func setNotificationPreference(organizationId: Int, kind: String, enabled: Bool, acknowledged: Bool) async {

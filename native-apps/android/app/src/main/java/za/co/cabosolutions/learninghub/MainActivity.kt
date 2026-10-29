@@ -57,6 +57,10 @@ class MainActivity : ComponentActivity() {
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedWrittenExams by mutableStateOf(false)
+    private var selectedLearnerPassport by mutableStateOf(false)
+    private var learnerPassport by mutableStateOf<LearnerPassport?>(null)
+    private var learnerPassportBusy by mutableStateOf(false)
+    private var learnerPassportMessage by mutableStateOf<String?>(null)
     private var managerCreatingExam by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
@@ -115,9 +119,10 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
+                        selectedLearnerPassport -> closeLearnerPassport()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
                         selectedWrittenExams && managerCreatingExam -> { managerCreatingExam = false; loadDashboard() }
@@ -228,6 +233,22 @@ class MainActivity : ComponentActivity() {
                             } else selectedWrittenExams = false
                         }
                     )
+                    selectedLearnerPassport -> NativeLearnerPassportScreen(
+                        passport = learnerPassport,
+                        busy = learnerPassportBusy,
+                        message = learnerPassportMessage,
+                        refresh = { loadLearnerPassport() },
+                        share = {
+                            learnerPassport?.let { passport ->
+                                val send = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/json"
+                                    putExtra(Intent.EXTRA_TEXT, passport.json)
+                                }
+                                startActivity(Intent.createChooser(send, "Export learner passport"))
+                            }
+                        },
+                        close = { closeLearnerPassport() }
+                    )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
                         attempt = attempt, busy = studyBusy, submitted = studySubmitted,
@@ -305,6 +326,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else selectedWrittenExams = true
                         },
+                        openPassport = { openLearnerPassport() },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -354,6 +376,40 @@ class MainActivity : ComponentActivity() {
         demoRole = "learner"
         screen = NativeDemoData.learner()
         status = "CABO demo · sample data only · no account connected"
+    }
+
+    private fun openLearnerPassport() {
+        selectedLearnerPassport = true
+        if (demoActive) {
+            learnerPassport = null
+            learnerPassportMessage = "Passport export needs a connected learner account. Synthetic demo data is not exported."
+        } else loadLearnerPassport()
+    }
+
+    private fun loadLearnerPassport() {
+        if (demoActive) {
+            learnerPassportMessage = "Passport export needs a connected learner account. Synthetic demo data is not exported."
+            return
+        }
+        if (learnerPassportBusy) return
+        learnerPassportBusy = true
+        learnerPassportMessage = null
+        lifecycleScope.launch {
+            try {
+                learnerPassport = api.fetchLearnerPassport()
+            } catch (_: Exception) {
+                learnerPassport = null
+                learnerPassportMessage = "Learner passport is unavailable for this account right now. Refresh to try again."
+            } finally {
+                learnerPassportBusy = false
+            }
+        }
+    }
+
+    private fun closeLearnerPassport() {
+        selectedLearnerPassport = false
+        learnerPassport = null
+        learnerPassportMessage = null
     }
 
     private fun closeMaterialUpload() {
@@ -1181,7 +1237,8 @@ internal fun NativeHome(
     deleteSupportDraft: (NativeSupportDraft) -> Unit = {},
     offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
     offlineSupportCourses: List<SupportCourseOption> = emptyList(),
-    learnerJourneyAction: (LearnerJourneyAction) -> Unit = {}
+    learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
+    openPassport: () -> Unit = {}
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -1366,7 +1423,7 @@ internal fun NativeHome(
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
-                                learnerJourneyAction = learnerJourneyAction
+                                learnerJourneyAction = learnerJourneyAction, openPassport = openPassport
                             )
                         }
                     } else {
@@ -1385,7 +1442,7 @@ internal fun NativeHome(
                             openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
-                            learnerJourneyAction = learnerJourneyAction
+                            learnerJourneyAction = learnerJourneyAction, openPassport = openPassport
                         )
                     }
                 }
@@ -1780,7 +1837,8 @@ private fun RoleContent(
     openSupportDraft: (NativeSupportDraft) -> Unit,
     sendSupportDraft: (NativeSupportDraft) -> Unit,
     deleteSupportDraft: (NativeSupportDraft) -> Unit,
-    learnerJourneyAction: (LearnerJourneyAction) -> Unit
+    learnerJourneyAction: (LearnerJourneyAction) -> Unit,
+    openPassport: () -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp).testTag("native-role-content"),
@@ -1945,6 +2003,12 @@ private fun RoleContent(
                     item { Text("Your progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     data.journey.forEach { milestone -> item { NativeCard(milestone, "Learning journey") } }
                     item { LearnerJourneyPanel(data, busy, learnerJourneyAction) }
+                    item {
+                        OutlinedButton(onClick = openPassport, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Open my learner passport")
+                        }
+                    }
                     if (data.learnerReportNotice.isNotBlank()) item { Text(data.learnerReportNotice) }
                     if (data.learnerReports.isEmpty()) item { NativeCard("No report preview", "A verified enrolment and published assessments are required.") }
                     items(data.learnerReports, key = { it.id }) { report ->

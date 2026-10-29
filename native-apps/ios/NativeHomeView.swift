@@ -12,6 +12,7 @@ struct NativeHomeView: View {
     @State private var selectedStaffTicket: NativeStaffSupportTicket?
     @State private var showSupportRequests = false
     @State private var showLearnerJourney = false
+    @State private var showLearnerPassport = false
     @State private var showExamManagement = false
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
@@ -64,6 +65,7 @@ struct NativeHomeView: View {
                 selectedMaterial = nil
                 selectedStaffTicket = nil
                 showExamManagement = false
+                showLearnerPassport = false
                 testPassword = ""
                 reviewedGuardianEvidence = []
             }
@@ -85,6 +87,9 @@ struct NativeHomeView: View {
         }
         .sheet(isPresented: $showLearnerJourney) {
             NativeLearnerJourneyView(session: session)
+        }
+        .sheet(isPresented: $showLearnerPassport) {
+            NativeLearnerPassportView(session: session)
         }
         .sheet(isPresented: $showExamManagement) {
             NativeExamManagementView(session: session)
@@ -445,6 +450,12 @@ struct NativeHomeView: View {
                 .frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
+        Button { showLearnerPassport = true } label: {
+            Label("Open my learner passport", systemImage: "person.text.rectangle")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.bordered)
         .disabled(session.busy)
         ForEach(session.summary + session.journey, id: \.self) { item in
             infoTile(item, "Current CABO learning progress", system: "chart.bar")
