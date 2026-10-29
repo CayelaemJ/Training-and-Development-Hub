@@ -1041,7 +1041,9 @@ class NativeSchoolProgressionConfirmationTest {
             }
         }
 
-        compose.onNodeWithText("CABO does not decide progression.").assertExists()
+        compose.onNodeWithText(
+            "Promoting or repeating creates a next-year enrolment and completes the previous year. CABO does not decide progression."
+        ).assertExists()
         compose.onNodeWithText("Promote to Form 2").performClick()
         compose.onNodeWithText("Confirm promotion for this learner?").assertIsDisplayed()
         assertEquals(null, submittedDecision)
