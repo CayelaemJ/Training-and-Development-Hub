@@ -105,8 +105,8 @@ struct NativeExamManagementView: View {
                                     .font(.subheadline).foregroundColor(.secondary)
                                 ForEach(submission.feedback, id: \.questionIndex) { mark in
                                     let assignedExamId = workspace.assignments.first(where: { $0.id == submission.assignmentId })?.examId
-                                    let prompt = session.writtenExams.first(where: { $0.id == assignedExamId })?
-                                        .questions[safe: mark.questionIndex]?.prompt
+                                    let prompt = session.writtenExams.first(where: { $0.id == assignedExamId })
+                                        .flatMap { exam in exam.questions.indices.contains(mark.questionIndex) ? exam.questions[mark.questionIndex].prompt : nil }
                                     NativeExamOverrideRow(
                                         session: session, organizationId: workspace.organizationId,
                                         submission: submission, mark: mark, prompt: prompt
