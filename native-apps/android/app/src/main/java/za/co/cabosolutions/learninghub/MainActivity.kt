@@ -1467,7 +1467,7 @@ internal fun NativeHome(
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
                                 learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
-                                openEducationCommand = openEducationCommand
+                                openEducationCommand = { openEducationCommand() }
                             )
                         }
                     } else {
@@ -1487,7 +1487,7 @@ internal fun NativeHome(
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
                             learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
-                            openEducationCommand = openEducationCommand
+                            openEducationCommand = { openEducationCommand() }
                         )
                     }
                 }
