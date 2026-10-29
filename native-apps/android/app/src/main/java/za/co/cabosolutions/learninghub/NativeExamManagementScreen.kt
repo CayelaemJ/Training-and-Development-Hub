@@ -139,7 +139,11 @@ internal fun NativeExamManagementScreen(
                                 submission.feedback.forEach { mark ->
                                     val key = "${submission.id}:${mark.questionIndex}"
                                     val answer = submission.answers.getOrNull(mark.questionIndex).orEmpty()
+                                    val assignedExamId = workspace.assignments.firstOrNull { it.id == submission.assignmentId }?.examId
+                                    val questionPrompt = exams.firstOrNull { it.id == assignedExamId }
+                                        ?.questions?.getOrNull(mark.questionIndex)?.prompt
                                     Text("Question ${mark.questionIndex + 1} · AI mark ${mark.awardedMarks}/${mark.maxMarks}")
+                                    questionPrompt?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                                     if (mark.needsReview) Text("Needs educator review", color = MaterialTheme.colorScheme.error)
                                     Text("Learner response: $answer", style = MaterialTheme.typography.bodySmall)
                                     Text(mark.feedback, style = MaterialTheme.typography.bodySmall)
