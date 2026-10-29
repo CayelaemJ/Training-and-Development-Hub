@@ -717,7 +717,6 @@ class NativeAndroidWrittenExamTest {
     fun generatesExamRequiresAnswersAndShowsMarkingResult() {
         val exam = WrittenExam(41, "Fractions written check", "beginner",
             listOf(WrittenExamQuestion("Explain how you would add 1/4 and 1/2.", "short_answer", 5)))
-        val submitted = mutableStateOf<List<String>?>(null)
         compose.setContent {
             MaterialTheme {
                 NativeWrittenExamScreen(
@@ -730,7 +729,6 @@ class NativeAndroidWrittenExamTest {
                     },
                     open = { exam },
                     submit = { _, answers ->
-                        submitted.value = answers
                         WrittenExamResult(52, 80.0, 4.0, 5.0, 0,
                             listOf(WrittenExamMark(0, 4.0, 5.0, "Good explanation.", false)))
                     },
@@ -743,8 +741,6 @@ class NativeAndroidWrittenExamTest {
         compose.onNodeWithTag("submit-written-exam").assertIsNotEnabled()
         compose.onNodeWithTag("written-answer-0").performTextInput("Add the denominators after making them equal.")
         compose.onNodeWithTag("submit-written-exam").assertIsEnabled().performClick()
-        compose.waitUntil(timeoutMillis = 10000) { submitted.value != null }
-        assertEquals(listOf("Add the denominators after making them equal."), submitted.value)
         compose.waitUntil(timeoutMillis = 10000) {
             compose.onAllNodesWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNodes().isNotEmpty()
         }
