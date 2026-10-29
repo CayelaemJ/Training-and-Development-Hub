@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Home
@@ -207,6 +208,9 @@ class MainActivity : ComponentActivity() {
                             decideSchoolReport(organizationId, reportId, action, reason)
                         },
                         verifyIssuedReport = { verifyIssuedReport(it) },
+                        publishSchoolNotice = { org, title, body, audience -> publishSchoolNotice(org, title, body, audience) },
+                        recordSchoolAttendance = { org, learner, day, attendanceStatus, note -> recordSchoolAttendance(org, learner, day, attendanceStatus, note) },
+                        substituteSchoolTeacher = { org, slot, teacher, reason -> substituteSchoolTeacher(org, slot, teacher, reason) },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
@@ -470,6 +474,39 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {
                 status = "Unable to verify this report right now. Check your connection and access."
             } finally { busy = false }
+        }
+    }
+
+    private fun publishSchoolNotice(organizationId: Int, subject: String, message: String, audience: String) {
+        if (demoActive || busy || screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.publishSchoolNotice(organizationId, subject, message, audience); status = "Notice published to the selected school audience." }
+            catch (_: Exception) { status = "Could not publish the notice. Confirm school administrator access and try again." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun recordSchoolAttendance(organizationId: Int, learnerId: String, day: String, attendanceStatus: String, note: String) {
+        if (demoActive || busy || screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.recordSchoolAttendance(organizationId, learnerId, day, attendanceStatus, note); status = "Attendance saved by the school." }
+            catch (_: Exception) { status = "Could not save attendance. Confirm the learner belongs to this institution and retry." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun substituteSchoolTeacher(organizationId: Int, slotId: Int, replacementTeacherId: String, reason: String) {
+        if (demoActive || busy || screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) return
+        busy = true
+        lifecycleScope.launch {
+            try { api.substituteSchoolTeacher(organizationId, slotId, replacementTeacherId, reason); status = "Teacher substitution recorded and audited." }
+            catch (_: Exception) { status = "Substitution was not saved. Check staff membership, reason, and timetable conflicts." }
+            finally { busy = false }
+            if (api.hasSession()) loadDashboard()
         }
     }
 
@@ -955,6 +992,9 @@ internal fun NativeHome(
     submitSchoolReport: (Int, String, Int) -> Unit = { _, _, _ -> },
     decideSchoolReport: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
     verifyIssuedReport: (IssuedSchoolReport) -> Unit = {},
+    publishSchoolNotice: (Int, String, String, String) -> Unit = { _, _, _, _ -> },
+    recordSchoolAttendance: (Int, String, String, String, String) -> Unit = { _, _, _, _, _ -> },
+    substituteSchoolTeacher: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
@@ -972,7 +1012,7 @@ internal fun NativeHome(
         Triple("learn", "Learn", Icons.Default.School),
         Triple("progress", "Progress", Icons.Default.Assessment),
         Triple("support", if (demoRole == "parent") "Family" else if (demoRole == "learner") "Help" else "Support", Icons.Default.Forum)
-    )
+    ) + if (data?.schoolOperations?.isNotEmpty() == true) listOf(Triple("school", "School", Icons.Default.AccountBalance)) else emptyList()
     Scaffold(
         containerColor = Color(0xFFF8F6EF),
         topBar = {
@@ -1141,6 +1181,8 @@ internal fun NativeHome(
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
                                 decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
+                                publishSchoolNotice = publishSchoolNotice, recordSchoolAttendance = recordSchoolAttendance,
+                                substituteSchoolTeacher = substituteSchoolTeacher,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
@@ -1154,6 +1196,8 @@ internal fun NativeHome(
                             respondToInvite = respondToInvite,
                             reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
                             decideSchoolReport = decideSchoolReport, verifyIssuedReport = verifyIssuedReport,
+                                publishSchoolNotice = publishSchoolNotice, recordSchoolAttendance = recordSchoolAttendance,
+                                substituteSchoolTeacher = substituteSchoolTeacher,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -1162,6 +1206,91 @@ internal fun NativeHome(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SchoolOperationsCard(
+    workspace: SchoolOperationsWorkspace,
+    busy: Boolean,
+    publishNotice: (Int, String, String, String) -> Unit,
+    recordAttendance: (Int, String, String, String, String) -> Unit,
+    substituteTeacher: (Int, Int, String, String) -> Unit
+) {
+    var subject by remember(workspace.organizationId) { mutableStateOf("") }
+    var message by remember(workspace.organizationId) { mutableStateOf("") }
+    var audience by remember(workspace.organizationId) { mutableStateOf("all") }
+    var learnerId by remember(workspace.organizationId) { mutableStateOf("") }
+    var day by remember(workspace.organizationId) { mutableStateOf(java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())) }
+    var attendanceStatus by remember(workspace.organizationId) { mutableStateOf("present") }
+    var attendanceNote by remember(workspace.organizationId) { mutableStateOf("") }
+    var replacement by remember(workspace.organizationId) { mutableStateOf("") }
+    var reason by remember(workspace.organizationId) { mutableStateOf("") }
+    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFEFA))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(workspace.organizationName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("School membership · ${workspace.membershipRole.replace('_', ' ')}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+            workspace.notice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Text("Notices", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (workspace.notices.isEmpty()) Text("No notices available.", style = MaterialTheme.typography.bodySmall)
+            workspace.notices.forEach { notice ->
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(notice.subject, fontWeight = FontWeight.SemiBold)
+                    Text(notice.message, style = MaterialTheme.typography.bodyMedium)
+                    Text("${notice.audience.replaceFirstChar { it.uppercase() }} · ${notice.createdAt.take(10)}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF68736B))
+                }
+            }
+            if (workspace.membershipRole == "learner") {
+                Text("My attendance", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                if (workspace.attendance.isEmpty()) Text("No personal attendance entries yet.", style = MaterialTheme.typography.bodySmall)
+                workspace.attendance.forEach { Text("${it.day} · ${it.status.replaceFirstChar { c -> c.uppercase() }}") }
+            }
+            if (workspace.canManage) {
+                workspace.attendanceSummary?.let { summary ->
+                    Text("Attendance overview · ${summary.year} · ${summary.records} records", fontWeight = FontWeight.SemiBold)
+                    Text(summary.counts.entries.sortedBy { it.key }.joinToString("   ") { "${it.key}: ${it.value}" }, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Text("Timetable · ${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (workspace.timetable.isEmpty()) Text("No timetable slots are published for this year.", style = MaterialTheme.typography.bodySmall)
+            workspace.timetable.sortedWith(compareBy<SchoolTimetableSlot> { it.day }.thenBy { it.startsAt }).forEach { slot ->
+                Text("Day ${slot.day} · ${slot.startsAt}–${slot.endsAt} · ${slot.subject} · ${slot.grade} ${slot.group} · ${slot.room}", style = MaterialTheme.typography.bodySmall)
+                if (workspace.canManage && slot.status != "cancelled") {
+                    OutlinedTextField(value = replacement, onValueChange = { replacement = it.take(160) },
+                        label = { Text("Replacement teacher ID") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = reason, onValueChange = { reason = it.take(1000) },
+                        label = { Text("Substitution reason") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedButton(onClick = { substituteTeacher(workspace.organizationId, slot.id, replacement, reason) },
+                        enabled = !busy && replacement.isNotBlank() && reason.trim().length >= 5,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Assign substitute") }
+                }
+            }
+            if (workspace.canManage) {
+                Text("Publish notice", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(value = subject, onValueChange = { subject = it.take(180) }, label = { Text("Notice title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = message, onValueChange = { message = it.take(5000) }, label = { Text("Notice message") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("all", "learners", "staff").forEach { value ->
+                        FilterChip(selected = audience == value, onClick = { audience = value }, label = { Text(value.replaceFirstChar { it.uppercase() }) }, enabled = !busy)
+                    }
+                }
+                Button(onClick = { publishNotice(workspace.organizationId, subject, message, audience) },
+                    enabled = !busy && subject.trim().length >= 3 && message.trim().length >= 10,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Publish to school") }
+                Text("Record attendance", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(value = learnerId, onValueChange = { learnerId = it.take(160) }, label = { Text("Learner account ID") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = day, onValueChange = { day = it.take(10) }, label = { Text("Date (YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("present", "absent", "late", "excused").forEach { value ->
+                        FilterChip(selected = attendanceStatus == value, onClick = { attendanceStatus = value }, label = { Text(value.replaceFirstChar { it.uppercase() }) }, enabled = !busy)
+                    }
+                }
+                OutlinedTextField(value = attendanceNote, onValueChange = { attendanceNote = it.take(1000) }, label = { Text("Optional note") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(onClick = { recordAttendance(workspace.organizationId, learnerId, day, attendanceStatus, attendanceNote) },
+                    enabled = !busy && learnerId.isNotBlank() && day.matches(Regex("\\d{4}-\\d{2}-\\d{2}")),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Save attendance online") }
             }
         }
     }
@@ -1225,6 +1354,9 @@ private fun RoleContent(
     submitSchoolReport: (Int, String, Int) -> Unit,
     decideSchoolReport: (Int, Int, String, String) -> Unit,
     verifyIssuedReport: (IssuedSchoolReport) -> Unit,
+    publishSchoolNotice: (Int, String, String, String) -> Unit,
+    recordSchoolAttendance: (Int, String, String, String, String) -> Unit,
+    substituteSchoolTeacher: (Int, Int, String, String) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -1245,6 +1377,14 @@ private fun RoleContent(
             return@LazyColumn
         }
         val role = data.portal.role
+        if (section == "school") {
+            item { Text("School operations", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            items(data.schoolOperations, key = { "school-operations:${it.organizationId}" }) { workspace ->
+                SchoolOperationsCard(workspace, busy, publishSchoolNotice, recordSchoolAttendance, substituteSchoolTeacher)
+            }
+            if (data.schoolOperations.isEmpty()) item { NativeCard("No school membership", "Notices, attendance, and timetable details are available only through an institution that authorizes this account.") }
+            return@LazyColumn
+        }
         if (section == "home") {
             item {
                 ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(

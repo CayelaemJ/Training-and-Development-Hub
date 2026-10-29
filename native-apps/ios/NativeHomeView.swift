@@ -22,7 +22,7 @@ struct NativeHomeView: View {
 
     private var isEducator: Bool {
         guard let role = session.role else { return false }
-        return ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head"]
+        return ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head", "administrator"]
             .contains(role)
     }
 
@@ -410,6 +410,7 @@ struct NativeHomeView: View {
         ForEach(session.reportIssuanceWorkspaces) { workspace in
             NativeReportIssuanceSection(session: session, workspace: workspace)
         }
+        NativeSchoolOperationsPanel(session: session)
         Text("Actions are limited by your server-assigned school and course permissions.")
             .font(.footnote).foregroundColor(.secondary)
     }
@@ -561,6 +562,7 @@ struct NativeHomeView: View {
             .buttonStyle(.plain)
             .disabled(session.busy)
         }
+        NativeSchoolOperationsPanel(session: session)
     }
 
     private func guardianExplanation(_ invite: GuardianInvitation) -> String {
@@ -592,6 +594,109 @@ struct NativeHomeView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct NativeSchoolOperationsPanel: View {
+    @ObservedObject var session: NativeSession
+    @State private var subject = ""
+    @State private var message = ""
+    @State private var audience = "all"
+    @State private var learnerId = ""
+    @State private var attendanceDay = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+    @State private var attendanceStatus = "present"
+    @State private var attendanceNote = ""
+    @State private var replacementTeacherId = ""
+    @State private var substitutionReason = ""
+
+    var body: some View {
+        if !session.schoolOperations.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("School operations", systemImage: "building.2").font(.title3.bold())
+                ForEach(session.schoolOperations) { workspace in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(workspace.organizationName).font(.headline)
+                        Text("Membership · \(workspace.membershipRole)").font(.footnote).foregroundColor(.secondary)
+                        if let notice = workspace.notice { Text(notice).font(.footnote).foregroundColor(.secondary) }
+                        Text("School notices").font(.subheadline.bold())
+                        if workspace.notices.isEmpty { Text("No notices available.").font(.footnote).foregroundColor(.secondary) }
+                        ForEach(workspace.notices) { item in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.subject).font(.subheadline.bold())
+                                Text(item.message).font(.subheadline)
+                                Text("\(item.audience.capitalized) · \(item.createdAt)").font(.caption).foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                            .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        if workspace.membershipRole == "learner" {
+                            Text("My attendance").font(.subheadline.bold()).padding(.top, 3)
+                            if workspace.attendance.isEmpty { Text("No attendance recorded yet.").font(.footnote).foregroundColor(.secondary) }
+                            ForEach(workspace.attendance) { row in
+                                HStack { Text(row.day); Spacer(); Text(row.status.capitalized).foregroundColor(.secondary) }
+                                    .font(.subheadline)
+                            }
+                        }
+                        if let summary = workspace.attendanceSummary {
+                            Text("Attendance overview · \(summary.year)").font(.subheadline.bold())
+                            Text("\(summary.records) recorded days").font(.subheadline)
+                            ForEach(summary.counts.keys.sorted(), id: \.self) { key in
+                                Text("\(key.capitalized): \(summary.counts[key] ?? 0)").font(.footnote).foregroundColor(.secondary)
+                            }
+                        }
+                        Text("Published timetable").font(.subheadline.bold()).padding(.top, 3)
+                        if workspace.timetable.isEmpty { Text("No published timetable available.").font(.footnote).foregroundColor(.secondary) }
+                        ForEach(workspace.timetable) { slot in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("\(weekday(slot.day)) · \(slot.startsAt)–\(slot.endsAt)").font(.caption).foregroundColor(.secondary)
+                                Text("\(slot.subject) · \(slot.grade) \(slot.group)").font(.subheadline.bold())
+                                Text("\(slot.room) · \(slot.status.capitalized)").font(.footnote).foregroundColor(.secondary)
+                            }
+                        }
+                        if workspace.canManage {
+                            Divider()
+                            Text("Publish a school notice").font(.subheadline.bold())
+                            TextField("Notice title", text: $subject).textFieldStyle(.roundedBorder)
+                            TextField("Message for the school community", text: $message).textFieldStyle(.roundedBorder)
+                            Picker("Audience", selection: $audience) {
+                                Text("Everyone").tag("all"); Text("Learners").tag("learners"); Text("Staff").tag("staff")
+                            }.pickerStyle(.segmented)
+                            Button("Publish notice") {
+                                Task { await session.publishSchoolNotice(organizationId: workspace.organizationId, subject: subject, message: message, audience: audience) }
+                            }.buttonStyle(.borderedProminent).disabled(session.busy || subject.count < 3 || message.count < 10)
+
+                            Text("Record learner attendance").font(.subheadline.bold()).padding(.top, 4)
+                            TextField("Learner account ID", text: $learnerId).textInputAutocapitalization(.never).textFieldStyle(.roundedBorder)
+                            TextField("Date (YYYY-MM-DD)", text: $attendanceDay).textInputAutocapitalization(.never).textFieldStyle(.roundedBorder)
+                            Picker("Status", selection: $attendanceStatus) {
+                                Text("Present").tag("present"); Text("Absent").tag("absent")
+                                Text("Late").tag("late"); Text("Excused").tag("excused")
+                            }.pickerStyle(.segmented)
+                            TextField("Note (optional)", text: $attendanceNote).textFieldStyle(.roundedBorder)
+                            Button("Save attendance") {
+                                Task { await session.recordSchoolAttendance(organizationId: workspace.organizationId, learnerId: learnerId, day: attendanceDay, attendanceStatus: attendanceStatus, note: attendanceNote) }
+                            }.buttonStyle(.bordered).disabled(session.busy || learnerId.isEmpty)
+
+                            Text("Assign a timetable substitute").font(.subheadline.bold()).padding(.top, 4)
+                            TextField("Replacement teacher account ID", text: $replacementTeacherId).textInputAutocapitalization(.never).textFieldStyle(.roundedBorder)
+                            TextField("Reason for substitution", text: $substitutionReason).textFieldStyle(.roundedBorder)
+                            ForEach(workspace.timetable) { slot in
+                                Button("Substitute for \(slot.subject) · slot \(slot.id)") {
+                                    Task { await session.substituteSchoolTeacher(organizationId: workspace.organizationId, slotId: slot.id, replacementTeacherId: replacementTeacherId, reason: substitutionReason) }
+                                }.buttonStyle(.bordered).disabled(session.busy || replacementTeacherId.isEmpty || substitutionReason.count < 5)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                    .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                }
+            }.padding(.vertical, 8)
+        }
+    }
+
+    private func weekday(_ day: Int) -> String {
+        let symbols = Calendar.current.weekdaySymbols
+        return (1...7).contains(day) ? symbols[(day - 1) % symbols.count] : "Day \(day)"
     }
 }
 
