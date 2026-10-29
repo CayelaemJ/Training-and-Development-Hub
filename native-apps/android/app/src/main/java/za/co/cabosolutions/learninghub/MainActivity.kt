@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -1358,7 +1359,12 @@ private fun RoleContent(
                                         Text("${review.status.replace('_', ' ')} · school review required",
                                             style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                            Checkbox(checked = evidenceReviewed, onCheckedChange = { evidenceReviewed = it }, enabled = !busy)
+                                            Checkbox(
+                                                checked = evidenceReviewed,
+                                                onCheckedChange = { evidenceReviewed = it },
+                                                enabled = !busy,
+                                                modifier = Modifier.testTag("guardian-evidence-confirmation")
+                                            )
                                             Text("I independently reviewed legal authority", style = MaterialTheme.typography.bodySmall)
                                         }
                                         when (review.status) {
