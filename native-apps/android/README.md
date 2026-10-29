@@ -27,7 +27,7 @@ Every record is fictional. Demo actions stay in memory on the device and never w
 
 The default build never exposes demo mode. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
 
-The launch screen and the demo Home section link to the full CABO web app in the device browser. That opens the existing Render-hosted CABO interface for the complete web workspace and its wider feature set; use an authorised account there. The offline native showcase remains available without a connection.
+The Android app is implemented with native Kotlin and Jetpack Compose screens. It does not embed or redirect to the web application. The current native prototype covers selected learner, parent and educator workflows only; it is not full feature parity. Track the remaining native work in [../FEATURE_PARITY.md](../FEATURE_PARITY.md).
 
 ## Run the isolated test build
 
