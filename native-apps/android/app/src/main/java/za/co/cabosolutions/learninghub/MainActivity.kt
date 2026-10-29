@@ -287,7 +287,16 @@ class MainActivity : ComponentActivity() {
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
-                        openWrittenExams = { selectedWrittenExams = true },
+                        openWrittenExams = {
+                            if (!demoActive && screen?.portal?.role in setOf("owner", "admin")) {
+                                busy = true
+                                lifecycleScope.launch {
+                                    try { screen = screen?.copy(examManagementWorkspaces = api.fetchExamManagementWorkspaces()) }
+                                    catch (_: Exception) { status = "Exam workspace could not be loaded. Check your connection and try again." }
+                                    finally { busy = false; selectedWrittenExams = true }
+                                }
+                            } else selectedWrittenExams = true
+                        },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
