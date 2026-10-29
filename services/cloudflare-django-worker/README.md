@@ -50,6 +50,11 @@ The connected Cloudflare account now has two **EU-jurisdiction** queues:
 
 **These queues are presently unbound, empty and inactive.** Do not publish messages until an authenticated producer, durable job-status store, idempotent consumer, failure classification, DLQ monitoring, consent/revocation checks and cross-border review are implemented. Cloudflare's Workers Free plan includes 10,000 queue operations/day with 24-hour retention, so it is unsuitable as the only durable job store.
 
+### Cloudflare Python local-runtime verification
+The pinned Wrangler `4.151.3` local `workerd` build supports compatibility date `2026-10-26` (not `2026-10-28`). The Worker configuration uses the supported date. A manual synthetic HTTP run under Cloudflare's local Pyodide/WSGI runtime confirmed: health 200, no/invalid bearer 401, authorised synthetic advisory 200, disallowed identifying fields 400 and forged Host 400. The local runtime took approximately 30 seconds to process its first request; subsequent requests completed in less than 0.1 seconds. This **does not predict hosted Cloudflare cold-start performance**, which requires separate verification.
+
+After `uvx --from workers-py==1.17.9 pywrangler sync`, the repeatable local smoke script is `node scripts/test-django-worker-local.mjs` from the repository root. It uses only synthetic secrets and data and will refuse to replace an existing local `.dev.vars` file. It must pass in an isolated runtime before any hosted staging deployment is approved.
+
 ### Expected staging verification
 1. Django test suite: `DJANGO_SECRET_KEY=local-only-test-secret DJANGO_WORKER_TOKEN=long-test-only-token-for-ci-tests-1234 python -m django test --settings=cabo_worker.settings`.
 2. CircleCI `django_worker`, `verify`, `security_suite` must be green; an unrelated failure requires diagnosis, not bypass.
