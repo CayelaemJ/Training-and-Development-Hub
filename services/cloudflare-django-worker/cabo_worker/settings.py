@@ -19,7 +19,10 @@ else:
 DEBUG = False
 ROOT_URLCONF = "cabo_worker.urls"
 INSTALLED_APPS = []
-MIDDLEWARE = ["django.middleware.security.SecurityMiddleware"]
+MIDDLEWARE = [
+    "cabo_worker.middleware.StrictHostValidationMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+]
 USE_TZ = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
