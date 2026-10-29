@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -195,7 +196,8 @@ class MainActivity : ComponentActivity() {
                         sendSupportDraft = { sendSupportDraft(it) },
                         deleteSupportDraft = { deleteSupportDraft(it) },
                         offlineSupportDrafts = supportDrafts,
-                        offlineSupportCourses = supportCourseOptions
+                        offlineSupportCourses = supportCourseOptions,
+                        learnerJourneyAction = { performLearnerJourneyAction(it) }
                     )
                 }
             }
@@ -384,6 +386,40 @@ class MainActivity : ComponentActivity() {
                 busy = false
             }
             if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun performLearnerJourneyAction(action: LearnerJourneyAction) {
+        if (busy || screen?.portal?.role != "learner") return
+        if (demoActive) {
+            val current = screen ?: return
+            screen = when (action) {
+                is LearnerJourneyAction.SaveIdentity -> current.copy(journeyIdentity = LearnerJourneyIdentity(action.displayName.take(160)))
+                is LearnerJourneyAction.AddEntry -> current.copy(journeyEntries = current.journeyEntries + LearnerJourneyEntry(
+                    -(current.journeyEntries.size + 1), action.institution.take(160), action.stage, action.year, action.note.take(2000)))
+                is LearnerJourneyAction.AddMilestone -> current.copy(journeyMilestones = current.journeyMilestones + LearnerJourneyMilestone(
+                    -(current.journeyMilestones.size + 1), action.title.take(160), action.description.take(4000), action.kind, action.year))
+                is LearnerJourneyAction.DeleteEntry -> current.copy(journeyEntries = current.journeyEntries.filterNot { it.id == action.id })
+                is LearnerJourneyAction.DeleteMilestone -> current.copy(journeyMilestones = current.journeyMilestones.filterNot { it.id == action.id })
+            }
+            status = "Demo journey updated on this device only."
+            return
+        }
+        busy = true
+        lifecycleScope.launch {
+            try {
+                when (action) {
+                    is LearnerJourneyAction.SaveIdentity -> api.saveJourneyIdentity(action.displayName)
+                    is LearnerJourneyAction.AddEntry -> api.addJourneyEntry(action.institution, action.stage, action.year, action.note)
+                    is LearnerJourneyAction.AddMilestone -> api.addJourneyMilestone(action.title, action.description, action.kind, action.year)
+                    is LearnerJourneyAction.DeleteEntry -> api.deleteJourneyItem("/api/learner-journey/entries/${action.id}")
+                    is LearnerJourneyAction.DeleteMilestone -> api.deleteJourneyItem("/api/learner-journey/milestones/${action.id}")
+                }
+                status = "Your private journey has been saved."
+                screen = api.dashboard()
+            } catch (_: Exception) {
+                status = "Could not save this journey change. Check your connection and try again."
+            } finally { busy = false }
         }
     }
 
@@ -730,7 +766,8 @@ internal fun NativeHome(
     sendSupportDraft: (NativeSupportDraft) -> Unit = {},
     deleteSupportDraft: (NativeSupportDraft) -> Unit = {},
     offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
-    offlineSupportCourses: List<SupportCourseOption> = emptyList()
+    offlineSupportCourses: List<SupportCourseOption> = emptyList(),
+    learnerJourneyAction: (LearnerJourneyAction) -> Unit = {}
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -907,7 +944,8 @@ internal fun NativeHome(
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
-                                sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft
+                                sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
+                                learnerJourneyAction = learnerJourneyAction
                             )
                         }
                     } else {
@@ -918,7 +956,8 @@ internal fun NativeHome(
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
-                            deleteSupportDraft = deleteSupportDraft
+                            deleteSupportDraft = deleteSupportDraft,
+                            learnerJourneyAction = learnerJourneyAction
                         )
                     }
                 }
@@ -988,7 +1027,8 @@ private fun RoleContent(
     pickMaterial: () -> Unit,
     openSupportDraft: (NativeSupportDraft) -> Unit,
     sendSupportDraft: (NativeSupportDraft) -> Unit,
-    deleteSupportDraft: (NativeSupportDraft) -> Unit
+    deleteSupportDraft: (NativeSupportDraft) -> Unit,
+    learnerJourneyAction: (LearnerJourneyAction) -> Unit
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp),
@@ -1117,6 +1157,7 @@ private fun RoleContent(
                 else -> {
                     item { Text("Your progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     data.journey.forEach { milestone -> item { NativeCard(milestone, "Learning journey") } }
+                    item { LearnerJourneyPanel(data, busy, learnerJourneyAction) }
                     if (data.learnerReportNotice.isNotBlank()) item { Text(data.learnerReportNotice) }
                     if (data.learnerReports.isEmpty()) item { NativeCard("No report preview", "A verified enrolment and published assessments are required.") }
                     items(data.learnerReports, key = { it.id }) { report ->
@@ -1213,6 +1254,94 @@ private fun RoleContent(
             style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B), modifier = Modifier.padding(top = 8.dp)) }
     }
 }
+
+@Composable
+private fun LearnerJourneyPanel(
+    data: NativeLearning,
+    busy: Boolean,
+    onAction: (LearnerJourneyAction) -> Unit
+) {
+    var displayName by remember(data.journeyIdentity.displayName) { mutableStateOf(data.journeyIdentity.displayName) }
+    var institution by remember { mutableStateOf("") }
+    var stage by remember { mutableStateOf("RR") }
+    var entryYear by remember { mutableIntStateOf(java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)) }
+    var note by remember { mutableStateOf("") }
+    var milestoneTitle by remember { mutableStateOf("") }
+    var milestoneDetail by remember { mutableStateOf("") }
+    var milestoneKind by remember { mutableStateOf("project") }
+    var milestoneYear by remember { mutableIntStateOf(java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)) }
+    var expanded by remember { mutableStateOf(false) }
+    val stages = listOf("RR", "R") + (1..12).map { it.toString() } + listOf("university", "college", "training", "professional")
+    val kinds = listOf("academic", "project", "community", "creative", "technical", "personal_growth", "other")
+    ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFEFA))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("My learning journey", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("A private, self-reported record. These entries are not verified school records and are never shared automatically.",
+                style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+            OutlinedTextField(displayName, { displayName = it.take(160) }, label = { Text("Preferred display name") },
+                modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true)
+            Button(onClick = { onAction(LearnerJourneyAction.SaveIdentity(displayName)) }, enabled = !busy,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Save identity") }
+            Divider()
+            Text("Education timeline", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (data.journeyEntries.isEmpty()) Text("Add your first learning stage.", color = Color(0xFF68736B))
+            data.journeyEntries.forEach { entry ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("${entry.academicYear} · ${if (entry.stage in listOf("RR", "R") || entry.stage.toIntOrNull() != null) "Grade ${entry.stage}" else entry.stage.replaceFirstChar { it.uppercase() }}",
+                        fontWeight = FontWeight.SemiBold)
+                    Text(entry.institutionName)
+                    if (entry.note.isNotBlank()) Text(entry.note, style = MaterialTheme.typography.bodySmall)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Self-reported", style = MaterialTheme.typography.labelSmall, color = Color(0xFF68736B))
+                        TextButton(onClick = { onAction(LearnerJourneyAction.DeleteEntry(entry.id)) }, enabled = !busy) { Text("Remove") }
+                    }
+                }
+            }
+            OutlinedTextField(institution, { institution = it.take(160) }, label = { Text("School or institution") },
+                modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true)
+            Box {
+                OutlinedButton(onClick = { expanded = true }, enabled = !busy) { Text("Stage: ${stageLabel(stage)}") }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    stages.forEach { option -> DropdownMenuItem(text = { Text(stageLabel(option)) }, onClick = { stage = option; expanded = false }) }
+                }
+            }
+            OutlinedTextField(entryYear.toString(), { value -> value.toIntOrNull()?.let { entryYear = it.coerceIn(1900, 2200) } },
+                label = { Text("Year") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true)
+            OutlinedTextField(note, { note = it.take(2000) }, label = { Text("What changed or stood out? (optional)") },
+                modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 2, maxLines = 5)
+            Button(onClick = { onAction(LearnerJourneyAction.AddEntry(institution, stage, entryYear, note)) },
+                enabled = !busy && institution.trim().length >= 2, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Add learning stage")
+            }
+            Divider()
+            Text("Development milestones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (data.journeyMilestones.isEmpty()) Text("Record an achievement or moment of growth when you are ready.", color = Color(0xFF68736B))
+            data.journeyMilestones.forEach { item ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("${item.year} · ${item.title}", fontWeight = FontWeight.SemiBold)
+                    Text("${item.kind.replace('_', ' ').replaceFirstChar { it.uppercase() }} · Self-reported", style = MaterialTheme.typography.labelSmall)
+                    Text(item.description, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { onAction(LearnerJourneyAction.DeleteMilestone(item.id)) }, enabled = !busy) { Text("Remove") }
+                }
+            }
+            OutlinedTextField(milestoneTitle, { milestoneTitle = it.take(160) }, label = { Text("Milestone title") },
+                modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                kinds.forEach { kind -> FilterChip(selected = milestoneKind == kind, onClick = { milestoneKind = kind },
+                    label = { Text(kind.replace('_', ' ')) }, enabled = !busy) }
+            }
+            OutlinedTextField(milestoneYear.toString(), { value -> value.toIntOrNull()?.let { milestoneYear = it.coerceIn(1900, 2200) } },
+                label = { Text("Year") }, modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true)
+            OutlinedTextField(milestoneDetail, { milestoneDetail = it.take(4000) }, label = { Text("What did you achieve, develop or learn?") },
+                modifier = Modifier.fillMaxWidth(), enabled = !busy, minLines = 3, maxLines = 7)
+            Button(onClick = { onAction(LearnerJourneyAction.AddMilestone(milestoneTitle, milestoneDetail, milestoneKind, milestoneYear)) },
+                enabled = !busy && milestoneTitle.trim().length >= 2 && milestoneDetail.trim().length >= 10,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Add milestone") }
+        }
+    }
+}
+
+private fun stageLabel(value: String) = if (value in listOf("RR", "R") || value.toIntOrNull() != null) "Grade $value" else value.replaceFirstChar { it.uppercase() }
 
 @Composable
 private fun ReportCard(
