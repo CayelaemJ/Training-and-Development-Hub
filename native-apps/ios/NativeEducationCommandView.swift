@@ -32,8 +32,16 @@ struct NativeEducationCommandView: View {
 
                 if let overview = session.educationCommand {
                     Section("Academic year \(overview.year)") {
-                        LabeledContent("Authorised schools", value: String(overview.institutions))
-                        LabeledContent("Minimum cohort shown", value: String(overview.minimumCohort))
+                        HStack {
+                            Text("Authorised schools")
+                            Spacer()
+                            Text(String(overview.institutions)).monospacedDigit()
+                        }
+                        HStack {
+                            Text("Minimum cohort shown")
+                            Spacer()
+                            Text(String(overview.minimumCohort)).monospacedDigit()
+                        }
                     }
                     Section("School summaries") {
                         if overview.schools.isEmpty {
