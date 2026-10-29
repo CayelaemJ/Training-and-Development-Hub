@@ -860,3 +860,42 @@ class NativeAndroidExamManagementTest {
         assertEquals("8:44:0:4.0:Reviewed against the answer guide.", reviewed.value)
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidLearnerPassportTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun passportShowsReviewedProgressAndOffersExplicitJsonExport() {
+        var exports = 0
+        val passport = LearnerPassport(
+            asOf = "2026-10-29T10:00:00.000Z",
+            items = listOf(LearnerPassportItem(
+                id = 81, concept = "Fractions", status = "resolved",
+                createdAt = "2026-10-01T10:00:00.000Z", updatedAt = "2026-10-29T10:00:00.000Z",
+                outcome = LearnerPassportOutcome(46.0, 70.0, 24.0)
+            )),
+            learningDna = listOf(LearnerPassportDna(81, "2026-10-29T10:00:00.000Z",
+                "demonstrated", "Fractions", 12)),
+            provenance = "Published result snapshots and educator-reviewed support records.",
+            interpretation = "Progress is observed, not proof of cause.",
+            json = "{\"version\":1}"
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeLearnerPassportScreen(
+                    passport = passport, busy = false, message = null,
+                    refresh = {}, share = { exports++ }, close = {}
+                )
+            }
+        }
+        compose.onNodeWithText("Your private learning progress").assertIsDisplayed()
+        compose.onNodeWithText("Conversations, staff contact details, and unreviewed narratives are excluded.")
+            .assertExists()
+        compose.onNodeWithText("Published results · 46.0% to 70.0%").assertExists()
+        compose.onNodeWithText("Export JSON").assertIsEnabled().performClick()
+        assertEquals(1, exports)
+    }
+}
