@@ -245,6 +245,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var quizzes: [String] = []
     @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var writtenExams: [NativeWrittenExam] = []
+    @Published var writtenAssignments: [NativeWrittenExamAssignment] = []
     @Published var guardians: [GuardianInvitation] = []
     @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -388,7 +389,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             clearSupportStorage()
             clearToken()
             role = nil
-            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; quizzes = []; quizSummaries = []
+            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; quizzes = []; quizSummaries = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
@@ -489,6 +490,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextQuizzes: [String] = []
             var nextQuizSummaries: [NativeQuizSummary] = []
             var nextWrittenExams: [NativeWrittenExam] = []
+            var nextWrittenAssignments: [NativeWrittenExamAssignment] = []
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
@@ -621,6 +623,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 if verifiedRole == "learner" {
                     nextWrittenExams = Array((try? JSONDecoder().decode([NativeWrittenExam].self,
                         from: await request("api/written-exams")))?.prefix(30) ?? [])
+                    nextWrittenAssignments = Array((try? JSONDecoder().decode([NativeWrittenExamAssignment].self,
+                        from: await request("api/my-assignments")))?.prefix(100) ?? [])
                     for organizationId in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
                         do {
                             let data = try await request("api/organizations/\(organizationId)/report-issuance/me")
@@ -749,10 +753,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             quizzes = nextQuizzes
             quizSummaries = nextQuizSummaries
             writtenExams = nextWrittenExams
+            writtenAssignments = nextWrittenAssignments
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenExams = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; writtenExams = []; writtenAssignments = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1247,18 +1252,29 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         return exam
     }
 
+    func loadAssignedWrittenExam(assignmentId: Int) async throws -> NativeWrittenExam {
+        guard role == "learner", assignmentId > 0 else { throw NSError(domain: "CABO", code: 403) }
+        let data = try await request("api/assignments/\(assignmentId)/exam")
+        return try JSONDecoder().decode(NativeWrittenExam.self, from: data)
+    }
+
     func loadWrittenExam(id: Int) async throws -> NativeWrittenExam {
         guard role == "learner", id > 0 else { throw NSError(domain: "CABO", code: 403) }
         let data = try await request("api/written-exams/\(id)")
         return try JSONDecoder().decode(NativeWrittenExam.self, from: data)
     }
 
-    func submitWrittenExam(id: Int, answers: [String]) async throws -> NativeWrittenExamResult {
+    func submitWrittenExam(id: Int, answers: [String], assignmentId: Int? = nil) async throws -> NativeWrittenExamResult {
         guard role == "learner", id > 0, !answers.isEmpty, answers.count <= 15,
               answers.allSatisfy({ $0.count <= 15_000 }) else {
             throw NSError(domain: "CABO", code: 400)
         }
-        let body = try JSONSerialization.data(withJSONObject: ["answers": answers])
+        var payload: [String: Any] = ["answers": answers]
+        if let assignmentId {
+            guard assignmentId > 0 else { throw NSError(domain: "CABO", code: 400) }
+            payload["assignmentId"] = assignmentId
+        }
+        let body = try JSONSerialization.data(withJSONObject: payload)
         let data = try await request("api/written-exams/\(id)/attempts",
             method: "POST", body: body, timeoutInterval: 85)
         return try JSONDecoder().decode(NativeWrittenExamResult.self, from: data)
@@ -1546,7 +1562,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearSupportStorage()
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []
         guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
