@@ -409,6 +409,105 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         return try JSONDecoder().decode(NativeMaterialPage.self, from: data)
     }
 
+    // Native study uploads mirror the web flow without storing document bytes
+    // or credentials beyond the signed-in request. The backend owns access,
+    // size checks, upload intents, and final material authorization.
+    func uploadMaterial(fileURL: URL, title: String) async throws {
+        guard role != nil else { throw NSError(domain: "CABO", code: 401) }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty, cleanTitle.count <= 200 else {
+            throw NSError(domain: "CABO", code: 400,
+                          userInfo: [NSLocalizedDescriptionKey: "Enter a title of 1 to 200 characters."])
+        }
+
+        let supportedTypes: [String: String] = [
+            "txt": "text/plain", "md": "text/markdown", "csv": "text/csv",
+            "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"
+        ]
+        let fileName = fileURL.lastPathComponent
+        let fileExtension = fileURL.pathExtension.lowercased()
+        guard let contentType = supportedTypes[fileExtension] else {
+            throw NSError(domain: "CABO", code: 415,
+                          userInfo: [NSLocalizedDescriptionKey: "Choose a supported PDF, Office, text, CSV, PNG, JPEG or WebP file."])
+        }
+
+        let hasScope = fileURL.startAccessingSecurityScopedResource()
+        defer { if hasScope { fileURL.stopAccessingSecurityScopedResource() } }
+        let values = try fileURL.resourceValues(forKeys: [.fileSizeKey])
+        guard let byteCount = values.fileSize, byteCount > 0, byteCount <= 30 * 1024 * 1024 else {
+            throw NSError(domain: "CABO", code: 413,
+                          userInfo: [NSLocalizedDescriptionKey: "Files must be between 1 byte and 30 MB."])
+        }
+
+        let staged = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cabo-material-\(UUID().uuidString).upload")
+        defer { try? FileManager.default.removeItem(at: staged) }
+        try FileManager.default.copyItem(at: fileURL, to: staged)
+
+        let uploadIntentBody = try JSONSerialization.data(withJSONObject: [
+            "name": fileName, "size": byteCount, "contentType": contentType,
+            "allowAiReading": false
+        ])
+        let intentData = try await request("api/storage/uploads/request-url", method: "POST", body: uploadIntentBody)
+        guard let intent = try JSONSerialization.jsonObject(with: intentData) as? [String: Any],
+              let uploadText = intent["uploadURL"] as? String,
+              let objectPath = intent["objectPath"] as? String,
+              let uploadURL = URL(string: uploadText),
+              let originHost = origin.host, let uploadHost = uploadURL.host,
+              uploadURL.scheme?.lowercased() == "https",
+              uploadURL.user == nil, uploadURL.password == nil,
+              uploadURL.fragment == nil else {
+            throw NSError(domain: "CABO", code: 502,
+                          userInfo: [NSLocalizedDescriptionKey: "CABO returned an invalid secure upload destination."])
+        }
+        let originPort = origin.port ?? 443
+        let uploadPort = uploadURL.port ?? 443
+        let sameAPIOrigin = originHost.caseInsensitiveCompare(uploadHost) == .orderedSame && originPort == uploadPort
+        let testUploadPath = sameAPIOrigin && uploadURL.path.range(
+            of: #"^/api/storage/uploads/railway/[a-f0-9-]{36}$"#, options: .regularExpression
+        ) != nil
+        if sameAPIOrigin && !testUploadPath {
+            throw NSError(domain: "CABO", code: 502,
+                          userInfo: [NSLocalizedDescriptionKey: "CABO returned an unexpected upload destination."])
+        }
+
+        var uploadRequest = URLRequest(url: uploadURL)
+        uploadRequest.httpMethod = "PUT"
+        uploadRequest.timeoutInterval = 60
+        uploadRequest.cachePolicy = .reloadIgnoringLocalCacheData
+        uploadRequest.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        // Test storage is same-origin and authenticated. Real signed storage
+        // URLs receive no CABO bearer token.
+        if testUploadPath {
+            guard let token = keychainToken() else { throw NSError(domain: "CABO", code: 401) }
+            uploadRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let uploadConfiguration = URLSessionConfiguration.ephemeral
+        uploadConfiguration.httpCookieStorage = nil
+        uploadConfiguration.httpShouldSetCookies = false
+        let uploadSession = URLSession(configuration: uploadConfiguration)
+        defer { uploadSession.invalidateAndCancel() }
+        let (_, uploadResponse) = try await uploadSession.upload(for: uploadRequest, fromFile: staged)
+        guard let uploadStatus = (uploadResponse as? HTTPURLResponse)?.statusCode,
+              (200...299).contains(uploadStatus) else {
+            throw NSError(domain: "CABO", code: 502,
+                          userInfo: [NSLocalizedDescriptionKey: "The file upload was not accepted. Please retry."])
+        }
+
+        let materialBody = try JSONSerialization.data(withJSONObject: ["title": cleanTitle, "objectPath": objectPath])
+        let savedData = try await request("api/materials", method: "POST", body: materialBody)
+        guard let saved = try JSONSerialization.jsonObject(with: savedData) as? [String: Any],
+              let id = saved["id"] as? Int, id > 0,
+              let savedTitle = saved["title"] as? String, !savedTitle.isEmpty else {
+            throw NSError(domain: "CABO", code: 502,
+                          userInfo: [NSLocalizedDescriptionKey: "CABO could not confirm the uploaded material."])
+        }
+    }
+
     // Source-of-truth practice assessment API. All results are returned by the server;
     // no correct answers or fabricated grades are built into the app.
     func loadQuiz(id: Int) async throws -> NativePracticeQuiz {
