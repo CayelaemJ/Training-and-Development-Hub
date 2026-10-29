@@ -11,7 +11,7 @@ import { db, uploadIntentsTable, materialUploadBlobsTable } from '@workspace/db'
 import { Router, type IRouter, type Request, type Response } from 'express';
 
 import { ObjectPermission } from '../lib/objectAcl';
-import { validateMaterial, MaterialReadError, MAX_FILE_BYTES } from '../lib/uploadPolicy';
+import { validateMaterial, validateDeclaredMaterialType, MaterialReadError, MAX_FILE_BYTES } from '../lib/uploadPolicy';
 import { railwayUploadUrl } from '../lib/railwayUploadUrl';
 import {
   ObjectNotFoundError,
@@ -63,6 +63,7 @@ router.post(
     try {
       const { name, size, contentType } = parsed.data;
       validateMaterial(name, size);
+      validateDeclaredMaterialType(name, contentType);
       const allowAiReading = req.body.allowAiReading === true;
       const railwayFallback = (process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === 'testing';
       const objectPath = railwayFallback ? `/railway-uploads/${randomUUID()}` : '';
