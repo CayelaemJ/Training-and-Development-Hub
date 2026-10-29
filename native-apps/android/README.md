@@ -27,6 +27,8 @@ Every record is fictional. Demo actions stay in memory on the device and never w
 
 The default build never exposes demo mode. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
 
+The launch screen and the demo Home section link to the full CABO web app in the device browser. That opens the existing Render-hosted CABO interface for the complete web workspace and its wider feature set; use an authorised account there. The offline native showcase remains available without a connection.
+
 ## Run the isolated test build
 
 To build the separate credential-based test login, use only synthetic test accounts and the isolated Render preview. From this folder:
