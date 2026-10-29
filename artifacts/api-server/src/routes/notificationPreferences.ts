@@ -81,30 +81,42 @@ router.get("/notifications/preferences",async(req,res)=>{
    res.json({enabled:false,schools:[],optInAvailable:false});return;
  }
  const available=await availableSchools(req.user.id),ids=[...available.keys()];
- if(!ids.length){res.json({enabled:true,schools:[],optInAvailable:false});return}
- const [schools,prefs]=await Promise.all([
-   db.select({id:organizationsTable.id,name:organizationsTable.name})
-     .from(organizationsTable).where(inArray(organizationsTable.id,ids)).limit(101),
-   db.select({organizationId:notificationPreferencesTable.organizationId,kind:notificationPreferencesTable.kind,
-     optedIn:notificationPreferencesTable.optedIn,confirmedAt:notificationPreferencesTable.confirmedAt,
-     revokedAt:notificationPreferencesTable.revokedAt})
-     .from(notificationPreferencesTable).where(and(
-       eq(notificationPreferencesTable.userId,req.user.id),
-       inArray(notificationPreferencesTable.organizationId,ids)
-     )).limit(501),
- ]);
- if(schools.length>100||prefs.length>500){res.sendStatus(503);return}
+ // Previous school consent remains revocable even after a child transfers or
+ // a guardian/educator is no longer allowed to view that institution.
+ const prefs=await db.select({
+   organizationId:notificationPreferencesTable.organizationId,kind:notificationPreferencesTable.kind,
+   optedIn:notificationPreferencesTable.optedIn,confirmedAt:notificationPreferencesTable.confirmedAt,
+   revokedAt:notificationPreferencesTable.revokedAt,
+ }).from(notificationPreferencesTable)
+   .where(eq(notificationPreferencesTable.userId,req.user.id)).limit(501);
+ if(prefs.length>500){res.sendStatus(503);return}
+ const schools=ids.length?await db.select({id:organizationsTable.id,name:organizationsTable.name})
+   .from(organizationsTable).where(inArray(organizationsTable.id,ids)).limit(101):[];
+ if(schools.length>100){res.sendStatus(503);return}
  const values=new Map(prefs.map(p=>[p.organizationId+":"+p.kind,p]));
+ const active=schools.map(s=>({
+   id:s.id,name:s.name,
+   choices:[...(available.get(s.id)??[])].map(kind=>{
+     const current=values.get(s.id+":"+kind);
+     return {kind,canEnable:true,
+       enabled:!!current?.optedIn && !!current.confirmedAt && current.revokedAt===null};
+   }),
+ }));
+ const former=new Map<number,Array<{kind:"guardian_review_requested"|"learner_support_updated";enabled:boolean;canEnable:boolean}>>();
+ for(const p of prefs){
+   if(!p.optedIn||!p.confirmedAt||p.revokedAt!==null)continue;
+   if(p.kind!=="guardian_review_requested"&&p.kind!=="learner_support_updated")continue;
+   if(available.get(p.organizationId)?.has(p.kind))continue;
+   const choices=former.get(p.organizationId)??[];
+   choices.push({kind:p.kind,enabled:true,canEnable:false});
+   former.set(p.organizationId,choices);
+ }
  res.json({
    enabled:true,
    optInAvailable:process.env.CABO_NOTIFICATION_PREFERENCES_OPT_IN_ENABLED==="true",
-   schools:schools.map(s=>({
-     id:s.id,name:s.name,
-     choices:[...(available.get(s.id)??[])].map(kind=>{
-       const current=values.get(s.id+":"+kind);
-       return {kind,enabled:!!current?.optedIn && !!current.confirmedAt && current.revokedAt===null};
-     }),
-   }))
+   schools:[...active,...[...former].map(([id,choices])=>({
+     id,name:"Previously connected institution",choices,
+   }))],
  });
 });
 
