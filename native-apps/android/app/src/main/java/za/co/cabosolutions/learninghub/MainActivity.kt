@@ -2173,6 +2173,11 @@ private fun RoleContent(
                     if (data.staff.isEmpty() || data.staff.all { it.tickets.isEmpty() })
                         item { NativeCard("No requests to show", data.staff.firstOrNull()?.notice ?: "New support requests for your assigned subjects will appear here.") }
                     data.staff.forEach { workspace ->
+                        if (workspace.supportSummary.isNotEmpty()) {
+                            item(key = "support-accountability:${workspace.organizationId}") {
+                                NativeSupportAccountabilityCard(workspace.supportSummary)
+                            }
+                        }
                         workspace.tickets.forEach { ticket ->
                             item(key = "ticket:${workspace.organizationId}:${ticket.id}") {
                                 ElevatedCard(onClick = { openSupportTicket(ticket) },
