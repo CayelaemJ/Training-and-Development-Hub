@@ -29,10 +29,12 @@ Confirm the deployed Worker URL and authorized health+POST smoke tests first; do
 
 ## Existing CABO API configuration
 - `ENABLE_CABO_DJANGO_INSIGHTS=true` (defaults **off**)
-- `CABO_DJANGO_WORKER_URL=https://<verified-worker-host>` (server-side only)
+- `CABO_ENVIRONMENT=staging` (or `testing`; **never** `production`)
+- `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` only after synthetic-data and cross-border review
+- `CABO_DJANGO_WORKER_URL=https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev` (server-side only)
 - `CABO_DJANGO_WORKER_TOKEN=<same secret as Cloudflare>` (server-side only)
 
-`POST /api/organizations/:orgId/learning/insights/draft` requires an authenticated CABO session and verified **owner/admin (or platform superadmin)** authorisation for that institution. Unscoped users and users belonging to other institutions are denied. It accepts `{"concepts":[{"code":"fractions","masteryPercent":45,"evidenceCount":5}]}` and returns advisory labels only. Metrics are supplied by the caller and are **not institution-verified**. This endpoint must not be used for real learner decisions until scoped source evidence and consent checks are implemented.
+`POST /api/organizations/:orgId/learning/insights/draft` requires an authenticated CABO session and verified **owner/admin (or platform superadmin)** authorisation for that institution. Unscoped users and users belonging to other institutions are denied. It accepts `{"concepts":[{"code":"fractions","masteryPercent":45,"evidenceCount":5}]}` and returns advisory labels only. Metrics are supplied by the caller and are **not institution-verified**. This endpoint must not be used for real learner decisions until scoped source evidence and consent checks are implemented. An additional server-side staging-only guard prevents calls outside `CABO_ENVIRONMENT=staging` or `testing`, even when `ENABLE_CABO_DJANGO_INSIGHTS=true` is set in production. `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` must also be explicitly granted by the responsible pilot administrator; this flag is an authorisation gate, not proof that supplied data is synthetic.
 
 ### Release gates
 - Django unit tests, main CABO typecheck/build and security regressions.
