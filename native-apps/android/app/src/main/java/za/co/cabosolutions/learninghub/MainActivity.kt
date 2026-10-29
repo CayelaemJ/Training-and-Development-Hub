@@ -2008,12 +2008,6 @@ private fun RoleContent(
                             Text("Open my learner passport")
                         }
                     }
-                    item {
-                        OutlinedButton(onClick = openLearnerPassport, enabled = !busy,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text("Open my learner passport")
-                        }
-                    }
                     if (data.learnerReportNotice.isNotBlank()) item { Text(data.learnerReportNotice) }
                     if (data.learnerReports.isEmpty()) item { NativeCard("No report preview", "A verified enrolment and published assessments are required.") }
                     items(data.learnerReports, key = { it.id }) { report ->
