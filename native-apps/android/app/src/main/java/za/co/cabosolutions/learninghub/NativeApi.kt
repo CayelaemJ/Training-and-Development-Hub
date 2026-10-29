@@ -58,6 +58,19 @@ internal data class WrittenExamMark(val questionIndex: Int, val awardedMarks: Do
     val feedback: String, val needsReview: Boolean)
 internal data class WrittenExamResult(val id: Int, val percentage: Double, val awardedMarks: Double,
     val maxMarks: Double, val reviewRequired: Int, val feedback: List<WrittenExamMark>)
+internal data class ManagedExamGroup(val id: Int, val name: String)
+internal data class ManagedExamAssignment(val id: Int, val groupId: Int, val examId: Int, val dueAt: String?)
+internal data class ManagedExamSubmission(
+    val id: Int, val assignmentId: Int, val userId: String, val attemptId: Int,
+    val percentage: Double, val awardedMarks: Double, val maxMarks: Double,
+    val answers: List<String>, val feedback: List<WrittenExamMark>
+)
+internal data class ExamManagementWorkspace(
+    val organizationId: Int, val organizationName: String, val groups: List<ManagedExamGroup>,
+    val assignments: List<ManagedExamAssignment>, val submissions: List<ManagedExamSubmission>,
+    val notice: String? = null
+)
+internal data class ExamManagementResources(val materials: List<MaterialSummary>, val exams: List<WrittenExam>)
 
 internal data class SchoolNotice(val id: Int, val subject: String, val message: String, val audience: String, val createdAt: String)
 internal data class SchoolAttendanceRecord(val day: String, val status: String)
@@ -186,6 +199,8 @@ internal data class NativeLearning(
     val quizEntries: List<QuizSummary> = emptyList(),
     val writtenExams: List<WrittenExam> = emptyList(),
     val writtenAssignments: List<WrittenExamAssignment> = emptyList(),
+    val examManagementWorkspaces: List<ExamManagementWorkspace> = emptyList(),
+    val canManageExamAssignments: Boolean = false,
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
     val learnerReportNotice: String = "",
@@ -535,6 +550,14 @@ internal class NativeApi(private val context: Context) {
         ), learnerName?.take(160))
     }
 
+    private fun hasManagerOrganizationMembership(): Boolean = try {
+        val rows = getArray("/api/organizations")
+        (0 until minOf(rows.length(), 100)).any { i ->
+            val row = rows.optJSONObject(i)
+            row?.optString("role") in setOf("owner", "admin")
+        }
+    } catch (_: Exception) { false }
+
     private fun loadAssessmentWorkspaces(): List<AssessmentWorkspace> {
         val memberships = try { getArray("/api/organizations") } catch (error: Exception) {
             if (!hasSession()) throw error
@@ -827,6 +850,7 @@ internal class NativeApi(private val context: Context) {
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
                 guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance,
+                canManageExamAssignments = hasManagerOrganizationMembership(),
                 schoolOperations = loadSchoolOperations(),
                 assessmentWorkspaces = loadAssessmentWorkspaces()
             )
@@ -861,7 +885,7 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
-        val writtenExams = if (role != "learner") emptyList() else try {
+        val writtenExams = if (role in setOf("learner", "owner", "admin")) try {
             getArray("/api/written-exams").let { arr ->
                 (0 until arr.length()).mapNotNull { i ->
                     val row = arr.optJSONObject(i) ?: return@mapNotNull null
@@ -871,7 +895,8 @@ internal class NativeApi(private val context: Context) {
         } catch (error: Exception) {
             if (!hasSession()) throw error
             emptyList()
-        }
+        } else emptyList()
+        val examManagementWorkspaces = emptyList<ExamManagementWorkspace>()
         val writtenAssignments = if (role != "learner") emptyList() else try {
             getArray("/api/my-assignments").let { arr ->
                 (0 until arr.length()).mapNotNull { i ->
@@ -1004,10 +1029,11 @@ internal class NativeApi(private val context: Context) {
         val learnerHelp = learnerSupportTickets.map { "${it.concept} · ${it.status.replace('_', ' ')}" }
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries, writtenExams = writtenExams, writtenAssignments = writtenAssignments,
+            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries, writtenExams = writtenExams, writtenAssignments = writtenAssignments, examManagementWorkspaces = examManagementWorkspaces,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports,
-            schoolOperations = loadSchoolOperations())
+            schoolOperations = loadSchoolOperations(),
+            canManageExamAssignments = hasManagerOrganizationMembership())
     }
 
     suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -1300,6 +1326,111 @@ internal class NativeApi(private val context: Context) {
             questions.all { it.prompt.isNotBlank() && it.maxMarks in 1..25 }) { "Invalid written exam" }
         return WrittenExam(id, row.getString("title"), row.optString("difficulty", "intermediate"), questions)
     }
+
+    suspend fun fetchExamManagementResources(): ExamManagementResources =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val materials = try {
+                getArray("/api/materials").let { rows ->
+                    (0 until minOf(rows.length(), 30)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val title = row.optString("title")
+                            if (id > 0 && title.isNotBlank()) MaterialSummary(id, title.take(200)) else null
+                        }
+                    }
+                }
+            } catch (_: Exception) { emptyList() }
+            val exams = try {
+                getArray("/api/written-exams").let { rows ->
+                    (0 until minOf(rows.length(), 30)).mapNotNull { i ->
+                        try { rows.optJSONObject(i)?.let(::parseWrittenExam) } catch (_: Exception) { null }
+                    }
+                }
+            } catch (_: Exception) { emptyList() }
+            ExamManagementResources(materials, exams)
+        }
+
+    suspend fun fetchExamManagementWorkspaces(): List<ExamManagementWorkspace> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { loadExamManagementWorkspaces() }
+
+    private suspend fun loadExamManagementWorkspaces(): List<ExamManagementWorkspace> {
+        val memberships = try { getArray("/api/organizations") } catch (_: Exception) { return emptyList() }
+        return (0 until minOf(memberships.length(), 5)).mapNotNull { index ->
+            val membership = memberships.optJSONObject(index) ?: return@mapNotNull null
+            val orgId = membership.optInt("id")
+            val role = membership.optString("role")
+            val name = membership.optString("name")
+            if (orgId <= 0 || role !in setOf("owner", "admin") || name.isBlank()) return@mapNotNull null
+            try {
+                val groupsJson = getArray("/api/organizations/$orgId/groups")
+                val groups = (0 until minOf(groupsJson.length(), 200)).mapNotNull { i ->
+                    groupsJson.optJSONObject(i)?.let { row ->
+                        val id = row.optInt("id"); val groupName = row.optString("name")
+                        if (id > 0 && groupName.isNotBlank()) ManagedExamGroup(id, groupName.take(200)) else null
+                    }
+                }
+                val assignmentsJson = getArray("/api/organizations/$orgId/assignments")
+                val assignments = (0 until minOf(assignmentsJson.length(), 200)).mapNotNull { i ->
+                    assignmentsJson.optJSONObject(i)?.let { row ->
+                        val id = row.optInt("id"); val groupId = row.optInt("groupId"); val examId = row.optInt("examId")
+                        if (id > 0 && groupId > 0 && examId > 0) ManagedExamAssignment(
+                            id, groupId, examId, if (row.isNull("dueAt")) null else row.optString("dueAt").take(40)
+                        ) else null
+                    }
+                }
+                val submissionsJson = getArray("/api/organizations/$orgId/submissions")
+                val submissions = (0 until minOf(submissionsJson.length(), 500)).mapNotNull { i ->
+                    submissionsJson.optJSONObject(i)?.let { row ->
+                        val id = row.optInt("id"); val assignmentId = row.optInt("assignmentId")
+                        val userId = row.optString("userId"); val attemptId = row.optInt("attemptId")
+                        if (id <= 0 || assignmentId <= 0 || userId.isBlank() || attemptId <= 0) null
+                        else {
+                            val answersJson = row.optJSONArray("answers") ?: JSONArray()
+                            val answers = (0 until minOf(answersJson.length(), 15)).map { answersJson.optString(it).take(15000) }
+                            val feedbackJson = row.optJSONArray("feedback") ?: JSONArray()
+                            val feedback = (0 until minOf(feedbackJson.length(), 15)).mapNotNull { j ->
+                                feedbackJson.optJSONObject(j)?.let { mark ->
+                                    val q = mark.optInt("questionIndex")
+                                    val awarded = mark.optDouble("awardedMarks", -1.0)
+                                    val max = mark.optDouble("maxMarks", -1.0)
+                                    if (q < 0 || awarded < 0 || max <= 0) null else WrittenExamMark(
+                                        q, awarded, max, mark.optString("feedback").take(2000),
+                                        mark.optBoolean("needsReview")
+                                    )
+                                }
+                            }
+                            ManagedExamSubmission(id, assignmentId, userId.take(160), attemptId,
+                                row.optDouble("percentage"), row.optDouble("awardedMarks"),
+                                row.optDouble("maxMarks"), answers, feedback)
+                        }
+                    }
+                }
+                ExamManagementWorkspace(orgId, name.take(200), groups, assignments, submissions)
+            } catch (_: Exception) {
+                ExamManagementWorkspace(orgId, name.take(200), emptyList(), emptyList(), emptyList(),
+                    "Assignment workspace could not be loaded. Check your connection and retry.")
+            }
+        }
+    }
+
+    suspend fun createExamAssignment(organizationId: Int, groupId: Int, examId: Int, dueAt: String?) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && groupId > 0 && examId > 0)
+            val payload = JSONObject().put("groupId", groupId).put("examId", examId)
+            if (!dueAt.isNullOrBlank()) {
+                require(dueAt.length <= 40 && dueAt.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?Z")))
+                payload.put("dueAt", if (dueAt.length == 17) dueAt.replace("Z", ":00Z") else dueAt)
+            }
+            request("/api/organizations/$organizationId/assignments", payload, auth = true)
+        }
+
+    suspend fun overrideExamSubmission(organizationId: Int, submissionId: Int, questionIndex: Int, awardedMarks: Double, reason: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && submissionId > 0 && questionIndex in 0..14 &&
+                awardedMarks >= 0 && awardedMarks <= 100 && reason.trim().length in 5..2000)
+            request("/api/organizations/$organizationId/submissions/$submissionId/overrides",
+                JSONObject().put("questionIndex", questionIndex).put("awardedMarks", awardedMarks)
+                    .put("reason", reason.trim()), auth = true)
+        }
 
     suspend fun setNotificationPreference(organizationId: Int, kind: String, enabled: Boolean, acknowledged: Boolean) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

@@ -12,6 +12,7 @@ struct NativeHomeView: View {
     @State private var selectedStaffTicket: NativeStaffSupportTicket?
     @State private var showSupportRequests = false
     @State private var showLearnerJourney = false
+    @State private var showExamManagement = false
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
@@ -62,6 +63,7 @@ struct NativeHomeView: View {
                 selectedQuiz = nil
                 selectedMaterial = nil
                 selectedStaffTicket = nil
+                showExamManagement = false
                 testPassword = ""
                 reviewedGuardianEvidence = []
             }
@@ -83,6 +85,9 @@ struct NativeHomeView: View {
         }
         .sheet(isPresented: $showLearnerJourney) {
             NativeLearnerJourneyView(session: session)
+        }
+        .sheet(isPresented: $showExamManagement) {
+            NativeExamManagementView(session: session)
         }
         .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
             switch result {
@@ -312,6 +317,21 @@ struct NativeHomeView: View {
     @ViewBuilder
     private var educatorContent: some View {
         title("Teaching & learner support")
+        if session.canManageExamAssignments {
+            Button {
+                Task {
+                    await session.refreshExamManagement()
+                    showExamManagement = true
+                }
+            } label: {
+                Label("Manage written exam assignments", systemImage: "doc.text.magnifyingglass")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(session.busy || session.examManagementBusy)
+            Text("School managers can assign their own written exams to learner groups and review submitted marking.")
+                .font(.footnote).foregroundColor(.secondary)
+        }
         if session.role == "teacher" {
             Button { showMaterialImporter = true } label: {
                 Label("Share study material", systemImage: "square.and.arrow.up")
@@ -546,6 +566,19 @@ struct NativeHomeView: View {
             ForEach(session.writtenExams) { exam in
                 infoTile(exam.title, "\(exam.questions.count) questions · \(exam.difficulty.capitalized)", system: "doc.text")
             }
+        }
+        if session.canManageExamAssignments {
+            Button {
+                Task {
+                    await session.refreshExamManagement()
+                    showExamManagement = true
+                }
+            } label: {
+                Label("Manage school exam assignments", systemImage: "building.2.crop.circle")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.bordered)
+            .disabled(session.busy || session.examManagementBusy)
         }
         title("My learning support")
         Button { showSupportRequests = true } label: {

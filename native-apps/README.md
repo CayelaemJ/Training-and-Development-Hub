@@ -8,7 +8,7 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 
 | Platform | Implemented in this branch | Still required |
 | --- | --- | --- |
-| Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token and encrypted support-draft storage; learner materials/quizzes/journey/help requests; authenticated learner upload picker for supported private study documents; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout; API 23 emulator tests and debug APK builds passed | Physical-device and live storage acceptance; authenticated native sign-in on a physical device; signed release AAB |
+| Android — Kotlin / Jetpack Compose | CABO-branded responsive phone/tablet UI; OIDC login via system browser and one-time PKCE bridge; Android Keystore token and encrypted support-draft storage; learner materials/quizzes/journey/help requests; authenticated learner upload picker for supported private study documents; owner/admin written-exam assignment and submission review; educator assigned courses and authorized ticket queues; parents accept/decline invitations with verified-child privacy restrictions; native logout; API 23 emulator tests and debug APK builds passed | Physical-device and live storage acceptance; authenticated native sign-in on a physical device; signed release AAB |
 | iOS — Swift / SwiftUI | Adaptive iPhone/iPad role screens; ASWebAuthenticationSession + PKCE; iOS Keychain bearer storage; learner/parent reports, parent invitation decisions, educator assignment summaries, material reading and practice-quiz submit/recovery; native material upload flow in progress | Full native route parity; support actions/drafts; educator assessment, marking, attendance and school operations; administration; Simulator CI for upload changes; physical-device tests, signed build and TestFlight/App Store review |
 | Windows — C# / WinUI 3 | WinUI 3 desktop UI; Windows loopback PKCE callback to the shared API; DPAPI CurrentUser secure token storage, logout and account-scoped read-only learner/admin dashboards | live login test, interactive quizzes and material previews, native teacher/guardian views, MSIX packaging and Windows lab QA |
 | Web — React + TypeScript | Previously merged PR #40 | Existing web release gates remain unchanged |
@@ -25,7 +25,7 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 ## Android emulator and internal build workflow
 
 - CI runs instrumentation tests on an Android 6.0 / API 23 emulator, the current minimum supported Android version.
-- The tests cover the default secure sign-in screen, hidden-by-default test credentials, quiz answer requirements, one-shot submission behavior, uncertain-submission recovery, learner written-exam marking, and assignment-scoped exam submission.
+- The tests cover the default secure sign-in screen, hidden-by-default test credentials, quiz answer requirements, one-shot submission behavior, uncertain-submission recovery, learner written-exam marking, assignment-scoped exam submission, and owner/admin assignment plus mark-review actions.
 - Each run creates a standard debug APK and a separate short-retention test APK pinned to the isolated Render preview. Neither build contains account credentials or release signing keys.
 - The test-login APK is for the isolated dummy-data service only. Never redistribute it as a production app.
 

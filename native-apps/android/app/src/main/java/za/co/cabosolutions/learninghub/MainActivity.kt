@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedWrittenExams by mutableStateOf(false)
+    private var managerCreatingExam by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
     private var selectedUploadFileName by mutableStateOf("")
@@ -114,11 +115,13 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
+                        selectedWrittenExams && managerCreatingExam -> { managerCreatingExam = false; loadDashboard() }
+                        selectedWrittenExams -> selectedWrittenExams = false
                         else -> closeStudy()
                     }
                 }
@@ -165,6 +168,22 @@ class MainActivity : ComponentActivity() {
                         recordOutcome = { baseline, followup, reason -> recordSupportOutcome(baseline, followup, reason) },
                         reviewLearningDna = { state, note -> saveSupportLearningDna(state, note) }
                     )
+                    selectedWrittenExams && !managerCreatingExam && (screen?.canManageExamAssignments == true) ->
+                        NativeExamManagementScreen(
+                            workspaces = screen?.examManagementWorkspaces.orEmpty(),
+                            exams = screen?.writtenExams.orEmpty(),
+                            busy = busy,
+                            assign = { organizationId, groupId, examId, dueAt ->
+                                api.createExamAssignment(organizationId, groupId, examId, dueAt)
+                                loadDashboard()
+                            },
+                            overrideMark = { organizationId, submissionId, questionIndex, awardedMarks, reason ->
+                                api.overrideExamSubmission(organizationId, submissionId, questionIndex, awardedMarks, reason)
+                                loadDashboard()
+                            },
+                            createExam = { managerCreatingExam = true },
+                            close = { selectedWrittenExams = false }
+                        )
                     selectedWrittenExams -> NativeWrittenExamScreen(
                         materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
                         assignments = if (demoActive && screen?.portal?.role == "learner")
@@ -202,7 +221,12 @@ class MainActivity : ComponentActivity() {
                             } else api.submitWrittenExam(examId, answers, assignmentId)
                         },
                         isDemo = demoActive,
-                        close = { selectedWrittenExams = false }
+                        close = {
+                            if (screen?.canManageExamAssignments == true) {
+                                managerCreatingExam = false
+                                loadDashboard()
+                            } else selectedWrittenExams = false
+                        }
                     )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
@@ -265,7 +289,22 @@ class MainActivity : ComponentActivity() {
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
-                        openWrittenExams = { selectedWrittenExams = true },
+                        openWrittenExams = {
+                            if (!demoActive && screen?.canManageExamAssignments == true) {
+                                busy = true
+                                lifecycleScope.launch {
+                                    try {
+                                        val workspaces = api.fetchExamManagementWorkspaces()
+                                        val resources = api.fetchExamManagementResources()
+                                        screen = screen?.copy(examManagementWorkspaces = workspaces,
+                                            materialEntries = resources.materials, materials = resources.materials.map { it.title },
+                                            writtenExams = resources.exams)
+                                    }
+                                    catch (_: Exception) { status = "Exam workspace could not be loaded. Check your connection and try again." }
+                                    finally { busy = false; selectedWrittenExams = true }
+                                }
+                            } else selectedWrittenExams = true
+                        },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -1856,7 +1895,7 @@ private fun RoleContent(
                     item {
                         OutlinedButton(onClick = openWrittenExams, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text("Create or take a written exam")
+                            Text(if (data.canManageExamAssignments) "Manage written exam assignments" else "Create or take a written exam")
                         }
                     }
                     if (data.writtenExams.isNotEmpty()) {

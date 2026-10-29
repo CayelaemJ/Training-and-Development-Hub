@@ -19,6 +19,7 @@ targets:
       - path: NativeMaterialView.swift
       - path: NativeMaterialUploadView.swift
       - path: NativeWrittenExamView.swift
+      - path: NativeExamManagementView.swift
       - path: NativeSupportRequestView.swift
       - path: NativeStaffSupportView.swift
       - path: NativeLearnerJourneyView.swift

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextClearance
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -786,8 +787,11 @@ class NativeAndroidWrittenExamTest {
         }
 
         compose.onNodeWithTag("assigned-written-exam-73032").assertIsDisplayed().performClick()
-        compose.onNodeWithText("CABO Demo School").assertIsDisplayed()
-        compose.onNodeWithText("Due 2026-11-10").assertIsDisplayed()
+        compose.waitUntil(timeoutMillis = 10000) {
+            compose.onAllNodesWithText("Assigned exam · CABO Demo School").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Assigned exam · CABO Demo School").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Due 2026-11-10").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("written-answer-0").performScrollTo()
             .performTextInput("One half is two quarters.")
         compose.onNodeWithTag("submit-written-exam").performScrollTo()
@@ -796,5 +800,63 @@ class NativeAndroidWrittenExamTest {
             compose.onAllNodesWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNodes().isNotEmpty()
         }
         assertEquals(73032, submittedAssignmentId)
+    }
+}
+
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidExamManagementTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun managerCanAssignExamAndRecordScopedMarkReview() {
+        val assigned = mutableStateOf("")
+        val reviewed = mutableStateOf("")
+        val workspace = ExamManagementWorkspace(
+            organizationId = 8,
+            organizationName = "Cabo Learning School",
+            groups = listOf(ManagedExamGroup(21, "Grade 8")),
+            assignments = listOf(ManagedExamAssignment(38, 21, 10, null)),
+            submissions = listOf(
+                ManagedExamSubmission(
+                    id = 44, assignmentId = 38, userId = "learner-private-id", attemptId = 50,
+                    percentage = 60.0, awardedMarks = 3.0, maxMarks = 5.0,
+                    answers = listOf("My answer"), feedback = listOf(
+                        WrittenExamMark(0, 3.0, 5.0, "Add supporting detail.", true)
+                    )
+                )
+            )
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeExamManagementScreen(
+                    workspaces = listOf(workspace),
+                    exams = listOf(WrittenExam(10, "Fractions check", "intermediate",
+                        listOf(WrittenExamQuestion("Explain fractions.", "short_answer", 5)))),
+                    busy = false,
+                    assign = { org, group, exam, due -> assigned.value = "$org:$group:$exam:$due" },
+                    overrideMark = { org, submission, index, marks, reason ->
+                        reviewed.value = "$org:$submission:$index:$marks:$reason"
+                    },
+                    createExam = {},
+                    close = {}
+                )
+            }
+        }
+
+        compose.onNodeWithTag("create-exam-assignment-8").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 5000) { assigned.value.startsWith("8:21:10:") }
+        assertEquals("8:21:10:null", assigned.value)
+        compose.onNodeWithText("Explain fractions.").performScrollTo().assertIsDisplayed()
+        val markField = compose.onNodeWithTag("override-mark-44:0").performScrollTo()
+        markField.performTextClearance()
+        markField.performTextInput("4")
+        compose.onNodeWithText("Reason for change (at least 5 characters)").performScrollTo()
+            .performTextInput("Reviewed against the answer guide.")
+        compose.onNodeWithTag("save-exam-override-44:0").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 5000) { reviewed.value.isNotEmpty() }
+        assertEquals("8:44:0:4.0:Reviewed against the answer guide.", reviewed.value)
     }
 }

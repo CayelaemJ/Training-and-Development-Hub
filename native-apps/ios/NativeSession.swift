@@ -1,3 +1,39 @@
+struct NativeManagedExamGroup: Decodable, Identifiable {
+    let id: Int
+    let name: String
+}
+struct NativeManagedExamAssignment: Decodable, Identifiable {
+    let id: Int
+    let groupId: Int
+    let examId: Int
+    let dueAt: String?
+}
+struct NativeManagedExamSubmission: Decodable, Identifiable {
+    let id: Int
+    let assignmentId: Int
+    let userId: String
+    let attemptId: Int
+    let percentage: Double
+    let awardedMarks: Double
+    let maxMarks: Double
+    let answers: [String]
+    let feedback: [NativeWrittenExamMark]
+}
+struct NativeExamManagementWorkspace: Identifiable {
+    let organizationId: Int
+    let organizationName: String
+    let groups: [NativeManagedExamGroup]
+    let assignments: [NativeManagedExamAssignment]
+    let submissions: [NativeManagedExamSubmission]
+    let notice: String?
+    var id: Int { organizationId }
+}
+private struct NativeOrganizationMembership: Decodable {
+    let id: Int
+    let name: String
+    let role: String
+}
+
 import Foundation
 import SwiftUI
 import AuthenticationServices
@@ -246,6 +282,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var writtenExams: [NativeWrittenExam] = []
     @Published var writtenAssignments: [NativeWrittenExamAssignment] = []
+    @Published var examManagementWorkspaces: [NativeExamManagementWorkspace] = []
+    @Published var canManageExamAssignments = false
+    @Published var examManagementBusy = false
     @Published var guardians: [GuardianInvitation] = []
     @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -389,7 +428,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             clearSupportStorage()
             clearToken()
             role = nil
-            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; quizzes = []; quizSummaries = []
+            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; quizzes = []; quizSummaries = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
@@ -470,6 +509,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 .map { "\($0.key): \($0.value)" }.sorted()
             let nextWorkspaces = (decoded["cards"] as? [[String: Any]] ?? [])
                 .compactMap { $0["label"] as? String }
+            var nextCanManageExamAssignments = false
+            if let membershipsData = try? await request("api/organizations"),
+               let memberships = try? JSONDecoder().decode([NativeOrganizationMembership].self, from: membershipsData) {
+                nextCanManageExamAssignments = memberships.contains { ["owner", "admin"].contains($0.role) }
+            }
             var nextGuardians: [GuardianInvitation] = []
             var nextNotificationPreferences = NativeNotificationPreferences.unavailable
             var nextGuardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -491,6 +535,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextQuizSummaries: [NativeQuizSummary] = []
             var nextWrittenExams: [NativeWrittenExam] = []
             var nextWrittenAssignments: [NativeWrittenExamAssignment] = []
+            var nextExamManagementWorkspaces: [NativeExamManagementWorkspace] = []
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
@@ -620,11 +665,15 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     }
                 }
             } else {
-                if verifiedRole == "learner" {
+                if verifiedRole == "learner" || nextCanManageExamAssignments {
                     nextWrittenExams = Array((try? JSONDecoder().decode([NativeWrittenExam].self,
                         from: await request("api/written-exams")))?.prefix(30) ?? [])
+                }
+                if verifiedRole == "learner" {
                     nextWrittenAssignments = Array((try? JSONDecoder().decode([NativeWrittenExamAssignment].self,
                         from: await request("api/my-assignments")))?.prefix(100) ?? [])
+                }
+                if verifiedRole == "learner" {
                     for organizationId in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
                         do {
                             let data = try await request("api/organizations/\(organizationId)/report-issuance/me")
@@ -754,10 +803,12 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             quizSummaries = nextQuizSummaries
             writtenExams = nextWrittenExams
             writtenAssignments = nextWrittenAssignments
+            examManagementWorkspaces = nextExamManagementWorkspaces
+            canManageExamAssignments = nextCanManageExamAssignments
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1237,7 +1288,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String) async throws -> NativeWrittenExam {
-        guard role == "learner", materialId > 0, (1...10).contains(questionCount),
+        guard (role == "learner" || canManageExamAssignments), materialId > 0, (1...10).contains(questionCount),
               ["beginner", "intermediate", "advanced"].contains(difficulty) else {
             throw NSError(domain: "CABO", code: 403)
         }
@@ -1259,13 +1310,13 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func loadWrittenExam(id: Int) async throws -> NativeWrittenExam {
-        guard role == "learner", id > 0 else { throw NSError(domain: "CABO", code: 403) }
+        guard (role == "learner" || canManageExamAssignments), id > 0 else { throw NSError(domain: "CABO", code: 403) }
         let data = try await request("api/written-exams/\(id)")
         return try JSONDecoder().decode(NativeWrittenExam.self, from: data)
     }
 
     func submitWrittenExam(id: Int, answers: [String], assignmentId: Int? = nil) async throws -> NativeWrittenExamResult {
-        guard role == "learner", id > 0, !answers.isEmpty, answers.count <= 15,
+        guard (role == "learner" || canManageExamAssignments), id > 0, !answers.isEmpty, answers.count <= 15,
               answers.allSatisfy({ $0.count <= 15_000 }) else {
             throw NSError(domain: "CABO", code: 400)
         }
@@ -1409,6 +1460,70 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     private struct NativeQuizAnswers: Encodable {
         let answers: [Int]
+    }
+
+    func refreshExamManagement() async {
+        guard canManageExamAssignments, !examManagementBusy else { return }
+        examManagementBusy = true
+        defer { examManagementBusy = false }
+        examManagementWorkspaces = await loadExamManagementWorkspaces()
+    }
+
+    @MainActor private func loadExamManagementWorkspaces() async -> [NativeExamManagementWorkspace] {
+        guard let data = try? await request("api/organizations"),
+              let memberships = try? JSONDecoder().decode([NativeOrganizationMembership].self, from: data) else { return [] }
+        var workspaces: [NativeExamManagementWorkspace] = []
+        for membership in memberships.prefix(5) where ["owner", "admin"].contains(membership.role) {
+            do {
+                let groupsData = try await request("api/organizations/\(membership.id)/groups")
+                let groups = try JSONDecoder().decode([NativeManagedExamGroup].self, from: groupsData).prefix(200)
+                let assignmentsData = try await request("api/organizations/\(membership.id)/assignments")
+                let assignments = try JSONDecoder().decode([NativeManagedExamAssignment].self, from: assignmentsData).prefix(200)
+                let submissionsData = try await request("api/organizations/\(membership.id)/submissions")
+                let submissions = try JSONDecoder().decode([NativeManagedExamSubmission].self, from: submissionsData).prefix(500)
+                workspaces.append(NativeExamManagementWorkspace(
+                    organizationId: membership.id, organizationName: String(membership.name.prefix(200)),
+                    groups: Array(groups), assignments: Array(assignments), submissions: Array(submissions), notice: nil
+                ))
+            } catch {
+                workspaces.append(NativeExamManagementWorkspace(
+                    organizationId: membership.id, organizationName: String(membership.name.prefix(200)),
+                    groups: [], assignments: [], submissions: [],
+                    notice: "Assignment workspace could not be loaded. Check your connection and retry."
+                ))
+            }
+        }
+        return workspaces
+    }
+
+    func createExamAssignment(organizationId: Int, groupId: Int, examId: Int, dueAt: String?) async throws {
+        guard canManageExamAssignments, organizationId > 0, groupId > 0, examId > 0 else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        var payload: [String: Any] = ["groupId": groupId, "examId": examId]
+        if let dueAt, !dueAt.isEmpty {
+            guard dueAt.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$"#, options: .regularExpression) != nil else {
+                throw NSError(domain: "CABO", code: 400)
+            }
+            payload["dueAt"] = dueAt.count == 17 ? dueAt.replacingOccurrences(of: "Z", with: ":00Z") : dueAt
+        }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        _ = try await request("api/organizations/\(organizationId)/assignments", method: "POST", body: body)
+        examManagementWorkspaces = await loadExamManagementWorkspaces()
+    }
+
+    func overrideExamSubmission(organizationId: Int, submissionId: Int, questionIndex: Int,
+                               awardedMarks: Double, reason: String) async throws {
+        let clean = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canManageExamAssignments, organizationId > 0, submissionId > 0,
+              (0...14).contains(questionIndex), awardedMarks >= 0, awardedMarks <= 100,
+              (5...2000).contains(clean.count) else { throw NSError(domain: "CABO", code: 400) }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "questionIndex": questionIndex, "awardedMarks": awardedMarks, "reason": clean
+        ])
+        _ = try await request("api/organizations/\(organizationId)/submissions/\(submissionId)/overrides",
+            method: "POST", body: body)
+        examManagementWorkspaces = await loadExamManagementWorkspaces()
     }
 
     func setNotificationPreference(organizationId: Int, kind: String, enabled: Bool, acknowledged: Bool) async {
@@ -1562,7 +1677,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearSupportStorage()
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
         guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
