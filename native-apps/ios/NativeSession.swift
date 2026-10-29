@@ -284,6 +284,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var writtenAssignments: [NativeWrittenExamAssignment] = []
     @Published var examManagementWorkspaces: [NativeExamManagementWorkspace] = []
     @Published var canManageExamAssignments = false
+    @Published var examManagementBusy = false
     @Published var guardians: [GuardianInvitation] = []
     @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -807,7 +808,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1462,7 +1463,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func refreshExamManagement() async {
-        guard canManageExamAssignments else { return }
+        guard canManageExamAssignments, !examManagementBusy else { return }
+        examManagementBusy = true
+        defer { examManagementBusy = false }
         examManagementWorkspaces = await loadExamManagementWorkspaces()
     }
 
