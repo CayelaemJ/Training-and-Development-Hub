@@ -339,6 +339,7 @@ class MainActivity : ComponentActivity() {
                             } else selectedWrittenExams = true
                         },
                         openPassport = { openLearnerPassport() },
+                        openEducationCommand = { openEducationCommand() },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -1281,7 +1282,8 @@ internal fun NativeHome(
     offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
     offlineSupportCourses: List<SupportCourseOption> = emptyList(),
     learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
-    openPassport: () -> Unit = {}
+    openPassport: () -> Unit = {},
+    openEducationCommand: () -> Unit = {}
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
