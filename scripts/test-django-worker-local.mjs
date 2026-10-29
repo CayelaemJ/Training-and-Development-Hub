@@ -39,7 +39,7 @@ async function request(endpoint, options = {}) {
   });
 }
 async function untilHealthy() {
-  const deadline = Date.now() + 150_000;
+  const deadline = Date.now() + 210_000;
   while (Date.now() < deadline) {
     if (spawnFailure) throw Error("Worker runtime failed to launch");
     if (child.exitCode !== null || child.signalCode !== null) throw Error("Worker runtime exited before healthy");
@@ -51,7 +51,7 @@ async function untilHealthy() {
     }
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
-  throw Error("Worker runtime did not return healthy within 150 seconds");
+  throw Error("Worker runtime did not return healthy within 210 seconds");
 }
 
 try {
@@ -67,11 +67,24 @@ try {
   }
   port = await unusedPort();
   console.log("Starting synthetic local Python Worker runtime...");
-  child = spawn("uvx", [
-    "--from", "workers-py==1.17.9", "pywrangler", "dev", "--local",
-    "--port", String(port), "--ip", "127.0.0.1",
+  // CI can pass an absolute, pinned Wrangler CLI path after Pywrangler sync.
+  // This avoids differences in wrapper-based npm/npx launchers on build hosts.
+  const cli = process.env.CABO_DJANGO_LOCAL_WRANGLER_CLI;
+  if (cli && !path.isAbsolute(cli)) throw Error("Worker test CLI must use an absolute path");
+  const argumentsForDev = [
+    "dev", "--local", "--port", String(port), "--ip", "127.0.0.1",
     "--show-interactive-dev-session", "false", "--log-level", "error",
-  ], { cwd, env: { ...process.env, CI: "1" }, detached: true, stdio: ["ignore", "ignore", "ignore"] });
+  ];
+  const command = cli ? process.execPath : "uvx";
+  const args = cli
+    ? [cli, ...argumentsForDev]
+    : ["--from", "workers-py==1.17.9", "pywrangler", ...argumentsForDev];
+  child = spawn(command, args, {
+    cwd,
+    env: { ...process.env, CI: "1" },
+    detached: true,
+    stdio: ["ignore", "ignore", "ignore"],
+  });
   child.on("error", error => { spawnFailure = error; });
   await untilHealthy();
   const data = JSON.stringify({ concepts: [
