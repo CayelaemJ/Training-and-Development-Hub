@@ -622,7 +622,7 @@ class NativeAndroidSchoolOperationsTest {
                     startDemo = {}, setDemoRole = {}, createSupportRequest = {},
                     testLoginAvailable = false, testUsername = "", testPassword = "",
                     onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
-                    respondToInvite = {}, openSupportTicket = {}, openQuiz = {},
+                    respondToInvite = { _, _ -> }, openSupportTicket = {}, openQuiz = {},
                     openMaterial = {}, pickMaterial = {}
                 )
             }
