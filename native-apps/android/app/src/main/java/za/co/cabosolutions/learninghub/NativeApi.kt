@@ -1236,6 +1236,12 @@ internal class NativeApi(private val context: Context) {
             parseWrittenExam(response)
         }
 
+    suspend fun fetchWrittenExam(id: Int): WrittenExam =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0)
+            parseWrittenExam(request("/api/written-exams/$id", auth = true))
+        }
+
     suspend fun submitWrittenExam(examId: Int, answers: List<String>): WrittenExamResult =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(examId > 0 && answers.isNotEmpty() && answers.size <= 15 && answers.all { it.length <= 15000 })
