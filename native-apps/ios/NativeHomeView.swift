@@ -480,7 +480,7 @@ struct NativeHomeView: View {
     }
 
     private func title(_ value: String) -> some View {
-        Text(value).font(.system(.title2, design: .serif, weight: .bold)).padding(.top, 4)
+        Text(value).font(.system(.title2, design: .serif).bold()).padding(.top, 4)
             .accessibilityAddTraits(.isHeader)
     }
 
