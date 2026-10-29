@@ -18,6 +18,8 @@ targets:
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift
       - path: NativeMaterialUploadView.swift
+      - path: NativeSupportRequestView.swift
+      - path: NativeStaffSupportView.swift
       - path: NativeGuardianReport.swift
     settings:
       base:
