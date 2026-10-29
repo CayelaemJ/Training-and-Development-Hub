@@ -8,8 +8,8 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -394,7 +394,7 @@ class NativeAndroidGuardianReviewTest {
         compose.onNodeWithText("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.")
             .performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Verify guardian access").performScrollTo().assertIsNotEnabled()
-        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
+        compose.onNodeWithTag("guardian-evidence-confirmation").performScrollTo().performClick()
         compose.onNodeWithText("Verify guardian access").performScrollTo().assertIsEnabled().performClick()
         assertEquals(Triple(9, 42, "verified"), decision)
     }
