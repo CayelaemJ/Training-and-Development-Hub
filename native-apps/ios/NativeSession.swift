@@ -403,7 +403,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     if keychainToken() == nil { throw error }
                     nextGuardianReportNotice = "Verified academic reports are unavailable. Check your connection or ask the school."
                 }
+                var issuedReportScopes = Set<String>()
                 for report in nextGuardianReports {
+                    let scope = "\(report.learnerId):\(report.organizationId)"
+                    guard issuedReportScopes.insert(scope).inserted else { continue }
+                    guard issuedReportScopes.count <= 12 else { break }
                     do {
                         let safeLearnerId = report.learnerId.addingPercentEncoding(
                             withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")) ?? ""

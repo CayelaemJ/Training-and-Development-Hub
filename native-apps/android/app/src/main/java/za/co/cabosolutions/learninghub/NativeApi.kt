@@ -560,7 +560,10 @@ internal class NativeApi(private val context: Context) {
                 if (!hasSession()) throw error
                 emptyList()
             }
-            val issuedReports = reports.flatMap { report ->
+            val issuedReports = reports
+                .distinctBy { "${it.learnerId}:${it.organizationId}" }
+                .take(12)
+                .flatMap { report ->
                 try {
                     val rows = getArray("/api/guardian/issued-reports/${Uri.encode(report.learnerId)}?organizationId=${report.organizationId}")
                     (0 until minOf(rows.length(), 50)).mapNotNull { i ->
