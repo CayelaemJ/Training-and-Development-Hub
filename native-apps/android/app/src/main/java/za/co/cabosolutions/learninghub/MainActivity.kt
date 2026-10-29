@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedWrittenExams by mutableStateOf(false)
+    private var managerCreatingExam by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
     private var selectedUploadFileName by mutableStateOf("")
@@ -114,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
                         creatingSupportRequest -> creatingSupportRequest = false
@@ -165,6 +166,22 @@ class MainActivity : ComponentActivity() {
                         recordOutcome = { baseline, followup, reason -> recordSupportOutcome(baseline, followup, reason) },
                         reviewLearningDna = { state, note -> saveSupportLearningDna(state, note) }
                     )
+                    selectedWrittenExams && !managerCreatingExam && (screen?.portal?.role in setOf("owner", "admin")) ->
+                        NativeExamManagementScreen(
+                            workspaces = screen?.examManagementWorkspaces.orEmpty(),
+                            exams = screen?.writtenExams.orEmpty(),
+                            busy = busy,
+                            assign = { organizationId, groupId, examId, dueAt ->
+                                api.createExamAssignment(organizationId, groupId, examId, dueAt)
+                                loadDashboard()
+                            },
+                            overrideMark = { organizationId, submissionId, questionIndex, awardedMarks, reason ->
+                                api.overrideExamSubmission(organizationId, submissionId, questionIndex, awardedMarks, reason)
+                                loadDashboard()
+                            },
+                            createExam = { managerCreatingExam = true },
+                            close = { selectedWrittenExams = false }
+                        )
                     selectedWrittenExams -> NativeWrittenExamScreen(
                         materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
                         assignments = if (demoActive && screen?.portal?.role == "learner")
@@ -202,7 +219,12 @@ class MainActivity : ComponentActivity() {
                             } else api.submitWrittenExam(examId, answers, assignmentId)
                         },
                         isDemo = demoActive,
-                        close = { selectedWrittenExams = false }
+                        close = {
+                            if (screen?.portal?.role in setOf("owner", "admin")) {
+                                managerCreatingExam = false
+                                loadDashboard()
+                            } else selectedWrittenExams = false
+                        }
                     )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
