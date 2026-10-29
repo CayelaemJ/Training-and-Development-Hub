@@ -1442,7 +1442,7 @@ internal fun NativeHome(
                             openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
-                            learnerJourneyAction = learnerJourneyAction
+                            learnerJourneyAction = learnerJourneyAction, openPassport = openPassport
                         )
                     }
                 }
