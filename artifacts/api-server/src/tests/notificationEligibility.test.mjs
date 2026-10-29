@@ -32,6 +32,7 @@ test("verified guardian requires current school decision, enrolment and explicit
    {preference:null},{preference:{...pref,optedIn:false}},
    {preference:{...pref,revokedAt:new Date()}},
    {preference:{...pref,confirmedAt:null}},
+   {preference:{...pref,confirmedAt:new Date("2100-01-01T00:00:00Z")}},
    {emailMatches:false},{source:{kind:"support_ticket",id:32}},
  ]) assert.equal(isNotificationEligible({...guardian,...patch}),false,JSON.stringify(patch));
 });
