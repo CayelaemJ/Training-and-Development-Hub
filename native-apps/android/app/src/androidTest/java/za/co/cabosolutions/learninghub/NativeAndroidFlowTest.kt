@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextClearance
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -845,7 +846,7 @@ class NativeAndroidExamManagementTest {
         compose.onNodeWithTag("create-exam-assignment-8").performScrollTo().performClick()
         compose.waitUntil(timeoutMillis = 5000) { assigned.value.startsWith("8:21:10:") }
         assertEquals("8:21:10:null", assigned.value)
-        compose.onNodeWithTag("override-mark-44:0").performScrollTo().performTextInput("4")
+        compose.onNodeWithTag("override-mark-44:0").performScrollTo().performTextClearance().performTextInput("4")
         compose.onNodeWithText("Reason for change (at least 5 characters)").performScrollTo()
             .performTextInput("Reviewed against the answer guide.")
         compose.onNodeWithTag("save-exam-override-44:0").performScrollTo().performClick()
