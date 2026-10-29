@@ -1,4 +1,4 @@
-name = "cabo-learning-django-insights"
+name = "cabo-learning-django-insights-staging"
 main = "main.py"
 compatibility_date = "2026-10-28"
 compatibility_flags = ["python_workers"]
@@ -8,4 +8,4 @@ compatibility_flags = ["python_workers"]
 # This worker is not intended for direct browser use.
 # Confirmed account workers.dev subdomain: cabo-solutions-za.
 [vars]
-DJANGO_ALLOWED_HOST = "cabo-learning-django-insights.cabo-solutions-za.workers.dev"
+DJANGO_ALLOWED_HOST = "cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev"
