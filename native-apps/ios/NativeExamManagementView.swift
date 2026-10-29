@@ -66,7 +66,7 @@ struct NativeExamManagementView: View {
                                     }
                                 }
                             }
-                            .disabled(session.busy || groupId <= 0 || examId <= 0)
+                            .disabled(session.busy || session.examManagementBusy || groupId <= 0 || examId <= 0)
                         }
                     }
                     NavigationLink(destination: NativeWrittenExamView(session: session)) {
