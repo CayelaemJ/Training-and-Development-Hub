@@ -42,7 +42,7 @@ async function request(endpoint, options = {}) {
       path: endpoint,
       method: options.method ?? "GET",
       headers: { Host: host, "Content-Type": "application/json", ...(options.headers ?? {}) },
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
     }, response => {
       const chunks = [];
       response.on("data", chunk => chunks.push(chunk));
@@ -58,19 +58,22 @@ async function request(endpoint, options = {}) {
   });
 }
 async function untilHealthy() {
-  const deadline = Date.now() + 210_000;
+  const deadline = Date.now() + 360_000;
   while (Date.now() < deadline) {
     if (spawnFailure) throw Error("Worker runtime failed to launch");
     if (child.exitCode !== null || child.signalCode !== null) throw Error("Worker runtime exited before healthy");
     try {
-      const response = await request("/health");
+      // Do not repeatedly abort Python/WASM first import after 10 seconds.
+      // A single long health probe allows the cold isolate to finish warming.
+      const remaining = Math.max(1_000, deadline - Date.now());
+      const response = await request("/health", {timeoutMs: Math.min(180_000, remaining)});
       if (response.status === 200) return;
     } catch {
       // Python/WASM startup may take longer than a normal HTTP request.
     }
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
-  throw Error("Worker runtime did not return healthy within 210 seconds");
+  throw Error("Worker runtime did not return healthy within 360 seconds");
 }
 
 try {
