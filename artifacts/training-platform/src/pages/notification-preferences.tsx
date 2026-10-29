@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import {Bell,CheckCircle2,LockKeyhole,ShieldCheck,LoaderCircle} from "lucide-react";
 
-type Choice={kind:"guardian_review_requested"|"learner_support_updated";enabled:boolean};
+type Choice={kind:"guardian_review_requested"|"learner_support_updated";enabled:boolean;canEnable:boolean};
 type School={id:number;name:string;choices:Choice[]};
 type Preferences={enabled:boolean;optInAvailable:boolean;schools:School[]};
 const labels:Record<Choice["kind"],{title:string;description:string}>={
@@ -80,10 +80,10 @@ export default function NotificationPreferencesPage(){
    {school.choices.map(choice=>{
      const copy=labels[choice.kind];
      const key=school.id+":"+choice.kind;
-     const locked=!choice.enabled&&!data.optInAvailable;
+     const locked=!choice.enabled&&(!data.optInAvailable||!choice.canEnable);
      return <div key={choice.kind} className="flex flex-col gap-3 border-b pb-5 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-1 sm:pr-6"><h3 className="font-semibold">{copy.title}</h3><p className="text-sm text-muted-foreground">{copy.description}</p>
-      <p className="text-xs text-muted-foreground">{choice.enabled?"Email permitted by your recorded choice; delivery still requires live checks.":locked?"New opt-ins are awaiting identity-provider approval.":"Off by default. You can withdraw consent at any time."}</p></div>
+      <p className="text-xs text-muted-foreground">{choice.enabled?"Email permitted by your recorded choice; delivery still requires live checks.":!choice.canEnable?"This institution is no longer verified for your account. You can withdraw any earlier consent.":locked?"New opt-ins are awaiting identity-provider approval.":"Off by default. You can withdraw consent at any time."}</p></div>
       <button type="button" className="shrink-0 rounded-lg border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         aria-pressed={choice.enabled} disabled={!!saving||locked||(!choice.enabled&&!consent)}
         onClick={()=>change(school,choice)}>{saving===key?"Saving…":choice.enabled?"Turn off":"Turn on"}</button>
