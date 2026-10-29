@@ -103,6 +103,14 @@ internal data class SchoolOperationsWorkspace(
 ) { val canManage: Boolean get() = membershipRole in setOf("owner", "admin") }
 
 internal data class NativePortal(val role: String, val summary: List<String>, val areas: List<String>)
+internal data class EducationCommandSnapshot(
+    val year: Int, val institutions: Int, val schools: List<EducationCommandSchool>,
+    val minimumCohort: Int, val nationalVerified: Boolean, val officialDbEData: Boolean
+)
+internal data class EducationCommandSchool(
+    val id: Int, val name: String, val learnerCount: Int?,
+    val attendanceRate: Int?, val privacySuppressed: Boolean
+)
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
@@ -656,6 +664,33 @@ internal class NativeApi(private val context: Context) {
                 if (partialFailure) "Some school data could not load. Check your connection and refresh." else null)
         }
     }
+
+    suspend fun fetchEducationCommand(year: Int): EducationCommandSnapshot =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(year in 2000..2200)
+            val response = request("/api/education-command/overview?year=$year", auth = true)
+            val rows = response.optJSONArray("schools") ?: JSONArray()
+            val schools = (0 until minOf(rows.length(), 100)).mapNotNull { index ->
+                val row = rows.optJSONObject(index) ?: return@mapNotNull null
+                val id = row.optInt("id")
+                val name = row.optString("name").trim().take(200)
+                if (id <= 0 || name.isBlank()) return@mapNotNull null
+                val learnerCount = if (row.isNull("learnerCount")) null else row.optInt("learnerCount").takeIf { it >= 10 }
+                val attendanceRate = if (row.isNull("attendanceRate")) null else row.optInt("attendanceRate").takeIf { it in 0..100 }
+                EducationCommandSchool(
+                    id, name, learnerCount, attendanceRate,
+                    row.optBoolean("privacySuppressed") || learnerCount == null
+                )
+            }
+            EducationCommandSnapshot(
+                year = response.optInt("year", year),
+                institutions = response.optInt("institutions", schools.size).coerceIn(0, 100),
+                schools = schools,
+                minimumCohort = response.optInt("minimumCohort", 10).coerceIn(10, 100),
+                nationalVerified = response.optBoolean("nationalVerified"),
+                officialDbEData = response.optBoolean("officialDbEData")
+            )
+        }
 
     suspend fun dashboard(): NativeLearning = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val json = request("/api/portal/me", auth = true)
