@@ -533,7 +533,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     private func sendStaffSupportAction(_ ticket: NativeStaffSupportTicket, action: [String: Any]) async throws {
-        guard ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head"].contains(role ?? "") else {
+        guard ["teacher", "assessor"].contains(role ?? "") else {
             throw NSError(domain: "CABO", code: 403)
         }
         let body = try JSONSerialization.data(withJSONObject: ["version": ticket.version, "action": action])
