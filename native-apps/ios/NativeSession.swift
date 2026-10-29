@@ -283,6 +283,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var writtenExams: [NativeWrittenExam] = []
     @Published var writtenAssignments: [NativeWrittenExamAssignment] = []
     @Published var examManagementWorkspaces: [NativeExamManagementWorkspace] = []
+    @Published var canManageExamAssignments = false
     @Published var guardians: [GuardianInvitation] = []
     @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -507,6 +508,10 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 .map { "\($0.key): \($0.value)" }.sorted()
             let nextWorkspaces = (decoded["cards"] as? [[String: Any]] ?? [])
                 .compactMap { $0["label"] as? String }
+            if let membershipsData = try? await request("api/organizations"),
+               let memberships = try? JSONDecoder().decode([NativeOrganizationMembership].self, from: membershipsData) {
+                nextCanManageExamAssignments = memberships.contains { ["owner", "admin"].contains($0.role) }
+            }
             var nextGuardians: [GuardianInvitation] = []
             var nextNotificationPreferences = NativeNotificationPreferences.unavailable
             var nextGuardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -529,6 +534,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextWrittenExams: [NativeWrittenExam] = []
             var nextWrittenAssignments: [NativeWrittenExamAssignment] = []
             var nextExamManagementWorkspaces: [NativeExamManagementWorkspace] = []
+            var nextCanManageExamAssignments = false
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
@@ -797,10 +803,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             writtenExams = nextWrittenExams
             writtenAssignments = nextWrittenAssignments
             examManagementWorkspaces = nextExamManagementWorkspaces
+            canManageExamAssignments = nextCanManageExamAssignments
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1455,6 +1462,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func refreshExamManagement() async {
+        guard canManageExamAssignments else { return }
         examManagementWorkspaces = await loadExamManagementWorkspaces()
     }
 
