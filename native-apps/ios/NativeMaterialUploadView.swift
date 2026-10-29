@@ -25,8 +25,10 @@ struct NativeMaterialUploadView: View {
         NavigationView {
             Form {
                 Section("Study material") {
-                    LabeledContent("File", value: selection.url.lastPathComponent)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Selected file").font(.caption).foregroundColor(.secondary)
+                        Text(selection.url.lastPathComponent).font(.body).lineLimit(2)
+                    }
                     TextField("Material title", text: $title)
                         .textInputAutocapitalization(.sentences)
                         .accessibilityLabel("Study material title")
