@@ -86,7 +86,7 @@ struct NativeExamManagementView: View {
                                 Text(exam).font(.headline)
                                 Text(group).font(.subheadline).foregroundColor(.secondary)
                                 if let deadline = assignment.dueAt {
-                                    Text("Due \(deadline.prefix(16).replacingOccurrences(of: "T", with: " ")) UTC")
+                                    Text("Due \(String(deadline.prefix(16)).replacingOccurrences(of: "T", with: " ")) UTC")
                                         .font(.footnote).foregroundColor(.secondary)
                                 }
                             }
@@ -105,8 +105,10 @@ struct NativeExamManagementView: View {
                                     .font(.subheadline).foregroundColor(.secondary)
                                 ForEach(submission.feedback, id: \.questionIndex) { mark in
                                     let assignedExamId = workspace.assignments.first(where: { $0.id == submission.assignmentId })?.examId
-                                    let prompt = session.writtenExams.first(where: { $0.id == assignedExamId })
-                                        .flatMap { exam in exam.questions.indices.contains(mark.questionIndex) ? exam.questions[mark.questionIndex].prompt : nil }
+                                    let prompt = assignedExamId.flatMap { examId in
+                                        session.writtenExams.first(where: { $0.id == examId })
+                                    }.flatMap { exam in exam.questions.indices.contains(mark.questionIndex)
+                                        ? exam.questions[mark.questionIndex].prompt : nil }
                                     NativeExamOverrideRow(
                                         session: session, organizationId: workspace.organizationId,
                                         submission: submission, mark: mark, prompt: prompt
