@@ -1870,7 +1870,6 @@ private fun RoleContent(
                     item { Text("Family invitations", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     if (data.parentGuidance.isNotBlank()) item { Text(data.parentGuidance, style = MaterialTheme.typography.bodySmall) }
                     if (data.guardians.isEmpty()) item { NativeCard("No invitations", "A learner can invite you through their CABO account.") }
-                    item { NotificationPreferencesCard(data.notificationPreferences, busy, setNotificationPreference) }
                     items(data.guardians, key = { "invite:${it.id}" }) { invite ->
                         ElevatedCard(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1891,6 +1890,7 @@ private fun RoleContent(
                             }
                         }
                     }
+                    item { NotificationPreferencesCard(data.notificationPreferences, busy, setNotificationPreference) }
                 }
                 "teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head" -> {
                     item { Text("Learner support queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
