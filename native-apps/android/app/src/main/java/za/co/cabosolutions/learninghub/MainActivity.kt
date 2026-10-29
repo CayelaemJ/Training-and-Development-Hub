@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,11 +103,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val caboColors = lightColorScheme(
-                primary = Color(0xFF14635D), onPrimary = Color.White,
-                secondary = Color(0xFFC66B43), onSecondary = Color.White,
-                background = Color(0xFFF4F5F1), surface = Color(0xFFFFFEFA),
-                surfaceVariant = Color(0xFFE6EFEB), onSurface = Color(0xFF1F302E),
-                onSurfaceVariant = Color(0xFF53625F), outline = Color(0xFFD0D9D5)
+                primary = Color(0xFF37876E), onPrimary = Color.White,
+                secondary = Color(0xFFC4673A), onSecondary = Color.White,
+                background = Color(0xFFF8F6EF), surface = Color(0xFFFFFEFA),
+                surfaceVariant = Color(0xFFE8F0E9), onSurface = Color(0xFF29372F),
+                onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
                 BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null) {
@@ -235,7 +237,7 @@ class MainActivity : ComponentActivity() {
         demoActive = true
         demoRole = "learner"
         screen = NativeDemoData.learner()
-        status = "DEMO MODE · sample data only · no account connected"
+        status = "CABO demo · sample data only · no account connected"
     }
 
     private fun closeMaterialUpload() {
@@ -272,7 +274,7 @@ class MainActivity : ComponentActivity() {
         closeSupportTicket()
         demoRole = role
         screen = NativeDemoData.forRole(role)
-        status = "DEMO MODE · ${role.uppercase()} preview · synthetic records"
+        status = "CABO demo · ${role.replaceFirstChar { it.uppercase() }} workspace"
     }
 
     private fun createDemoSupportRequest(concept: String, question: String, attempted: String) {
@@ -280,7 +282,7 @@ class MainActivity : ComponentActivity() {
         NativeDemoSession.createRequest(concept, question, attempted)
         screen = NativeDemoData.learner()
         creatingSupportRequest = false
-        status = "Demo request created locally. Switch to Educator to review it."
+        status = "Request saved on this device. Switch to Teacher to review it."
     }
 
     private fun saveSupportDraft(draft: NativeSupportDraft) {
@@ -605,12 +607,27 @@ class MainActivity : ComponentActivity() {
         val summary = supportTicket?.summary ?: return
         if (supportBusy) return
         if (demoActive) {
-            supportGuidance = SupportGuidanceDraft(
-                explanation = "To add fractions with different denominators, rewrite them as equivalent fractions with the same denominator. For thirds and fourths, twelfths work because 12 is a multiple of both 3 and 4.",
-                questions = listOf("How many twelfths are equal to one third?", "How many twelfths are equal to one quarter?"),
-                practice = listOf("Rewrite 1/3 and 1/4 in twelfths.", "Add the numerators and keep the denominator."),
-                source = "non_ai_template"
-            )
+            val guidance = when {
+                summary.concept.contains("fraction", ignoreCase = true) -> SupportGuidanceDraft(
+                    explanation = "To add fractions with different denominators, rewrite them as equivalent fractions with the same denominator. For thirds and fourths, twelfths work because 12 is a multiple of both 3 and 4.",
+                    questions = listOf("How many twelfths are equal to one third?", "How many twelfths are equal to one quarter?"),
+                    practice = listOf("Rewrite 1/3 and 1/4 in twelfths.", "Add the numerators and keep the denominator."),
+                    source = "non_ai_template"
+                )
+                summary.concept.contains("read", ignoreCase = true) || summary.concept.contains("evidence", ignoreCase = true) -> SupportGuidanceDraft(
+                    explanation = "Invite the learner to point to a sentence or detail that supports their answer, then connect that evidence to the question.",
+                    questions = listOf("Which detail helped you decide?", "How does that detail support your answer?"),
+                    practice = listOf("Choose one claim in a short paragraph.", "Underline a sentence that supports it and explain why."),
+                    source = "non_ai_template"
+                )
+                else -> SupportGuidanceDraft(
+                    explanation = "Break ${summary.concept} into a small example the learner can explain step by step. Ask them to show the point where they became unsure.",
+                    questions = listOf("What part feels clear so far?", "Where did your answer start to differ from the example?"),
+                    practice = listOf("Work through one short example together.", "Ask the learner to explain the next step in their own words."),
+                    source = "non_ai_template"
+                )
+            }
+            supportGuidance = guidance
             supportMessage = "Synthetic guidance draft ready. Review it before adding it to your reply."
             return
         }
@@ -720,42 +737,41 @@ internal fun NativeHome(
         Triple("home", "Home", Icons.Default.Home),
         Triple("learn", "Learn", Icons.Default.School),
         Triple("progress", "Progress", Icons.Default.Assessment),
-        Triple("support", "Support", Icons.Default.Forum)
+        Triple("support", if (demoRole == "parent") "Family" else if (demoRole == "learner") "Help" else "Support", Icons.Default.Forum)
     )
     Scaffold(
-        containerColor = Color(0xFFF4F5F1),
+        containerColor = Color(0xFFF8F6EF),
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("CABO", color = Color(0xFFBFE5D6), fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Text("Learning Hub", color = Color.White,
-                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    }
-                },
-                navigationIcon = {
-                    Surface(
-                        color = Color(0xFF2A746D), shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.padding(start = 16.dp).size(40.dp)
-                    ) {
-                        Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-                            Text("C", color = Color.White, fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge)
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                            Text("CABO", color = Color(0xFFC4673A), fontSize = 20.sp,
+                                fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp, lineHeight = 20.sp)
+                            Text("SOLUTIONS", color = Color(0xFFC9A84C), fontSize = 7.sp,
+                                fontFamily = FontFamily.Monospace, letterSpacing = 1.1.sp,
+                                lineHeight = 9.sp)
                         }
+                        Box(Modifier.width(1.dp).height(32.dp).background(Color(0xFFDDD7C8)))
+                        Text("Training &\nDevelopment Hub", color = Color(0xFF29372F),
+                            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium,
+                            lineHeight = 14.sp)
                     }
                 },
+                navigationIcon = {},
                 actions = {
                     if (data != null) {
                         IconButton(onClick = refresh, enabled = !busy) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh dashboard", tint = Color.White)
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh dashboard", tint = Color(0xFF37876E))
                         }
                         IconButton(onClick = signOut, enabled = !busy) {
-                            Icon(Icons.Default.Logout, contentDescription = if (demoActive) "Exit demo" else "Sign out", tint = Color.White)
+                            Icon(Icons.Default.Logout, contentDescription = if (demoActive) "Exit demo" else "Sign out", tint = Color(0xFF37876E))
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF153B38))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F6EF))
             )
         },
         bottomBar = {
@@ -768,9 +784,9 @@ internal fun NativeHome(
                             icon = { Icon(icon, contentDescription = null) },
                             label = { Text(label) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF14635D),
-                                selectedTextColor = Color(0xFF14635D),
-                                indicatorColor = Color(0xFFD9ECE4)
+                                selectedIconColor = Color(0xFF37876E),
+                                selectedTextColor = Color(0xFF37876E),
+                                indicatorColor = Color(0xFFDCECE2)
                             )
                         )
                     }
@@ -782,14 +798,14 @@ internal fun NativeHome(
             if (data == null) {
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Learning that moves with you", style = MaterialTheme.typography.headlineMedium,
-                        color = Color(0xFF153B38), fontWeight = FontWeight.Bold)
-                    Text("A secure space for learners, families and educators to stay connected to progress.",
-                        style = MaterialTheme.typography.bodyLarge, color = Color(0xFF53625F))
+                    Text("A place to learn.\nRoom to grow.", style = MaterialTheme.typography.headlineMedium,
+                        color = Color(0xFF29372F), fontWeight = FontWeight.Bold)
+                    Text("Lessons, practice, support and progress for children, families and educators.",
+                        style = MaterialTheme.typography.bodyLarge, color = Color(0xFF68736B))
                     ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
                         containerColor = Color(0xFFFFFEFA))) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(status, color = if (busy) MaterialTheme.colorScheme.primary else Color(0xFF53625F))
+                            Text(status, color = if (busy) MaterialTheme.colorScheme.primary else Color(0xFF68736B))
                             SessionButtons(data, busy, signIn, refresh, signOut, isDemo = false)
                             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                             if (testLoginAvailable) TestLoginControls(testUsername, testPassword, busy,
@@ -798,14 +814,14 @@ internal fun NativeHome(
                     }
                     if (demoEnabled) {
                         OutlinedButton(onClick = startDemo, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
-                            Text("Explore the interactive demo", fontWeight = FontWeight.SemiBold)
+                            Text("Explore the CABO demo", fontWeight = FontWeight.SemiBold)
                         }
-                        Text("Fictional sample records · works without an account or network · no data is sent",
-                            style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+                        Text("Learner, teacher and parent workspaces · sample data stays on this device",
+                            style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                     }
                     if (offlineSupportDrafts.isNotEmpty()) {
                         ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
-                            containerColor = Color(0xFFE6EFEB))) {
+                            containerColor = Color(0xFFE8F0E9))) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text("Saved drafts on this device", style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold)
@@ -830,7 +846,7 @@ internal fun NativeHome(
                         }
                     }
                     Text("LEARNER · FAMILY · EDUCATOR", style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF14635D), letterSpacing = 1.2.sp)
+                        color = Color(0xFF37876E), letterSpacing = 1.2.sp)
                     NativeCard("Your learning space", "Study resources, practice and progress in one place.")
                     NativeCard("Family connection", "Guardian access follows school verification and enrolment rules.")
                     NativeCard("Educator workspace", "Assigned subjects and learner support stay scoped to your school.")
@@ -844,22 +860,22 @@ internal fun NativeHome(
                             Text(when(section) {
                                 "learn" -> "Your learning space"
                                 "progress" -> "Progress & outcomes"
-                                "support" -> "Support & connection"
+                                "support" -> if (demoRole == "parent") "Family & school connection" else if (demoRole == "learner") "My support" else "Learner support"
                                 else -> "Welcome back"
-                            }, style = MaterialTheme.typography.titleLarge, color = Color(0xFF153B38),
+                            }, style = MaterialTheme.typography.titleLarge, color = Color(0xFF29372F),
                                 fontWeight = FontWeight.Bold)
-                            Text(status, style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+                            Text(status, style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                         }
                         if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                     if (demoActive) {
                         ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
-                            containerColor = Color(0xFFE5F1E8))) {
+                            containerColor = Color(0xFFDCECE2))) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("DEMO MODE · synthetic records only", style = MaterialTheme.typography.labelLarge,
+                        Text("CABO PREVIEW · sample workspace", style = MaterialTheme.typography.labelLarge,
                                     color = Color(0xFF14554F), fontWeight = FontWeight.Bold)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf("learner" to "Learner", "teacher" to "Educator", "parent" to "Guardian").forEach { (role, label) ->
+                                    listOf("learner" to "Child", "teacher" to "Teacher", "parent" to "Parent").forEach { (role, label) ->
                                         FilterChip(selected = demoRole == role, onClick = { setDemoRole(role) },
                                             label = { Text(label) }, enabled = !busy)
                                     }
@@ -874,16 +890,16 @@ internal fun NativeHome(
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Column(Modifier.width(224.dp).padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("YOUR SPACE", color = Color(0xFF14635D),
+                                Text("YOUR SPACE", color = Color(0xFF37876E),
                                     style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
                                 Text(data.portal.role.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                                    style = MaterialTheme.typography.headlineSmall, color = Color(0xFF153B38),
+                                    style = MaterialTheme.typography.headlineSmall, color = Color(0xFF29372F),
                                     fontWeight = FontWeight.Bold)
                                 data.portal.summary.take(3).forEach { metric ->
                                     NativeCard(metric, "Current account summary")
                                 }
                                 Text("Use the sections below to move between learning, progress and support.",
-                                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+                                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                             }
                             RoleContent(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
@@ -986,32 +1002,32 @@ private fun RoleContent(
         if (section == "home") {
             item {
                 ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
-                    containerColor = Color(0xFF153B38))) {
+                    containerColor = Color(0xFFFFFEFA))) {
                     Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(when {
-                            role == "teacher" || role == "assessor" -> "Make every next step count"
-                            role == "parent" -> "Stay close to their progress"
+                            role == "teacher" || role == "assessor" -> "Your teaching desk"
+                            role == "parent" -> "Learning grows together"
                             role == "superadmin" -> "Platform overview"
-                            else -> "Small steps. Real progress."
+                            else -> "A place to learn. Room to grow."
                         }, style = MaterialTheme.typography.headlineSmall,
-                            color = Color.White, fontWeight = FontWeight.Bold)
+                            color = Color(0xFF29372F), fontWeight = FontWeight.Bold)
                         Text(when {
-                            role == "teacher" || role == "assessor" -> "Your assigned classes and support requests, together."
-                            role == "parent" -> "School-verified information, clearly separated from draft records."
+                            role == "teacher" || role == "assessor" -> "Prepare learning, support children and follow progress in one workspace."
+                            role == "parent" -> "Stay connected to school updates and the progress shared with your family."
                             role == "superadmin" -> "Governance tools are read-only and never expose learner records."
-                            else -> "Pick up your learning with resources, practice and progress in one space."
-                        }, style = MaterialTheme.typography.bodyLarge, color = Color(0xFFD8E9E3))
-                        Surface(color = Color(0xFF2B615A), shape = MaterialTheme.shapes.large) {
+                            else -> "Lessons, practice, support and progress come together in your CABO learning space."
+                        }, style = MaterialTheme.typography.bodyLarge, color = Color(0xFF68736B))
+                        Surface(color = Color(0xFFDCECE2), shape = MaterialTheme.shapes.large) {
                             Text("${role.replace('_', ' ').uppercase()} SPACE",
                                 Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                color = Color.White, style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFF37876E), style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     }
                 }
             }
             if (data.portal.summary.isNotEmpty()) {
-                item { Text("At a glance", style = MaterialTheme.typography.titleMedium, color = Color(0xFF153B38)) }
+                item { Text("At a glance", style = MaterialTheme.typography.titleMedium, color = Color(0xFF29372F)) }
                 items(data.portal.summary.take(3)) { metric ->
                     NativeCard(metric, when(role) {
                         "teacher", "assessor" -> "Your authorised school workspace"
@@ -1061,7 +1077,7 @@ private fun RoleContent(
                         ElevatedCard(onClick = { openMaterial(material) }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(material.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Text("Open reading", style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+                                Text("Open reading", style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                             }
                         }
                     }
@@ -1072,7 +1088,7 @@ private fun RoleContent(
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(quiz.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text("${quiz.questionCount} questions", style = MaterialTheme.typography.bodySmall)
-                                quiz.latestScore?.let { Text("Previous practice: $it%", color = Color(0xFF14635D)) }
+                                quiz.latestScore?.let { Text("Previous practice: $it%", color = Color(0xFF37876E)) }
                             }
                         }
                     }
@@ -1125,7 +1141,7 @@ private fun RoleContent(
                                     "verified" -> if (invite.verified) "Verified guardian connection" else "School enrolment needs confirmation"
                                     "revoked" -> "Connection revoked"
                                     else -> "Status: ${invite.status}"
-                                }, color = Color(0xFF53625F))
+                                }, color = Color(0xFF68736B))
                                 if (invite.status == "pending") Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Button(onClick = { respondToInvite(invite.id, true) }, enabled = !busy,
                                         modifier = Modifier.heightIn(min = 48.dp)) { Text("Accept invitation") }
@@ -1149,7 +1165,7 @@ private fun RoleContent(
                                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(ticket.concept, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                         Text("${ticket.status.replace('_', ' ')} · request ${ticket.id}", style = MaterialTheme.typography.bodySmall)
-                                        Text("Review request  ›", style = MaterialTheme.typography.labelLarge, color = Color(0xFF14635D))
+                                        Text("Review request  ›", style = MaterialTheme.typography.labelLarge, color = Color(0xFF37876E))
                                     }
                                 }
                             }
@@ -1193,7 +1209,7 @@ private fun RoleContent(
             }
         }
         item { Text("CABO protects account access. Sample and preview information is not an official record.",
-            style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F), modifier = Modifier.padding(top = 8.dp)) }
+            style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B), modifier = Modifier.padding(top = 8.dp)) }
     }
 }
 
@@ -1206,8 +1222,8 @@ private fun ReportCard(
     ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = Color(0xFFFFFEFA))) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("$grade · $year", color = Color(0xFF53625F))
-            average?.let { Text("Average  $it%", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF14635D)) }
+            Text("$grade · $year", color = Color(0xFF68736B))
+            average?.let { Text("Average  $it%", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF37876E)) }
             if (subjects.isNotEmpty()) {
                 HorizontalDivider()
                 subjects.forEach { subject ->
@@ -1218,7 +1234,7 @@ private fun ReportCard(
                 }
             }
             attendanceRate?.let { Text("Attendance  $it% · $presentDays of $recordedDays days") }
-            Text(note, style = MaterialTheme.typography.bodySmall, color = Color(0xFF53625F))
+            Text(note, style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
         }
     }
 }
@@ -1229,9 +1245,9 @@ private fun NativeCard(title: String, subtitle: String) {
         containerColor = Color(0xFFFFFEFA))) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFF153B38), fontWeight = FontWeight.SemiBold)
+                color = Color(0xFF29372F), fontWeight = FontWeight.SemiBold)
             Text(subtitle, style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF53625F))
+                color = Color(0xFF68736B))
         }
     }
 }
