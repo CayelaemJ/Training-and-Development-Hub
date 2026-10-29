@@ -425,3 +425,54 @@ private fun NativeSupportResultPicker(
 
 private fun Double.formatOneDecimal(): String =
     String.format(java.util.Locale.getDefault(), "%.1f", this)
+
+
+@Composable
+internal fun NativeSupportAccountabilityCard(summary: List<String>) {
+    val values = summary.mapNotNull { item ->
+        val split = item.indexOf(':')
+        if (split < 1) null else item.substring(0, split).trim().lowercase()
+            .replace(" ", "").replace("_", "").replace("-", "") to
+            item.substring(split + 1).trim().toIntOrNull()
+    }.filter { it.second != null }.associate { it.first to it.second!! }
+
+    fun find(vararg keys: String): Int? = keys.firstNotNullOfOrNull { values[it] }
+    val metrics = listOfNotNull(
+        find("total", "openrequests")?.let { "Open requests" to it },
+        find("unassigned")?.let { "Unassigned" to it },
+        find("overduecheckpoints", "followupsdue")?.let { "Follow-ups due" to it },
+        find("awaitinglearner")?.let { "Awaiting learner" to it },
+        find("needsmorehelp")?.let { "Needs more help" to it },
+        find("measuredoutcomes")?.let { "Measured outcomes" to it }
+    )
+    if (metrics.isEmpty()) return
+
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Support accountability", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Counts include only requests your account can view. They are not a staff ranking.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            metrics.chunked(2).forEach { rowMetrics ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowMetrics.forEach { (label, count) ->
+                        ElevatedCard(Modifier.weight(1f)) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(count.toString(), style = MaterialTheme.typography.headlineSmall)
+                                Text(label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                    if (rowMetrics.size == 1) androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
