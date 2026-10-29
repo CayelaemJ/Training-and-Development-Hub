@@ -666,8 +666,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     nextWrittenAssignments = Array((try? JSONDecoder().decode([NativeWrittenExamAssignment].self,
                         from: await request("api/my-assignments")))?.prefix(100) ?? [])
                 }
-                if ["owner", "admin", "superadmin"].contains(verifiedRole) {
-                    nextExamManagementWorkspaces = []
+                if verifiedRole == "learner" {
                     for organizationId in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
                         do {
                             let data = try await request("api/organizations/\(organizationId)/report-issuance/me")
