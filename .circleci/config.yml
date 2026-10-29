@@ -15,8 +15,10 @@ parameters:
             python -m pip install --disable-pip-version-check "uv==0.13.6"
             cd services/cloudflare-django-worker
             uvx --from workers-py==1.17.9 pywrangler sync
+            # Install a pinned CLI in an isolated folder, not the repo lockfile.
+            npm install --prefix /tmp/cabo-django-smoke-cli --no-save --no-audit --no-fund wrangler@4.151.3
             cd ../..
-            node scripts/test-django-worker-local.mjs
+            CABO_DJANGO_LOCAL_WRANGLER_CLI=/tmp/cabo-django-smoke-cli/node_modules/wrangler/wrangler-dist/cli.js node scripts/test-django-worker-local.mjs
           no_output_timeout: 8m
 
   deploy_django_staging:
