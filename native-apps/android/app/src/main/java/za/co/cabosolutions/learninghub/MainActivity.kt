@@ -1077,7 +1077,7 @@ internal fun NativeHome(
                             RoleContent(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
-                                respondToInvite = respondToInvite, reviewGuardianRelationship = reviewGuardianRelationship,
+                                respondToInvite = respondToInvite, reviewGuardian = reviewGuardian,
                                 createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
@@ -1090,7 +1090,7 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive,
                             respondToInvite = respondToInvite,
-                            reviewGuardianRelationship = reviewGuardianRelationship,
+                            reviewGuardian = reviewGuardian,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -1158,7 +1158,7 @@ private fun RoleContent(
     busy: Boolean,
     demoActive: Boolean,
     respondToInvite: (Int, Boolean) -> Unit,
-    reviewGuardianRelationship: (Int, Int, String) -> Unit,
+    reviewGuardian: (Int, Int, String) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -1362,11 +1362,11 @@ private fun RoleContent(
                                             Text("I independently reviewed legal authority", style = MaterialTheme.typography.bodySmall)
                                         }
                                         when (review.status) {
-                                            "accepted" -> Button(onClick = { reviewGuardianRelationship(workspace.organizationId, review.id, "verified") },
+                                            "accepted" -> Button(onClick = { reviewGuardian(workspace.organizationId, review.id, "verified") },
                                                 enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                                                 Text("Verify guardian access")
                                             }
-                                            "verified" -> OutlinedButton(onClick = { reviewGuardianRelationship(workspace.organizationId, review.id, "revoked") },
+                                            "verified" -> OutlinedButton(onClick = { reviewGuardian(workspace.organizationId, review.id, "revoked") },
                                                 enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                                                 Text("Revoke guardian access")
                                             }
