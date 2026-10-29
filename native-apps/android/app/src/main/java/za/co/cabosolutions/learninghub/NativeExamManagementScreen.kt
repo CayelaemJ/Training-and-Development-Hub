@@ -72,8 +72,7 @@ internal fun NativeExamManagementScreen(
                         if (workspace.groups.isEmpty()) {
                             Text("No learner groups are available. Ask a school administrator to create a group.")
                         } else {
-                            val selectedGroup = groupSelections[workspace.organizationId]
-                                ?: workspace.groups.first().id.also { groupSelections[workspace.organizationId] = it }
+                            val selectedGroup = groupSelections[workspace.organizationId] ?: workspace.groups.first().id
                             val selectedGroupName = workspace.groups.firstOrNull { it.id == selectedGroup }?.name ?: "Choose group"
                             OutlinedButton(
                                 onClick = { expandedGroupFor = workspace.organizationId },
@@ -93,8 +92,7 @@ internal fun NativeExamManagementScreen(
                         if (exams.isEmpty()) {
                             Text("Create an exam from your study material before assigning it.")
                         } else {
-                            val selectedExam = examSelections[workspace.organizationId]
-                                ?: exams.first().id.also { examSelections[workspace.organizationId] = it }
+                            val selectedExam = examSelections[workspace.organizationId] ?: exams.first().id
                             val selectedExamTitle = exams.firstOrNull { it.id == selectedExam }?.title ?: "Choose exam"
                             OutlinedButton(
                                 onClick = { expandedExamFor = workspace.organizationId },
