@@ -58,3 +58,4 @@ export * from "./lifelongPassport";
 export * from "./passportTrustLayers";
 
 export * from "./mlops";
+export * from "./notificationOutbox";
