@@ -55,3 +55,13 @@ The connected Cloudflare account now has two **EU-jurisdiction** queues:
 4. Call `GET /health` (200), unauthenticated `POST /v1/insights/draft` (401), authenticated synthetic POST (200).
 5. Enable the main API feature only in isolated staging; verify anonymous requests (401), non-manager/other-institution requests (403), disabled path (404), and unavailable worker handling (503).
 6. Verify no PII reaches Cloudflare logs or queues and no existing academic marks are changed.
+
+## Approved Cloudflare deployment via CircleCI (never automatic)
+The repository includes a pipeline parameter `deploy_django_staging` (default `false`). It runs the Cloudflare deployment workflow **only when explicitly triggered against `main`**, and only after Django, repository and security-suite jobs pass. Set up a restricted CircleCI context named `cabo-cloudflare-staging` with:
+- `CLOUDFLARE_ACCOUNT_ID` set to the verified CABO account ID.
+- `CLOUDFLARE_API_TOKEN`: a short-lived or managed **account-scoped Workers Scripts deployment credential**, not a global API key.
+- `DJANGO_SECRET_KEY`: strong randomly generated Django signing key, at least 32 characters.
+- `DJANGO_WORKER_TOKEN`: strong random shared bearer secret, at least 32 characters, also configured in the **staging CABO API only**.
+- `CABO_DJANGO_WORKER_URL=https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev`.
+
+Restrict context access to approved maintainers and staging jobs; do not use live student records. The job writes secrets to a temporary mode-0600 file, deploys via Pywrangler, deletes that file, then runs `node scripts/test-django-worker-staging.mjs` to check HTTP health, authentication, advisory output, and privacy rejection. A failed test is a failed release even if the Worker upload succeeded: revert staging before proceeding. **There is currently no authorised Cloudflare deployment credential configured in this connected environment, so this remains a prepared, untriggered workflow.**
