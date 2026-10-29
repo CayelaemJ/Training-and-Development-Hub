@@ -1814,6 +1814,7 @@ private fun AssessmentWorkspaceCard(
 @Composable
 private fun SchoolOperationsCard(
     workspace: SchoolOperationsWorkspace,
+    demoActive: Boolean,
     busy: Boolean,
     publishNotice: (Int, String, String, String) -> Unit,
     recordAttendance: (Int, String, String, String, String) -> Unit,
@@ -2091,7 +2092,7 @@ private fun RoleContent(
         if (section == "school") {
             item { Text("School operations", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             items(data.schoolOperations, key = { "school-operations:${it.organizationId}" }) { workspace ->
-                SchoolOperationsCard(workspace, busy, publishSchoolNotice, recordSchoolAttendance, substituteSchoolTeacher, openSchoolIntelligence, openSchoolProgression)
+                SchoolOperationsCard(workspace, demoActive, busy, publishSchoolNotice, recordSchoolAttendance, substituteSchoolTeacher, openSchoolIntelligence, openSchoolProgression)
             }
             if (data.schoolOperations.isEmpty()) item { NativeCard("No school membership", "Notices, attendance, and timetable details are available only through an institution that authorizes this account.") }
             return@LazyColumn
