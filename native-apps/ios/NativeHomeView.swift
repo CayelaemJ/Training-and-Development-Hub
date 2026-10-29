@@ -22,7 +22,7 @@ struct NativeHomeView: View {
 
     private var isEducator: Bool {
         guard let role = session.role else { return false }
-        return ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head", "administrator"]
+        return ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head", "administrator", "admin", "owner"]
             .contains(role)
     }
 
@@ -411,6 +411,7 @@ struct NativeHomeView: View {
             NativeReportIssuanceSection(session: session, workspace: workspace)
         }
         NativeSchoolOperationsPanel(session: session)
+        NativeAssessmentWorkspacePanel(session: session)
         Text("Actions are limited by your server-assigned school and course permissions.")
             .font(.footnote).foregroundColor(.secondary)
     }
@@ -697,6 +698,183 @@ private struct NativeSchoolOperationsPanel: View {
     private func weekday(_ day: Int) -> String {
         let symbols = Calendar.current.weekdaySymbols
         return (1...7).contains(day) ? symbols[(day - 1) % symbols.count] : "Day \(day)"
+    }
+}
+
+private struct NativeAssessmentWorkspacePanel: View {
+    @ObservedObject var session: NativeSession
+    @State private var grade = ""
+    @State private var subject = ""
+    @State private var curriculum = "National Curriculum"
+    @State private var stem = ""
+    @State private var answerGuide = ""
+    @State private var rubric = ""
+    @State private var sourceAttribution = ""
+    @State private var license = "original"
+    @State private var reviewNote = ""
+    @State private var paperTitle = ""
+    @State private var paperQuestionIds = ""
+
+    var body: some View {
+        if !session.assessmentWorkspaces.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Assessment workspace", systemImage: "checklist")
+                    .font(.title3.bold()).accessibilityAddTraits(.isHeader)
+                ForEach(session.assessmentWorkspaces) { workspace in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(workspace.organizationName).font(.headline)
+                        Text("School membership · \(workspace.membershipRole)")
+                            .font(.footnote).foregroundColor(.secondary)
+                        if let notice = workspace.notice {
+                            Text(notice).font(.footnote).foregroundColor(.secondary)
+                        }
+                        Text("Question bank").font(.subheadline.bold())
+                        if workspace.questions.isEmpty {
+                            Text("No questions are available in this school bank.").font(.footnote).foregroundColor(.secondary)
+                        }
+                        ForEach(workspace.questions) { question in
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("\(question.subject) · \(question.grade) · \(question.curriculum)")
+                                    .font(.caption).foregroundColor(.secondary)
+                                Text(question.stem).font(.subheadline.bold())
+                                Text("Answer guide: \(question.answerGuide)").font(.footnote)
+                                if !question.rubric.isEmpty { Text("Rubric: \(question.rubric)").font(.footnote) }
+                                Text("Source: \(question.sourceAttribution) · \(question.license)")
+                                    .font(.caption).foregroundColor(.secondary)
+                                Text("Status · \(question.status.capitalized)")
+                                    .font(.caption.bold()).foregroundColor(.secondary)
+                                questionActions(question, workspace: workspace)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(11)
+                            .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        if ["owner", "admin", "teacher"].contains(workspace.membershipRole) {
+                            Divider()
+                            Text("Add an attributed question").font(.subheadline.bold())
+                            TextField("Grade", text: $grade).textFieldStyle(.roundedBorder)
+                            TextField("Subject", text: $subject).textFieldStyle(.roundedBorder)
+                            TextField("Curriculum", text: $curriculum).textFieldStyle(.roundedBorder)
+                            TextField("Question stem", text: $stem).textFieldStyle(.roundedBorder)
+                            TextField("Answer guide", text: $answerGuide).textFieldStyle(.roundedBorder)
+                            TextField("Marking rubric (optional)", text: $rubric).textFieldStyle(.roundedBorder)
+                            TextField("Source attribution", text: $sourceAttribution).textFieldStyle(.roundedBorder)
+                            Picker("Content license", selection: $license) {
+                                Text("Original").tag("original")
+                                Text("CC BY").tag("CC-BY")
+                                Text("CC BY SA").tag("CC-BY-SA")
+                                Text("Public domain").tag("public-domain")
+                                Text("Institution licensed").tag("institution-licensed")
+                            }
+                            Button("Save question draft") {
+                                Task { await session.createAssessmentQuestion(organizationId: workspace.organizationId,
+                                    grade: grade, subject: subject, curriculum: curriculum, stem: stem,
+                                    answerGuide: answerGuide, rubric: rubric, sourceAttribution: sourceAttribution, license: license) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(session.busy || grade.isEmpty || subject.count < 2 || curriculum.count < 2 ||
+                                      stem.count < 10 || answerGuide.count < 3 || sourceAttribution.count < 5)
+
+                            Text("Create an assessment paper").font(.subheadline.bold()).padding(.top, 3)
+                            TextField("Paper title", text: $paperTitle).textFieldStyle(.roundedBorder)
+                            TextField("Published question IDs, comma separated", text: $paperQuestionIds)
+                                .keyboardType(.numbersAndPunctuation).textFieldStyle(.roundedBorder)
+                            Button("Save paper draft") {
+                                let ids = paperQuestionIds.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                                Task { await session.createAssessmentPaper(organizationId: workspace.organizationId,
+                                    academicYear: Calendar.current.component(.year, from: Date()), grade: grade,
+                                    subject: subject, curriculum: curriculum, title: paperTitle, questionIds: ids) }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(session.busy || paperTitle.count < 5 || paperQuestionIds.isEmpty || grade.isEmpty || subject.count < 2)
+                        }
+
+                        Text("Assessment papers").font(.subheadline.bold()).padding(.top, 3)
+                        if workspace.papers.isEmpty {
+                            Text("No paper drafts or published assessments yet.").font(.footnote).foregroundColor(.secondary)
+                        }
+                        ForEach(workspace.papers) { paper in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(paper.title).font(.subheadline.bold())
+                                Text("\(paper.grade) · \(paper.subject) · \(paper.academicYear) · \(paper.questionCount) questions")
+                                    .font(.caption).foregroundColor(.secondary)
+                                Text("Status · \(paper.status.capitalized)").font(.caption.bold())
+                                paperActions(paper, workspace: workspace)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                            .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                    .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    @ViewBuilder
+    private func questionActions(_ question: NativeAssessmentQuestion, workspace: NativeAssessmentWorkspace) -> some View {
+        if question.status == "draft" {
+            Button("Submit for independent review") {
+                Task { await session.decideAssessmentQuestion(organizationId: workspace.organizationId,
+                    questionId: question.id, action: "submit", note: "") }
+            }.buttonStyle(.bordered).disabled(session.busy)
+        }
+        if question.status == "submitted" && ["owner", "admin"].contains(workspace.membershipRole) {
+            TextField("Review note (required to reject)", text: $reviewNote).textFieldStyle(.roundedBorder)
+            HStack {
+                Button("Approve question") {
+                    Task { await session.decideAssessmentQuestion(organizationId: workspace.organizationId,
+                        questionId: question.id, action: "approve", note: reviewNote) }
+                }.buttonStyle(.borderedProminent).disabled(session.busy)
+                Button("Reject") {
+                    Task { await session.decideAssessmentQuestion(organizationId: workspace.organizationId,
+                        questionId: question.id, action: "reject", note: reviewNote) }
+                }.buttonStyle(.bordered).disabled(session.busy || reviewNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        if question.status == "approved" && ["owner", "admin"].contains(workspace.membershipRole) {
+            Button("Publish question") {
+                Task { await session.decideAssessmentQuestion(organizationId: workspace.organizationId,
+                    questionId: question.id, action: "publish", note: "") }
+            }.buttonStyle(.borderedProminent).disabled(session.busy)
+        }
+        if ["published", "rejected"].contains(question.status) && ["owner", "admin"].contains(workspace.membershipRole) {
+            TextField("Archive reason", text: $reviewNote).textFieldStyle(.roundedBorder)
+            Button("Archive question") {
+                Task { await session.decideAssessmentQuestion(organizationId: workspace.organizationId,
+                    questionId: question.id, action: "archive", note: reviewNote) }
+            }.buttonStyle(.bordered).disabled(session.busy || reviewNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    @ViewBuilder
+    private func paperActions(_ paper: NativeAssessmentPaper, workspace: NativeAssessmentWorkspace) -> some View {
+        if paper.status == "draft" {
+            Button("Submit paper for review") {
+                Task { await session.decideAssessmentPaper(organizationId: workspace.organizationId,
+                    paperId: paper.id, action: "submit", note: "") }
+            }.buttonStyle(.bordered).disabled(session.busy)
+        }
+        if paper.status == "submitted" && ["owner", "admin"].contains(workspace.membershipRole) {
+            TextField("Paper review note (required to reject)", text: $reviewNote).textFieldStyle(.roundedBorder)
+            HStack {
+                Button("Approve paper") {
+                    Task { await session.decideAssessmentPaper(organizationId: workspace.organizationId,
+                        paperId: paper.id, action: "approve", note: reviewNote) }
+                }.buttonStyle(.borderedProminent).disabled(session.busy)
+                Button("Reject paper") {
+                    Task { await session.decideAssessmentPaper(organizationId: workspace.organizationId,
+                        paperId: paper.id, action: "reject", note: reviewNote) }
+                }.buttonStyle(.bordered).disabled(session.busy || reviewNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        if paper.status == "approved" && ["owner", "admin"].contains(workspace.membershipRole) {
+            Button("Publish paper") {
+                Task { await session.decideAssessmentPaper(organizationId: workspace.organizationId,
+                    paperId: paper.id, action: "publish", note: "") }
+            }.buttonStyle(.borderedProminent).disabled(session.busy)
+        }
     }
 }
 

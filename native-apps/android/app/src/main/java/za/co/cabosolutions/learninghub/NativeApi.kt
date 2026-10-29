@@ -56,6 +56,20 @@ internal data class SchoolAttendanceRecord(val day: String, val status: String)
 internal data class SchoolTimetableSlot(val id: Int, val day: Int, val startsAt: String, val endsAt: String,
     val grade: String, val group: String, val subject: String, val room: String, val teacherId: String, val status: String)
 internal data class SchoolAttendanceSummary(val year: Int, val records: Int, val counts: Map<String, Int>)
+internal data class AssessmentQuestion(
+    val id: Int, val organizationId: Int, val grade: String, val subject: String, val curriculum: String,
+    val stem: String, val answerGuide: String, val rubric: String, val sourceAttribution: String,
+    val license: String, val status: String, val createdBy: String, val reviewedBy: String?
+)
+internal data class AssessmentPaper(
+    val id: Int, val title: String, val grade: String, val subject: String, val curriculum: String,
+    val academicYear: Int, val status: String, val createdBy: String, val approvedBy: String?, val questionCount: Int
+)
+internal data class AssessmentWorkspace(
+    val organizationId: Int, val organizationName: String, val membershipRole: String,
+    val questions: List<AssessmentQuestion>, val papers: List<AssessmentPaper>, val notice: String? = null
+)
+
 internal data class SchoolOperationsWorkspace(
     val organizationId: Int, val organizationName: String, val membershipRole: String,
     val notices: List<SchoolNotice>, val attendance: List<SchoolAttendanceRecord>,
@@ -161,7 +175,8 @@ internal data class NativeLearning(
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
     val learnerReportNotice: String = "",
-    val schoolOperations: List<SchoolOperationsWorkspace> = emptyList()
+    val schoolOperations: List<SchoolOperationsWorkspace> = emptyList(),
+    val assessmentWorkspaces: List<AssessmentWorkspace> = emptyList()
 )
 
 internal class NativeApi(private val context: Context) {
@@ -505,6 +520,56 @@ internal class NativeApi(private val context: Context) {
         ), learnerName?.take(160))
     }
 
+    private fun loadAssessmentWorkspaces(): List<AssessmentWorkspace> {
+        val memberships = try { getArray("/api/organizations") } catch (error: Exception) {
+            if (!hasSession()) throw error
+            return emptyList()
+        }
+        return (0 until minOf(memberships.length(), 12)).mapNotNull { i ->
+            val member = memberships.optJSONObject(i) ?: return@mapNotNull null
+            val orgId = member.optInt("id")
+            val name = member.optString("name").trim()
+            val memberRole = member.optString("role")
+            if (orgId <= 0 || name.isBlank() || memberRole !in setOf("owner", "admin", "teacher", "assessor")) return@mapNotNull null
+            var partialFailure = false
+            val questions = try {
+                val rows = getArray("/api/organizations/" + orgId + "/question-bank")
+                (0 until minOf(rows.length(), 200)).mapNotNull { q ->
+                    rows.optJSONObject(q)?.let { row ->
+                        val questionId = row.optInt("id")
+                        if (questionId <= 0) null else AssessmentQuestion(
+                            questionId, row.optInt("organizationId"), row.optString("grade").take(24),
+                            row.optString("subject").take(120), row.optString("curriculum").take(32),
+                            row.optString("stem").take(8000), row.optString("answerGuide").take(8000),
+                            row.optString("rubric").take(6000), row.optString("sourceAttribution").take(2000),
+                            row.optString("license").take(60), row.optString("status").take(24),
+                            row.optString("createdBy").take(160),
+                            if (row.isNull("reviewedBy")) null else row.optString("reviewedBy").take(160)
+                        )
+                    }
+                }
+            } catch (error: Exception) { if (!hasSession()) throw error else { partialFailure = true; emptyList() } }
+            val papers = try {
+                val rows = getArray("/api/organizations/" + orgId + "/assessment-papers")
+                (0 until minOf(rows.length(), 100)).mapNotNull { p ->
+                    rows.optJSONObject(p)?.let { row ->
+                        val paperId = row.optInt("id")
+                        if (paperId <= 0) null else AssessmentPaper(
+                            paperId, row.optString("title").take(180), row.optString("grade").take(24),
+                            row.optString("subject").take(120), row.optString("curriculum").take(32),
+                            row.optInt("academicYear"), row.optString("status").take(24),
+                            row.optString("createdBy").take(160),
+                            if (row.isNull("approvedBy")) null else row.optString("approvedBy").take(160),
+                            row.optInt("questionCount").coerceIn(0, 50)
+                        )
+                    }
+                }
+            } catch (error: Exception) { if (!hasSession()) throw error else { partialFailure = true; emptyList() } }
+            AssessmentWorkspace(orgId, name.take(200), memberRole, questions, papers,
+                if (partialFailure) "Some assessment data could not load. Refresh and check school access." else null)
+        }
+    }
+
     private fun loadSchoolOperations(): List<SchoolOperationsWorkspace> {
         val memberships = try { getArray("/api/organizations") } catch (error: Exception) {
             if (!hasSession()) throw error
@@ -728,7 +793,8 @@ internal class NativeApi(private val context: Context) {
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
                 guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance,
-                schoolOperations = loadSchoolOperations()
+                schoolOperations = loadSchoolOperations(),
+                assessmentWorkspaces = loadAssessmentWorkspaces()
             )
         }
 
@@ -1181,6 +1247,45 @@ internal class NativeApi(private val context: Context) {
             require(organizationId > 0 && slotId > 0 && replacementTeacherId.trim().length in 1..160 && reason.trim().length in 5..1000)
             request("/api/organizations/$organizationId/timetable/$slotId/substitution", JSONObject()
                 .put("replacementTeacherId", replacementTeacherId.trim()).put("reason", reason.trim()), auth = true)
+        }
+
+    suspend fun createAssessmentQuestion(organizationId: Int, grade: String, subject: String, curriculum: String,
+                                         stem: String, answerGuide: String, rubric: String, sourceAttribution: String,
+                                         license: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(organizationId > 0 && grade.trim().length in 1..24 && subject.trim().length in 2..120 &&
+            curriculum.trim().length in 2..32 && stem.trim().length in 10..8000 && answerGuide.trim().length in 3..8000 &&
+            rubric.length <= 6000 && sourceAttribution.trim().length in 5..2000 &&
+            license in setOf("original", "CC-BY", "CC-BY-SA", "public-domain", "institution-licensed"))
+        request("/api/organizations/" + organizationId + "/question-bank", JSONObject()
+            .put("grade", grade.trim()).put("subject", subject.trim()).put("curriculum", curriculum.trim())
+            .put("stem", stem.trim()).put("answerGuide", answerGuide.trim()).put("rubric", rubric.take(6000))
+            .put("sourceAttribution", sourceAttribution.trim()).put("license", license), auth = true)
+    }
+
+    suspend fun decideAssessmentQuestion(organizationId: Int, questionId: Int, action: String, note: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && questionId > 0 && action in setOf("submit", "approve", "reject", "publish", "archive") && note.length <= 1500)
+            request("/api/organizations/" + organizationId + "/question-bank/" + questionId + "/decision",
+                JSONObject().put("action", action).put("note", note.trim()), auth = true)
+        }
+
+    suspend fun createAssessmentPaper(organizationId: Int, academicYear: Int, grade: String, subject: String,
+                                     curriculum: String, title: String, questionIds: List<Int>) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && academicYear in 2000..2200 && grade.trim().length in 1..24 &&
+                subject.trim().length in 2..120 && curriculum.trim().length in 2..32 && title.trim().length in 5..180 &&
+                questionIds.isNotEmpty() && questionIds.size <= 50 && questionIds.distinct().size == questionIds.size)
+            val ids = JSONArray().also { array -> questionIds.forEach(array::put) }
+            request("/api/organizations/" + organizationId + "/assessment-papers", JSONObject()
+                .put("academicYear", academicYear).put("grade", grade.trim()).put("subject", subject.trim())
+                .put("curriculum", curriculum.trim()).put("title", title.trim()).put("questionIds", ids), auth = true)
+        }
+
+    suspend fun decideAssessmentPaper(organizationId: Int, paperId: Int, action: String, note: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && paperId > 0 && action in setOf("submit", "approve", "reject", "publish") && note.length <= 1000)
+            request("/api/organizations/" + organizationId + "/assessment-papers/" + paperId + "/decision",
+                JSONObject().put("action", action).put("note", note.trim()), auth = true)
         }
 
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
