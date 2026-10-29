@@ -14,8 +14,8 @@ The API origin is a build-time setting (`-PcaboApiOrigin=...`), not embedded in 
 
 The internal demo opens a locally simulated CABO workspace without a login or backend. Switch between the **Child**, **Teacher** and **Parent** roles from the preview bar; each role has its own Home, Learn, Progress and Help/Family/Support areas.
 
-- Child: read two different sample lessons, complete practice activities, review progress and report previews, and send a sample help request.
-- Teacher: open that same request, add a triage note, prepare topic-aware starter guidance, and reply. Switch back to Child to see the reply.
+- Child: read two different sample lessons, complete practice activities, review progress and report previews, check personal attendance, see school notices and browse a published sample timetable, and send a sample help request.
+- Teacher: open that same request, add a triage note, prepare topic-aware starter guidance, and reply. Switch back to Child to see the reply. Teacher preview also includes school notices and an assigned timetable.
 - Parent: review the explicitly synthetic progress preview, respond to a sample family invitation, and see that school verification is still required after acceptance.
 - All demo changes are shared across role switches during the session, so the walkthrough follows a real flow instead of unrelated static screens.
 
@@ -58,4 +58,4 @@ After secure sign-in, learner accounts can add a supported document from the And
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, guidance review, material upload, and the learner support-draft form. Learner drafts and enrolled subject choices are encrypted with Android Keystore-backed storage, bound to the active session, and cleared on logout. Sending is explicit; a failed attempt leaves the draft for retry. Live object-storage uploads, physical-device checks, signed store releases, full teacher parity, and production authentication remain separate work.
+The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, guidance review, material upload, and the learner support-draft form and school-operations demo navigation. Learner drafts and enrolled subject choices are encrypted with Android Keystore-backed storage, bound to the active session, and cleared on logout. Sending is explicit; a failed attempt leaves the draft for retry. Live object-storage uploads, physical-device checks, signed store releases, full teacher parity, and production authentication remain separate work.

@@ -40,6 +40,51 @@ struct NativeReportIssuanceWorkspace: Identifiable {
     let records: [NativeReportIssuanceRecord]
     var id: Int { organizationId }
 }
+struct NativeSchoolNotice: Identifiable, Decodable {
+    let id: Int
+    let subject: String
+    let message: String
+    let audience: String
+    let createdAt: String
+}
+struct NativeSchoolAttendance: Decodable, Identifiable {
+    let day: String
+    let status: String
+    var id: String { day }
+}
+struct NativeSchoolTimetableSlot: Identifiable, Decodable {
+    let id: Int
+    let day: Int
+    let startsAt: String
+    let endsAt: String
+    let grade: String
+    let group: String
+    let subject: String
+    let room: String
+    let teacherId: String
+    let status: String
+}
+struct NativeSchoolAttendanceSummary: Decodable {
+    let year: Int
+    let records: Int
+    let counts: [String: Int]
+}
+struct NativeSchoolOperationsWorkspace: Identifiable {
+    let organizationId: Int
+    let organizationName: String
+    let membershipRole: String
+    let notices: [NativeSchoolNotice]
+    let attendance: [NativeSchoolAttendance]
+    let timetable: [NativeSchoolTimetableSlot]
+    let attendanceSummary: NativeSchoolAttendanceSummary?
+    let notice: String?
+    var id: Int { organizationId }
+    var canManage: Bool { ["owner", "admin"].contains(membershipRole) }
+}
+private struct NativeSchoolAttendanceEnvelope: Decodable {
+    let attendance: [NativeSchoolAttendance]
+}
+
 struct StaffSchool: Identifiable {
     let id: Int
     let subjects: [String]
@@ -134,6 +179,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var guardians: [GuardianInvitation] = []
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
     @Published var reportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
+    @Published var schoolOperations: [NativeSchoolOperationsWorkspace] = []
     @Published var guardianGuidance = ""
     @Published var guardianReports: [NativeGuardianReport] = []
     @Published var guardianReportNotice = ""
@@ -355,6 +401,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextGuardians: [GuardianInvitation] = []
             var nextGuardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
             var nextReportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
+            var nextSchoolOperations: [NativeSchoolOperationsWorkspace] = []
             var nextStaff: [StaffSchool] = []
             var nextAdminOrganizations: [String] = []
             var nextJourney: [String] = []
@@ -585,6 +632,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 if !nextSupportCourses.isEmpty { storeSupportCourses(nextSupportCourses) }
                 else { nextSupportCourses = loadSupportCourses() }
             }
+            if !["superadmin", "parent"].contains(verifiedRole) {
+                nextSchoolOperations = await loadSchoolOperations()
+            }
             // One of the nested requests may have cleared credentials after a 401.
             guard keychainToken() != nil else { throw NSError(domain: "CABO", code: 401) }
             role = verifiedRole
@@ -593,6 +643,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             guardians = nextGuardians
             guardianReviewWorkspaces = nextGuardianReviewWorkspaces
             reportIssuanceWorkspaces = nextReportIssuanceWorkspaces
+            schoolOperations = nextSchoolOperations
             guardianGuidance = nextGuidance
             guardianReports = nextGuardianReports
             guardianReportNotice = nextGuardianReportNotice
@@ -654,6 +705,111 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             ]))
         }
         try await reloadJourney()
+    }
+
+    private func loadSchoolOperations() async -> [NativeSchoolOperationsWorkspace] {
+        guard let membershipData = try? await request("api/organizations"),
+              let memberships = try? JSONSerialization.jsonObject(with: membershipData) as? [[String: Any]] else {
+            return []
+        }
+        let year = Calendar.current.component(.year, from: Date())
+        var result: [NativeSchoolOperationsWorkspace] = []
+        for member in memberships.prefix(12) {
+            guard let orgId = member["id"] as? Int, orgId > 0,
+                  let name = member["name"] as? String, !name.isEmpty,
+                  let memberRole = member["role"] as? String, !memberRole.isEmpty else { continue }
+            var partialFailure = false
+            var notices: [NativeSchoolNotice] = []
+            if let data = try? await request("api/organizations/\(orgId)/notices"),
+               let decoded = try? JSONDecoder().decode([NativeSchoolNotice].self, from: data) {
+                notices = Array(decoded.prefix(100))
+            } else if keychainToken() == nil { return [] }
+            else { partialFailure = true }
+
+            var attendance: [NativeSchoolAttendance] = []
+            if memberRole == "learner" {
+                if let data = try? await request("api/organizations/\(orgId)/attendance/me"),
+                   let decoded = try? JSONDecoder().decode(NativeSchoolAttendanceEnvelope.self, from: data) {
+                    attendance = Array(decoded.attendance.prefix(180))
+                } else if keychainToken() == nil { return [] }
+                else { partialFailure = true }
+            }
+
+            var timetable: [NativeSchoolTimetableSlot] = []
+            if let data = try? await request("api/organizations/\(orgId)/timetable?year=\(year)"),
+               let decoded = try? JSONDecoder().decode([NativeSchoolTimetableSlot].self, from: data) {
+                timetable = Array(decoded.prefix(200))
+            } else if keychainToken() == nil { return [] }
+            else { partialFailure = true }
+
+            var summary: NativeSchoolAttendanceSummary?
+            if ["owner", "admin"].contains(memberRole) {
+                if let data = try? await request("api/organizations/\(orgId)/attendance/summary?year=\(year)"),
+                   let decoded = try? JSONDecoder().decode(NativeSchoolAttendanceSummary.self, from: data) {
+                    summary = decoded
+                } else if keychainToken() == nil { return [] }
+                else { partialFailure = true }
+            }
+            result.append(NativeSchoolOperationsWorkspace(
+                organizationId: orgId, organizationName: String(name.prefix(200)),
+                membershipRole: String(memberRole.prefix(40)), notices: notices,
+                attendance: attendance, timetable: timetable, attendanceSummary: summary,
+                notice: partialFailure ? "Some school data could not load. Check your connection and refresh." : nil
+            ))
+        }
+        return result
+    }
+
+    func publishSchoolNotice(organizationId: Int, subject: String, message: String, audience: String) async {
+        guard schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }),
+              subject.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3,
+              subject.count <= 180, message.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10,
+              message.count <= 5000, ["all", "learners", "staff"].contains(audience), !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["subject": subject.trimmingCharacters(in: .whitespacesAndNewlines),
+                "message": message.trimmingCharacters(in: .whitespacesAndNewlines), "audience": audience])
+            _ = try await request("api/organizations/\(organizationId)/notices", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "School notice published"
+        } catch { status = "Could not publish the school notice. Check your access and try again." }
+    }
+
+    func recordSchoolAttendance(organizationId: Int, learnerId: String, day: String,
+                                attendanceStatus: String, note: String) async {
+        guard schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }),
+              !learnerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              day.range(of: #"^\\d{4}-\\d{2}-\\d{2}$"#, options: .regularExpression) != nil,
+              ["present", "absent", "late", "excused"].contains(attendanceStatus),
+              note.count <= 1000, !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["learnerId": learnerId.trimmingCharacters(in: .whitespacesAndNewlines),
+                "day": day, "status": attendanceStatus, "note": note])
+            _ = try await request("api/organizations/\(organizationId)/attendance", method: "POST", body: body)
+            busy = false
+            await refresh()
+            status = "Attendance recorded"
+        } catch { status = "Could not record attendance. Check your access and try again." }
+    }
+
+    func substituteSchoolTeacher(organizationId: Int, slotId: Int, replacementTeacherId: String, reason: String) async {
+        guard schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }),
+              slotId > 0, !replacementTeacherId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              reason.trimmingCharacters(in: .whitespacesAndNewlines).count >= 5, reason.count <= 1000, !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["replacementTeacherId": replacementTeacherId.trimmingCharacters(in: .whitespacesAndNewlines),
+                "reason": reason.trimmingCharacters(in: .whitespacesAndNewlines)])
+            _ = try await request("api/organizations/\(organizationId)/timetable/\(slotId)/substitution", method: "PATCH", body: body)
+            busy = false
+            await refresh()
+            status = "Teacher substitution recorded"
+        } catch { status = "Could not record the substitution. Check your access and try again." }
     }
 
     func deleteJourneyItem(_ path: String) async throws {

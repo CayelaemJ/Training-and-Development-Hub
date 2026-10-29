@@ -51,6 +51,18 @@ internal data class QuizAttempt(val id: Int, val quizId: Int, val correctCount: 
 internal data class MaterialPage(val id: Int, val title: String, val text: String,
     val offset: Int, val nextOffset: Int?)
 
+internal data class SchoolNotice(val id: Int, val subject: String, val message: String, val audience: String, val createdAt: String)
+internal data class SchoolAttendanceRecord(val day: String, val status: String)
+internal data class SchoolTimetableSlot(val id: Int, val day: Int, val startsAt: String, val endsAt: String,
+    val grade: String, val group: String, val subject: String, val room: String, val teacherId: String, val status: String)
+internal data class SchoolAttendanceSummary(val year: Int, val records: Int, val counts: Map<String, Int>)
+internal data class SchoolOperationsWorkspace(
+    val organizationId: Int, val organizationName: String, val membershipRole: String,
+    val notices: List<SchoolNotice>, val attendance: List<SchoolAttendanceRecord>,
+    val timetable: List<SchoolTimetableSlot>, val attendanceSummary: SchoolAttendanceSummary? = null,
+    val notice: String? = null
+) { val canManage: Boolean get() = membershipRole in setOf("owner", "admin") }
+
 internal data class NativePortal(val role: String, val summary: List<String>, val areas: List<String>)
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
@@ -148,7 +160,8 @@ internal data class NativeLearning(
     val quizEntries: List<QuizSummary> = emptyList(),
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
-    val learnerReportNotice: String = ""
+    val learnerReportNotice: String = "",
+    val schoolOperations: List<SchoolOperationsWorkspace> = emptyList()
 )
 
 internal class NativeApi(private val context: Context) {
@@ -492,6 +505,55 @@ internal class NativeApi(private val context: Context) {
         ), learnerName?.take(160))
     }
 
+    private fun loadSchoolOperations(): List<SchoolOperationsWorkspace> {
+        val memberships = try { getArray("/api/organizations") } catch (error: Exception) {
+            if (!hasSession()) throw error
+            return emptyList()
+        }
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        return (0 until minOf(memberships.length(), 12)).mapNotNull { i ->
+            val member = memberships.optJSONObject(i) ?: return@mapNotNull null
+            val orgId = member.optInt("id")
+            val name = member.optString("name").trim()
+            val memberRole = member.optString("role")
+            if (orgId <= 0 || name.isBlank() || memberRole.isBlank()) return@mapNotNull null
+            var partialFailure = false
+            val notices = try {
+                val rows = getArray("/api/organizations/$orgId/notices")
+                (0 until minOf(rows.length(), 100)).mapNotNull { n -> rows.optJSONObject(n)?.let { row ->
+                    val id = row.optInt("id"); val subject = row.optString("subject").trim()
+                    if (id <= 0 || subject.isBlank()) null else SchoolNotice(id, subject.take(180),
+                        row.optString("message").take(5000), row.optString("audience").take(16), row.optString("createdAt").take(40))
+                } }
+            } catch (error: Exception) { if (!hasSession()) throw error else { partialFailure = true; emptyList() } }
+            val attendance = if (memberRole == "learner") try {
+                val rows = request("/api/organizations/$orgId/attendance/me", auth = true).optJSONArray("attendance") ?: JSONArray()
+                (0 until minOf(rows.length(), 180)).mapNotNull { a -> rows.optJSONObject(a)?.let { row ->
+                    val day = row.optString("day"); val status = row.optString("status")
+                    if (day.length != 10 || status !in setOf("present", "absent", "late", "excused")) null
+                    else SchoolAttendanceRecord(day, status)
+                } }
+            } catch (error: Exception) { if (!hasSession()) throw error else { partialFailure = true; emptyList() } } else emptyList()
+            val timetable = try {
+                val rows = getArray("/api/organizations/$orgId/timetable?year=$year")
+                (0 until minOf(rows.length(), 200)).mapNotNull { t -> rows.optJSONObject(t)?.let { row ->
+                    val id = row.optInt("id"); val subject = row.optString("subject").trim()
+                    if (id <= 0 || subject.isBlank()) null else SchoolTimetableSlot(id, row.optInt("day"),
+                        row.optString("startsAt").take(5), row.optString("endsAt").take(5), row.optString("grade").take(32),
+                        row.optString("group").take(40), subject.take(100), row.optString("room").take(80),
+                        row.optString("teacherId").take(160), row.optString("status").take(16))
+                } }
+            } catch (error: Exception) { if (!hasSession()) throw error else { partialFailure = true; emptyList() } }
+            val summary = if (memberRole in setOf("owner", "admin")) try {
+                val row = request("/api/organizations/$orgId/attendance/summary?year=$year", auth = true)
+                val counts = row.optJSONObject("counts")?.let { c -> c.keys().asSequence().associateWith { c.optInt(it).coerceAtLeast(0) } } ?: emptyMap()
+                SchoolAttendanceSummary(row.optInt("year", year), row.optInt("records").coerceAtLeast(0), counts)
+            } catch (error: Exception) { if (!hasSession()) throw error else { partialFailure = true; null } } else null
+            SchoolOperationsWorkspace(orgId, name.take(200), memberRole.take(40), notices, attendance, timetable, summary,
+                if (partialFailure) "Some school data could not load. Check your connection and refresh." else null)
+        }
+    }
+
     suspend fun dashboard(): NativeLearning = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val json = request("/api/portal/me", auth = true)
         val role = json.optString("role", "learner")
@@ -665,7 +727,8 @@ internal class NativeApi(private val context: Context) {
             }
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
-                guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance
+                guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance,
+                schoolOperations = loadSchoolOperations()
             )
         }
 
@@ -813,7 +876,8 @@ internal class NativeApi(private val context: Context) {
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
             learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
-            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports)
+            learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports,
+            schoolOperations = loadSchoolOperations())
     }
 
     suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -1095,6 +1159,28 @@ internal class NativeApi(private val context: Context) {
                 result.optBoolean("cryptographicallySigned"), result.optBoolean("signatureValid"),
                 result.optBoolean("issuerIdentityAccredited")
             )
+        }
+
+    suspend fun publishSchoolNotice(organizationId: Int, subject: String, message: String, audience: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && subject.trim().length in 3..180 && message.trim().length in 10..5000 && audience in setOf("all", "learners", "staff"))
+            request("/api/organizations/$organizationId/notices", JSONObject().put("subject", subject.trim())
+                .put("message", message.trim()).put("audience", audience), auth = true)
+        }
+
+    suspend fun recordSchoolAttendance(organizationId: Int, learnerId: String, day: String, attendanceStatus: String, note: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && learnerId.trim().length in 1..160 && day.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) &&
+                attendanceStatus in setOf("present", "absent", "late", "excused") && note.length <= 1000)
+            request("/api/organizations/$organizationId/attendance", JSONObject().put("learnerId", learnerId.trim())
+                .put("day", day).put("status", attendanceStatus).put("note", note.take(1000)), auth = true)
+        }
+
+    suspend fun substituteSchoolTeacher(organizationId: Int, slotId: Int, replacementTeacherId: String, reason: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && slotId > 0 && replacementTeacherId.trim().length in 1..160 && reason.trim().length in 5..1000)
+            request("/api/organizations/$organizationId/timetable/$slotId/substitution", JSONObject()
+                .put("replacementTeacherId", replacementTeacherId.trim()).put("reason", reason.trim()), auth = true)
         }
 
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

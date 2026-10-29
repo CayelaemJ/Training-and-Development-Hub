@@ -604,3 +604,36 @@ class NativeAndroidSupportDraftTest {
         assertEquals("How do I add unlike fractions?", sent?.question)
     }
 }
+
+ 
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidSchoolOperationsTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun learnerCanOpenSchoolNoticesAttendanceAndTimetable() {
+        compose.setContent {
+            MaterialTheme {
+                NativeHome(
+                    status = "Connected securely to CABO", busy = false,
+                    data = NativeDemoData.learner(), signIn = {}, refresh = {},
+                    demoEnabled = true, demoActive = true, demoRole = "learner",
+                    startDemo = {}, setDemoRole = {}, createSupportRequest = {},
+                    testLoginAvailable = false, testUsername = "", testPassword = "",
+                    onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
+                    respondToInvite = { _, _ -> }, openSupportTicket = {}, openQuiz = {},
+                    openMaterial = {}, pickMaterial = {}
+                )
+            }
+        }
+        compose.onNodeWithText("School").performClick()
+        val content = compose.onNodeWithTag("native-role-content")
+        content.performScrollToNode(hasText("Term 2 learning showcase"))
+        compose.onNodeWithText("Cabo Valley Learning Centre").assertIsDisplayed()
+        content.performScrollToNode(hasText("My attendance"))
+        compose.onNodeWithText("My attendance").assertIsDisplayed()
+        content.performScrollToNode(hasText("Day 1 · 08:00–08:45 · Mathematics · Form 2 A · Room 4"))
+        compose.onNodeWithText("Day 1 · 08:00–08:45 · Mathematics · Form 2 A · Room 4").performScrollTo().assertIsDisplayed()
+    }
+}

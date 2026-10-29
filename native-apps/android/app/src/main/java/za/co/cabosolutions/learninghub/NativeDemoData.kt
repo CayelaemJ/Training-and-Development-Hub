@@ -10,6 +10,24 @@ internal object NativeDemoData {
         else -> learner()
     }
 
+    private fun schoolOperations(role: String) = listOf(SchoolOperationsWorkspace(
+        organizationId = DEMO_ORGANIZATION_ID,
+        organizationName = "Cabo Valley Learning Centre",
+        membershipRole = role,
+        notices = listOf(SchoolNotice(73051, "Term 2 learning showcase",
+            "Families are invited to the learner showcase on Friday at 14:00.", "all", "2026-10-20T10:00:00Z")),
+        attendance = if (role == "learner") listOf(
+            SchoolAttendanceRecord("2026-10-28", "present"),
+            SchoolAttendanceRecord("2026-10-27", "present"),
+            SchoolAttendanceRecord("2026-10-26", "late")
+        ) else emptyList(),
+        timetable = listOf(
+            SchoolTimetableSlot(73061, 1, "08:00", "08:45", "Form 2", "A", "Mathematics", "Room 4", "sample-teacher", "published"),
+            SchoolTimetableSlot(73062, 2, "09:00", "09:45", "Form 2", "A", "Integrated Science", "Lab 1", "sample-teacher", "published")
+        ),
+        notice = "Sample timetable and school notice. This demo is not connected to a school account."
+    ))
+
     fun learner(): NativeLearning {
         val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
         val demoTicket = NativeDemoSession.ticket(NativeDemoSession.summary())
@@ -53,7 +71,8 @@ internal object NativeDemoData {
                     presentDays = 47,
                     recordedDays = 50
                 )
-            )
+            ),
+            schoolOperations = schoolOperations("learner")
         )
     }
 
@@ -73,7 +92,8 @@ internal object NativeDemoData {
                     supportSummary = listOf("Open requests: 1", "Unassigned: 0", "Follow-ups due: 0"),
                     tickets = listOf(ticket), notice = null
                 )
-            )
+            ),
+            schoolOperations = schoolOperations("teacher")
         )
     }
 
