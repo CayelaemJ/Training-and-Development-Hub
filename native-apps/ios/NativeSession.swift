@@ -244,6 +244,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var materialSummaries: [NativeMaterialSummary] = []
     @Published var quizzes: [String] = []
     @Published var quizSummaries: [NativeQuizSummary] = []
+    @Published var writtenExams: [NativeWrittenExam] = []
     @Published var guardians: [GuardianInvitation] = []
     @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
@@ -357,7 +358,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
-    private func request(_ path: String, method: String = "GET", body: Data? = nil, authorized: Bool = true, idempotencyKey: String? = nil) async throws -> Data {
+    private func request(_ path: String, method: String = "GET", body: Data? = nil, authorized: Bool = true, idempotencyKey: String? = nil, timeoutInterval: TimeInterval = 12) async throws -> Data {
         // URLComponents keeps the reading-offset query outside of URL path
         // encoding (appendingPathComponent would escape the '?' separator).
         let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
@@ -367,7 +368,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         guard let url = components.url else { throw NSError(domain: "CABO", code: 400) }
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.timeoutInterval = 12
+        request.timeoutInterval = min(max(timeoutInterval, 12), 180)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let idempotencyKey {
@@ -387,7 +388,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             clearSupportStorage()
             clearToken()
             role = nil
-            summary = []; workspaces = []; materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
+            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; quizzes = []; quizSummaries = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
@@ -487,6 +488,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextMaterialSummaries: [NativeMaterialSummary] = []
             var nextQuizzes: [String] = []
             var nextQuizSummaries: [NativeQuizSummary] = []
+            var nextWrittenExams: [NativeWrittenExam] = []
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
@@ -617,6 +619,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 }
             } else {
                 if verifiedRole == "learner" {
+                    nextWrittenExams = Array((try? JSONDecoder().decode([NativeWrittenExam].self,
+                        from: await request("api/written-exams")))?.prefix(30) ?? [])
                     for organizationId in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
                         do {
                             let data = try await request("api/organizations/\(organizationId)/report-issuance/me")
@@ -744,10 +748,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             materialSummaries = nextMaterialSummaries
             quizzes = nextQuizzes
             quizSummaries = nextQuizSummaries
+            writtenExams = nextWrittenExams
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
+            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenExams = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -1226,6 +1231,39 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         return try JSONDecoder().decode(NativeMaterialPage.self, from: data)
     }
 
+    func generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String) async throws -> NativeWrittenExam {
+        guard role == "learner", materialId > 0, (1...10).contains(questionCount),
+              ["beginner", "intermediate", "advanced"].contains(difficulty) else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "questionCount": questionCount, "difficulty": difficulty
+        ])
+        let data = try await request("api/materials/\(materialId)/written-exams",
+            method: "POST", body: body, timeoutInterval: 85)
+        let exam = try JSONDecoder().decode(NativeWrittenExam.self, from: data)
+        writtenExams.insert(exam, at: 0)
+        writtenExams = Array(writtenExams.prefix(30))
+        return exam
+    }
+
+    func loadWrittenExam(id: Int) async throws -> NativeWrittenExam {
+        guard role == "learner", id > 0 else { throw NSError(domain: "CABO", code: 403) }
+        let data = try await request("api/written-exams/\(id)")
+        return try JSONDecoder().decode(NativeWrittenExam.self, from: data)
+    }
+
+    func submitWrittenExam(id: Int, answers: [String]) async throws -> NativeWrittenExamResult {
+        guard role == "learner", id > 0, !answers.isEmpty, answers.count <= 15,
+              answers.allSatisfy({ $0.count <= 15_000 }) else {
+            throw NSError(domain: "CABO", code: 400)
+        }
+        let body = try JSONSerialization.data(withJSONObject: ["answers": answers])
+        let data = try await request("api/written-exams/\(id)/attempts",
+            method: "POST", body: body, timeoutInterval: 85)
+        return try JSONDecoder().decode(NativeWrittenExamResult.self, from: data)
+    }
+
     // Native study uploads mirror the web flow without storing document bytes
     // or credentials beyond the signed-in request. The backend owns access,
     // size checks, upload intents, and final material authorization.
@@ -1508,7 +1546,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearSupportStorage()
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
+        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []
         guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."

@@ -706,3 +706,47 @@ class NativeAndroidNotificationPreferenceTest {
         assertEquals(listOf(7, "guardian_review_requested", false, false), changes.last())
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidWrittenExamTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun generatesExamRequiresAnswersAndShowsMarkingResult() {
+        val exam = WrittenExam(41, "Fractions written check", "beginner",
+            listOf(WrittenExamQuestion("Explain how you would add 1/4 and 1/2.", "short_answer", 5)))
+        compose.setContent {
+            MaterialTheme {
+                NativeWrittenExamScreen(
+                    materials = listOf(MaterialSummary(9, "Fractions notes")),
+                    exams = emptyList(),
+                    generate = { materialId, count, difficulty ->
+                        assertEquals(9, materialId)
+                        assertEquals(5, count)
+                        exam.copy(difficulty = difficulty)
+                    },
+                    open = { exam },
+                    submit = { _, answers ->
+                        WrittenExamResult(52, 80.0, 4.0, 5.0, 0,
+                            listOf(WrittenExamMark(0, 4.0, 5.0, "Good explanation.", false)))
+                    },
+                    close = {}
+                )
+            }
+        }
+        compose.onNodeWithTag("generate-written-exam").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("submit-written-exam").assertIsNotEnabled()
+        compose.onNodeWithTag("written-answer-0").performScrollTo()
+            .performTextInput("Add the denominators after making them equal.")
+        compose.onNodeWithTag("submit-written-exam").performScrollTo()
+            .assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 10000) {
+            compose.onAllNodesWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Result · 80.0% (4.0/5.0 marks)").assertExists()
+        compose.onNodeWithText("Good explanation.").assertExists()
+    }
+}

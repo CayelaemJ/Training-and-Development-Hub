@@ -50,6 +50,12 @@ internal data class QuizAttempt(val id: Int, val quizId: Int, val correctCount: 
     val totalQuestions: Int, val percentage: Double, val feedback: List<QuizFeedback>)
 internal data class MaterialPage(val id: Int, val title: String, val text: String,
     val offset: Int, val nextOffset: Int?)
+internal data class WrittenExamQuestion(val prompt: String, val type: String, val maxMarks: Int)
+internal data class WrittenExam(val id: Int, val title: String, val difficulty: String, val questions: List<WrittenExamQuestion>)
+internal data class WrittenExamMark(val questionIndex: Int, val awardedMarks: Double, val maxMarks: Double,
+    val feedback: String, val needsReview: Boolean)
+internal data class WrittenExamResult(val id: Int, val percentage: Double, val awardedMarks: Double,
+    val maxMarks: Double, val reviewRequired: Int, val feedback: List<WrittenExamMark>)
 
 internal data class SchoolNotice(val id: Int, val subject: String, val message: String, val audience: String, val createdAt: String)
 internal data class SchoolAttendanceRecord(val day: String, val status: String)
@@ -176,6 +182,7 @@ internal data class NativeLearning(
     val supportCourses: List<SupportCourseOption> = emptyList(),
     val supportDrafts: List<NativeSupportDraft> = emptyList(),
     val quizEntries: List<QuizSummary> = emptyList(),
+    val writtenExams: List<WrittenExam> = emptyList(),
     val adminOrganizations: List<String> = emptyList(),
     val learnerReports: List<LearnerAcademicReport> = emptyList(),
     val learnerReportNotice: String = "",
@@ -457,11 +464,11 @@ internal class NativeApi(private val context: Context) {
         } catch (_: Exception) { "Native sign-in could not complete. Please try again." }
     }
     private fun request(route: String, body: JSONObject? = null, method: String? = null,
-                        auth: Boolean = false, requestKey: String? = null): JSONObject {
+                        auth: Boolean = false, requestKey: String? = null, timeoutMs: Int = 9000): JSONObject {
         val url = URL(origin + route)
         val connection = url.openConnection() as HttpURLConnection
-        connection.connectTimeout = 9000
-        connection.readTimeout = 9000
+        connection.connectTimeout = timeoutMs.coerceIn(9000, 180000)
+        connection.readTimeout = timeoutMs.coerceIn(9000, 180000)
         connection.instanceFollowRedirects = false
         connection.useCaches = false
         connection.setRequestProperty("Accept", "application/json")
@@ -851,6 +858,17 @@ internal class NativeApi(private val context: Context) {
             if (!hasSession()) throw error
             emptyList()
         }
+        val writtenExams = if (role != "learner") emptyList() else try {
+            getArray("/api/written-exams").let { arr ->
+                (0 until arr.length()).mapNotNull { i ->
+                    val row = arr.optJSONObject(i) ?: return@mapNotNull null
+                    parseWrittenExam(row)
+                }.take(30)
+            }
+        } catch (error: Exception) {
+            if (!hasSession()) throw error
+            emptyList()
+        }
         var learnerReportNotice = ""
         val learnerReports = orgIds.take(5).mapNotNull { orgId ->
             try {
@@ -964,7 +982,7 @@ internal class NativeApi(private val context: Context) {
         val learnerHelp = learnerSupportTickets.map { "${it.concept} · ${it.status.replace('_', ' ')}" }
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
-            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
+            learnerSupportTickets = learnerSupportTickets, materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries, writtenExams = writtenExams,
             journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports,
             schoolOperations = loadSchoolOperations())
@@ -1208,6 +1226,49 @@ internal class NativeApi(private val context: Context) {
                 (next == null || next > offset)) { "Invalid reading position" }
             MaterialPage(id, obj.getString("title"), obj.getString("text"), offset, next)
         }
+
+    suspend fun generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String): WrittenExam =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(materialId > 0 && questionCount in 1..10 && difficulty in setOf("beginner", "intermediate", "advanced"))
+            val response = request("/api/materials/$materialId/written-exams",
+                JSONObject().put("questionCount", questionCount).put("difficulty", difficulty),
+                auth = true, timeoutMs = 85000)
+            parseWrittenExam(response)
+        }
+
+    suspend fun fetchWrittenExam(id: Int): WrittenExam =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0)
+            parseWrittenExam(request("/api/written-exams/$id", auth = true))
+        }
+
+    suspend fun submitWrittenExam(examId: Int, answers: List<String>): WrittenExamResult =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(examId > 0 && answers.isNotEmpty() && answers.size <= 15 && answers.all { it.length <= 15000 })
+            val response = request("/api/written-exams/$examId/attempts",
+                JSONObject().put("answers", JSONArray(answers)), auth = true, timeoutMs = 120000)
+            val rows = response.getJSONArray("feedback")
+            val marks = (0 until rows.length()).map { i ->
+                val row = rows.getJSONObject(i)
+                WrittenExamMark(row.getInt("questionIndex"), row.getDouble("awardedMarks"),
+                    row.getDouble("maxMarks"), row.getString("feedback"), row.getBoolean("needsReview"))
+            }
+            WrittenExamResult(response.getInt("id"), response.getDouble("percentage"),
+                response.getDouble("awardedMarks"), response.getDouble("maxMarks"),
+                response.optInt("reviewRequired"), marks)
+        }
+
+    private fun parseWrittenExam(row: JSONObject): WrittenExam {
+        val id = row.getInt("id")
+        val questionRows = row.getJSONArray("questions")
+        val questions = (0 until questionRows.length()).map { i ->
+            val q = questionRows.getJSONObject(i)
+            WrittenExamQuestion(q.getString("prompt"), q.getString("type"), q.getInt("maxMarks"))
+        }
+        require(id > 0 && questions.isNotEmpty() && questions.size <= 15 &&
+            questions.all { it.prompt.isNotBlank() && it.maxMarks in 1..25 }) { "Invalid written exam" }
+        return WrittenExam(id, row.getString("title"), row.optString("difficulty", "intermediate"), questions)
+    }
 
     suspend fun setNotificationPreference(organizationId: Int, kind: String, enabled: Boolean, acknowledged: Boolean) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

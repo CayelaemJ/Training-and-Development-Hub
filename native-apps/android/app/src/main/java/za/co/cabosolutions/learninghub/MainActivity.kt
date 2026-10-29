@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private var supportBusy by mutableStateOf(false)
     private var supportMessage by mutableStateOf<String?>(null)
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
+    private var selectedWrittenExams by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
     private var selectedUploadFileName by mutableStateOf("")
@@ -164,6 +165,36 @@ class MainActivity : ComponentActivity() {
                         recordOutcome = { baseline, followup, reason -> recordSupportOutcome(baseline, followup, reason) },
                         reviewLearningDna = { state, note -> saveSupportLearningDna(state, note) }
                     )
+                    selectedWrittenExams -> NativeWrittenExamScreen(
+                        materials = screen?.materialEntries.orEmpty(), exams = screen?.writtenExams.orEmpty(),
+                        generate = { materialId, count, difficulty ->
+                            if (demoActive) WrittenExam(73031, "CABO demo · ${screen?.materialEntries?.firstOrNull { it.id == materialId }?.title ?: "Study material"}", difficulty,
+                                List(count) { index -> WrittenExamQuestion(
+                                    listOf("Explain one key idea from your study material.", "Give an example of how that idea can be used.") [index % 2],
+                                    "short_answer", 5
+                                ) })
+                            else api.generateWrittenExam(materialId, count, difficulty)
+                        },
+                        open = { examId ->
+                            if (demoActive) throw IllegalStateException("Select a demo exam above.")
+                            else api.fetchWrittenExam(examId)
+                        },
+                        submit = { examId, answers ->
+                            if (demoActive) {
+                                val marks = answers.mapIndexed { index, answer ->
+                                    val awarded = if (answer.trim().length >= 20) 4.0 else 2.0
+                                    WrittenExamMark(index, awarded, 5.0,
+                                        if (awarded > 2) "Clear response. Add one supporting detail to strengthen it."
+                                        else "Add more detail and connect your explanation to the study material.", false)
+                                }
+                                val total = marks.sumOf { it.maxMarks }
+                                val awarded = marks.sumOf { it.awardedMarks }
+                                WrittenExamResult(73099, awarded * 100.0 / total, awarded, total, 0, marks)
+                            } else api.submitWrittenExam(examId, answers)
+                        },
+                        isDemo = demoActive,
+                        close = { selectedWrittenExams = false }
+                    )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
                         attempt = attempt, busy = studyBusy, submitted = studySubmitted,
@@ -225,6 +256,7 @@ class MainActivity : ComponentActivity() {
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
+                        openWrittenExams = { selectedWrittenExams = true },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -1094,6 +1126,7 @@ internal fun NativeHome(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
+    openWrittenExams: () -> Unit = {},
     pickMaterial: () -> Unit,
     openSupportDraft: (NativeSupportDraft) -> Unit = {},
     sendSupportDraft: (NativeSupportDraft) -> Unit = {},
@@ -1282,7 +1315,7 @@ internal fun NativeHome(
                                 substituteSchoolTeacher = substituteSchoolTeacher,
                                 createAssessmentQuestion = createAssessmentQuestion, decideAssessmentQuestion = decideAssessmentQuestion,
                                 createAssessmentPaper = createAssessmentPaper, decideAssessmentPaper = decideAssessmentPaper,
-                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
+                                openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
                                 learnerJourneyAction = learnerJourneyAction
@@ -1301,7 +1334,7 @@ internal fun NativeHome(
                                 createAssessmentQuestion = createAssessmentQuestion, decideAssessmentQuestion = decideAssessmentQuestion,
                                 createAssessmentPaper = createAssessmentPaper, decideAssessmentPaper = decideAssessmentPaper,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
+                            openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
                             learnerJourneyAction = learnerJourneyAction
@@ -1694,6 +1727,7 @@ private fun RoleContent(
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
+    openWrittenExams: () -> Unit = {},
     pickMaterial: () -> Unit,
     openSupportDraft: (NativeSupportDraft) -> Unit,
     sendSupportDraft: (NativeSupportDraft) -> Unit,
@@ -1807,6 +1841,19 @@ private fun RoleContent(
                                 Text(material.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text("Open reading", style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
                             }
+                        }
+                    }
+                    item { Text("Written exams", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    item {
+                        OutlinedButton(onClick = openWrittenExams, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Create or take a written exam")
+                        }
+                    }
+                    if (data.writtenExams.isNotEmpty()) {
+                        item { Text("Your written exams", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                        items(data.writtenExams, key = { "written-exam:${it.id}" }) { exam ->
+                            NativeCard(exam.title, "${exam.questions.size} questions · ${exam.difficulty}")
                         }
                     }
                     item { Text("Practice", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }

@@ -18,6 +18,7 @@ targets:
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift
       - path: NativeMaterialUploadView.swift
+      - path: NativeWrittenExamView.swift
       - path: NativeSupportRequestView.swift
       - path: NativeStaffSupportView.swift
       - path: NativeLearnerJourneyView.swift

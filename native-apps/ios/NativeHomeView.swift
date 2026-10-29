@@ -534,6 +534,19 @@ struct NativeHomeView: View {
             .disabled(session.busy)
             .accessibilityHint("Opens a CABO practice assessment to complete and submit")
         }
+        title("Written exams")
+        NavigationLink(destination: NativeWrittenExamView(session: session)) {
+            Label("Create or take a written exam", systemImage: "doc.text.magnifyingglass")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(session.busy)
+        .accessibilityHint("Generate a written exam from your study material and submit answers for marking")
+        if !session.writtenExams.isEmpty {
+            ForEach(session.writtenExams) { exam in
+                infoTile(exam.title, "\(exam.questions.count) questions · \(exam.difficulty.capitalized)", system: "doc.text")
+            }
+        }
         title("My learning support")
         Button { showSupportRequests = true } label: {
             Label("Ask for help or manage drafts", systemImage: "questionmark.bubble")
