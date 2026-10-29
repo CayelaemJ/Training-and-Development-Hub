@@ -15,6 +15,7 @@ struct NativeHomeView: View {
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
+    @State private var reviewedGuardianEvidence: Set<Int> = []
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
     private let gold = Color(red: 201.0 / 255.0, green: 168.0 / 255.0, blue: 76.0 / 255.0)
@@ -62,6 +63,7 @@ struct NativeHomeView: View {
                 selectedMaterial = nil
                 selectedStaffTicket = nil
                 testPassword = ""
+                reviewedGuardianEvidence = []
             }
         }
         .sheet(item: $selectedQuiz) { quiz in
@@ -342,6 +344,56 @@ struct NativeHomeView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        ForEach(session.guardianReviewWorkspaces) { workspace in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Family access review · school \(workspace.organizationId)")
+                    .font(.headline).accessibilityAddTraits(.isHeader)
+                Text("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.")
+                    .font(.footnote).foregroundColor(.secondary)
+                if workspace.reviews.isEmpty {
+                    Text("No family reviews awaiting action.")
+                        .font(.subheadline).foregroundColor(.secondary)
+                }
+                ForEach(workspace.reviews) { review in
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text("Guardian relationship \(review.id)").font(.subheadline.bold())
+                        Text("Learner \(review.learnerId) · guardian \(review.guardianId)")
+                            .font(.caption).foregroundColor(.secondary)
+                        Text("\(review.status.replacingOccurrences(of: "_", with: " ")) · school review required")
+                            .font(.caption).foregroundColor(.secondary)
+                        Toggle("I independently reviewed legal authority",
+                               isOn: Binding(
+                                get: { reviewedGuardianEvidence.contains(review.id) },
+                                set: { value in
+                                    if value { reviewedGuardianEvidence.insert(review.id) }
+                                    else { reviewedGuardianEvidence.remove(review.id) }
+                                }))
+                            .font(.footnote).disabled(session.busy)
+                        if review.status == "accepted" {
+                            Button("Verify guardian access") {
+                                Task { await session.reviewGuardianRelationship(
+                                    organizationId: workspace.organizationId, relationshipId: review.id,
+                                    decision: "verified", evidenceReviewed: reviewedGuardianEvidence.contains(review.id)) }
+                            }
+                            .buttonStyle(.borderedProminent).disabled(session.busy || !reviewedGuardianEvidence.contains(review.id))
+                        } else if review.status == "verified" {
+                            Button("Revoke guardian access", role: .destructive) {
+                                Task { await session.reviewGuardianRelationship(
+                                    organizationId: workspace.organizationId, relationshipId: review.id,
+                                    decision: "revoked", evidenceReviewed: reviewedGuardianEvidence.contains(review.id)) }
+                            }
+                            .buttonStyle(.bordered).disabled(session.busy || !reviewedGuardianEvidence.contains(review.id))
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding(18)

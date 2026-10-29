@@ -55,6 +55,8 @@ internal data class NativePortal(val role: String, val summary: List<String>, va
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
+internal data class GuardianReview(val id: Int, val learnerId: String, val guardianId: String, val status: String)
+internal data class GuardianReviewWorkspace(val organizationId: Int, val reviews: List<GuardianReview>)
 internal data class GuardianSubject(val name: String, val percentage: Double, val assessmentCount: Int)
 internal data class GuardianAcademicReport(
     val learnerId: String, val learnerName: String, val organizationId: Int,
@@ -108,6 +110,7 @@ internal data class NativeLearning(
     val materials: List<String>,
     val quizzes: List<String>,
     val guardians: List<GuardianInvite> = emptyList(),
+    val guardianReviewWorkspaces: List<GuardianReviewWorkspace> = emptyList(),
     val parentGuidance: String = "",
     val parentReports: List<GuardianAcademicReport> = emptyList(),
     val parentReportNotice: String = "",
@@ -521,6 +524,23 @@ internal class NativeApi(private val context: Context) {
         }
 
         if (role in listOf("teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head")) {
+            val guardianReviews = orgIds.mapNotNull { orgId ->
+                try {
+                    val rows = getArray("/api/organizations/$orgId/guardian-reviews")
+                    val reviews = (0 until minOf(rows.length(), 200)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val learnerId = row.optString("learnerId")
+                            val guardianId = row.optString("guardianId"); val status = row.optString("status")
+                            if (id <= 0 || learnerId.isBlank() || guardianId.isBlank() || status.isBlank()) null
+                            else GuardianReview(id, learnerId.take(200), guardianId.take(200), status.take(32))
+                        }
+                    }
+                    GuardianReviewWorkspace(orgId, reviews)
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    null
+                }
+            }
             val workspace = orgIds.map { orgId ->
                 try {
                     val response = request("/api/organizations/$orgId/support/options", auth = true)
@@ -566,7 +586,8 @@ internal class NativeApi(private val context: Context) {
                 }
             }
             return@withContext NativeLearning(
-                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace
+                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
+                guardianReviewWorkspaces = guardianReviews
             )
         }
 
@@ -945,6 +966,13 @@ internal class NativeApi(private val context: Context) {
             require(invitationId > 0)
             request("/api/guardian-relationships/$invitationId/decision",
                 JSONObject().put("decision", if (accept) "accepted" else "declined"), auth = true)
+        }
+
+    suspend fun reviewGuardianRelationship(organizationId: Int, relationshipId: Int, decision: String): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && relationshipId > 0 && decision in setOf("verified", "revoked"))
+            request("/api/organizations/$organizationId/guardian-reviews/$relationshipId",
+                JSONObject().put("decision", decision).put("evidenceReviewed", true), auth = true)
         }
 
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

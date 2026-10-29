@@ -16,7 +16,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | Assessment question bank | — | — | Teacher / school leaders | Admin | Missing native workspace |
 | School intelligence | — | — | School leaders | Admin | Missing native workspace |
 | Report issuance and integrity | — | Guardian views | School leaders | Admin | Report previews only; issue/review flows missing |
-| Guardian Connect | — | Invitations | School verification | Admin | Parent decisions and protected reports partial; school review missing |
+| Guardian Connect | — | Invitations | School verification | Admin | Android and iOS support invitations, protected reports, and the server-authorized school review action; institutional ownership and evidence must still be confirmed in end-to-end acceptance |
 | Education reports | Learner preview | Verified reports | Assigned school scope | Admin | Learner/parent previews partial; reporting workflow missing |
 | University applications | Apply and track | — | — | Admin catalog | Missing native workspace |
 | School progression | — | — | School leadership | Admin | Missing native workspace |
@@ -52,3 +52,8 @@ A capability moves to complete only when all of these are true on both native pl
 - Sensitive records are not copied into shared preferences, logs, analytics or an unreviewed offline cache. Tokens stay in Android Keystore-backed storage or iOS Keychain.
 - Automated tests cover the intended flow and its important denied/failed cases, and Android emulator plus iOS Simulator build/test checks pass.
 - The capability is exercised with synthetic accounts on a physical device before a production/store readiness claim.
+
+## Recent native additions
+
+- The native family-access review surfaces accepted and verified guardian relationships only when the existing school review endpoint authorizes the signed-in account. Both clients require an explicit reviewer confirmation before submitting a decision. The API remains authoritative for institution ownership, active enrollment, invitation acceptance, and revocation rules. No identity documents are collected by the native review flow.
+- Android and iOS support lifecycle changes, learner feedback, published result comparison, and Learning DNA review are in the current delivery sequence. They are not a substitute for the missing route families listed above or for complete device acceptance.

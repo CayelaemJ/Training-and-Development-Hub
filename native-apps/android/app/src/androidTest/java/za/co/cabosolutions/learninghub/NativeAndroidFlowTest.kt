@@ -9,6 +9,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -356,6 +358,46 @@ class NativeAndroidSupportTest {
         compose.onNodeWithText("Accepted · school verification pending").assertIsDisplayed()
         compose.onNodeWithText("Progress").performClick()
         compose.onNodeWithText("School-verified progress").assertIsDisplayed()
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidGuardianReviewTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun schoolGuardianReviewRequiresExplicitEvidenceConfirmation() {
+        var decision: Triple<Int, Int, String>? = null
+        val data = NativeLearning(
+            portal = NativePortal("headmaster", emptyList(), emptyList()),
+            materials = emptyList(), quizzes = emptyList(),
+            guardianReviewWorkspaces = listOf(GuardianReviewWorkspace(9, listOf(
+                GuardianReview(42, "learner-17", "guardian-28", "accepted")
+            )))
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeHome(
+                    status = "Connected securely to CABO", busy = false, data = data,
+                    signIn = {}, refresh = {}, demoEnabled = false, demoActive = false,
+                    demoRole = "headmaster", startDemo = {}, setDemoRole = {}, createSupportRequest = {},
+                    testLoginAvailable = false, testUsername = "", testPassword = "",
+                    onTestUsername = {}, onTestPassword = {}, signInTest = {}, signOut = {},
+                    respondToInvite = { _, _ -> },
+                    reviewGuardian = { org, relationship, action -> decision = Triple(org, relationship, action) },
+                    openSupportTicket = {}, openQuiz = {}, openMaterial = {}, pickMaterial = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("Support").performClick()
+        compose.onNodeWithText("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Verify guardian access").performScrollTo().assertIsNotEnabled()
+        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
+        compose.onNodeWithText("Verify guardian access").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(Triple(9, 42, "verified"), decision)
     }
 }
 
