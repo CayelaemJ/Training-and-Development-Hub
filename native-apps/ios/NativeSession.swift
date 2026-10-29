@@ -151,6 +151,26 @@ struct NativeSchoolAttendanceSummary: Decodable {
     let records: Int
     let counts: [String: Int]
 }
+struct NativeSchoolIntelligenceLearner: Identifiable {
+    let learnerId: String
+    let grade: String
+    let average: Double?
+    let attendanceRate: Double?
+    let subjectsAtRisk: [String]
+    let supportPlans: Int
+    var id: String { learnerId }
+}
+struct NativeSchoolIntelligenceSnapshot {
+    let year: Int
+    let attendanceRecords: Int
+    let attendanceCounts: [String: Int]
+    let studentsReviewed: Int
+    let attentionNeeded: Int
+    let learners: [NativeSchoolIntelligenceLearner]
+    let subjectBelow: Double
+    let attendanceBelow: Double
+    let officialDistrictData: Bool
+}
 struct NativeSchoolOperationsWorkspace: Identifiable {
     let organizationId: Int
     let organizationName: String
