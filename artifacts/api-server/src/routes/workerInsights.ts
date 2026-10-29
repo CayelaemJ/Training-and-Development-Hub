@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { schoolManager } from "./reportCards";
+import { djangoWorkerDraftURL } from "../lib/djangoWorkerOrigin";
 
 /**
  * Feature-gated internal integration; accepts only pre-aggregated, coded
@@ -59,13 +60,7 @@ router.post("/organizations/:orgId/learning/insights/draft", async (req, res) =>
   let target: URL;
   try {
     if (!rawUrl || !token || token.length < 24) throw Error("Not configured");
-    const base = new URL(rawUrl);
-    if (base.protocol !== "https:" || base.username || base.password ||
-        base.port || base.search || base.hash ||
-        base.hostname !== "cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev") {
-      throw Error("Unapproved worker origin");
-    }
-    target = new URL("/v1/insights/draft", base);
+    target = djangoWorkerDraftURL(rawUrl);
   } catch {
     res.status(503).json({error: "Learning insights worker is not configured"});
     return;
