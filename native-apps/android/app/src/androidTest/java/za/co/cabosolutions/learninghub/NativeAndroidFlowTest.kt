@@ -130,6 +130,7 @@ class NativeAndroidSupportTest {
             MaterialTheme {
                 NativeSupportTicketScreen(
                     ticket = ticket,
+                    canManageSupport = true,
                     reply = reply.value,
                     onReply = { reply.value = it },
                     triageReason = "Reviewed by the assigned educator.",
@@ -141,6 +142,8 @@ class NativeAndroidSupportTest {
                     useGuidance = {},
                     sendReply = { sendCount++ },
                     triage = { triageCount++ },
+                    assign = {},
+                    schedulePractice = { _, _ -> },
                     close = {}
                 )
             }
@@ -168,6 +171,7 @@ class NativeAndroidSupportTest {
                         SupportTicketSummary(3, 18, "Fractions", "triaged", 2, ""),
                         "How do I add unlike fractions?", "I added the denominators.", emptyList()
                     ),
+                    canManageSupport = true,
                     reply = reply.value,
                     onReply = { reply.value = it },
                     triageReason = "",
@@ -183,6 +187,8 @@ class NativeAndroidSupportTest {
                     useGuidance = { useCount++ },
                     sendReply = {},
                     triage = {},
+                    assign = {},
+                    schedulePractice = { _, _ -> },
                     close = {}
                 )
             }
