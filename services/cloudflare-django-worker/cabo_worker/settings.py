@@ -9,7 +9,7 @@ try:
     from workers import env
 except ImportError:
     # Only for local Django tests. The Cloudflare runtime must supply bindings.
-    SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "test-runtime-only-not-for-deployment")
+    SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
     ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 else:
     # Missing Worker bindings abort startup rather than opening an insecure mode.
