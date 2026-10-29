@@ -71,6 +71,14 @@ class MainActivity : ComponentActivity() {
     private var schoolIntelligence by mutableStateOf<SchoolIntelligenceSnapshot?>(null)
     private var schoolIntelligenceBusy by mutableStateOf(false)
     private var schoolIntelligenceMessage by mutableStateOf<String?>(null)
+    private var selectedSchoolProgressionOrganization by mutableStateOf<Int?>(null)
+    private var schoolProgressionOrganizationName by mutableStateOf("")
+    private var schoolProgressionYearText by mutableStateOf(java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).toString())
+    private var schoolProgression by mutableStateOf<SchoolProgressionSnapshot?>(null)
+    private var schoolProgressionBusy by mutableStateOf(false)
+    private var schoolProgressionSavingId by mutableStateOf<Int?>(null)
+    private var schoolProgressionMessage by mutableStateOf<String?>(null)
+    private var schoolProgressionError by mutableStateOf<String?>(null)
     private var managerCreatingExam by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
@@ -129,9 +137,10 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedEducationCommand || selectedSchoolIntelligenceOrganization != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedEducationCommand || selectedSchoolIntelligenceOrganization != null || selectedSchoolProgressionOrganization != null) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
+                        selectedSchoolProgressionOrganization != null -> closeSchoolProgression()
                         selectedSchoolIntelligenceOrganization != null -> closeSchoolIntelligence()
                         selectedEducationCommand -> closeEducationCommand()
                         selectedLearnerPassport -> closeLearnerPassport()
@@ -143,6 +152,19 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 when {
+                    selectedSchoolProgressionOrganization != null -> NativeSchoolProgressionScreen(
+                        organizationName = schoolProgressionOrganizationName,
+                        yearText = schoolProgressionYearText,
+                        snapshot = schoolProgression,
+                        busy = schoolProgressionBusy,
+                        savingEnrollmentId = schoolProgressionSavingId,
+                        message = schoolProgressionMessage,
+                        error = schoolProgressionError,
+                        onYearText = { schoolProgressionYearText = it },
+                        refresh = { loadSchoolProgression() },
+                        decide = { candidate, decision -> decideSchoolProgression(candidate, decision) },
+                        close = { closeSchoolProgression() }
+                    )
                     selectedSchoolIntelligenceOrganization != null -> NativeSchoolIntelligenceScreen(
                         organizationName = schoolIntelligenceOrganizationName,
                         yearText = schoolIntelligenceYearText,
@@ -358,6 +380,7 @@ class MainActivity : ComponentActivity() {
                         openPassport = { openLearnerPassport() },
                         openEducationCommand = { openEducationCommand() },
                         openSchoolIntelligence = { org, name -> openSchoolIntelligence(org, name) },
+                        openSchoolProgression = { org, name -> openSchoolProgression(org, name) },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -517,6 +540,81 @@ class MainActivity : ComponentActivity() {
         schoolIntelligence = null
         schoolIntelligenceMessage = null
         schoolIntelligenceBusy = false
+    }
+
+    private fun openSchoolProgression(organizationId: Int, organizationName: String) {
+        if (demoActive || organizationId <= 0 ||
+            screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) return
+        selectedSchoolProgressionOrganization = organizationId
+        schoolProgressionOrganizationName = organizationName.take(200)
+        schoolProgressionYearText = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).toString()
+        schoolProgression = null
+        schoolProgressionMessage = null
+        schoolProgressionError = null
+        loadSchoolProgression()
+    }
+
+    private fun loadSchoolProgression() {
+        val organizationId = selectedSchoolProgressionOrganization ?: return
+        val year = schoolProgressionYearText.toIntOrNull()?.takeIf { it in 2020..2200 }
+        if (demoActive || schoolProgressionBusy || schoolProgressionSavingId != null) return
+        if (year == null) {
+            schoolProgressionError = "Enter a current academic year from 2020 to 2200."
+            return
+        }
+        if (screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) {
+            schoolProgressionError = "School progression is not available to this account."
+            schoolProgression = null
+            return
+        }
+        schoolProgressionBusy = true
+        schoolProgressionError = null
+        schoolProgressionMessage = null
+        lifecycleScope.launch {
+            try {
+                schoolProgression = api.fetchSchoolProgression(organizationId, year)
+            } catch (_: Exception) {
+                schoolProgression = null
+                schoolProgressionError = "Progression records are unavailable for this account right now. Check your connection and try again."
+            } finally {
+                schoolProgressionBusy = false
+            }
+        }
+    }
+
+    private fun decideSchoolProgression(candidate: SchoolProgressionCandidate, decision: String) {
+        val organizationId = selectedSchoolProgressionOrganization ?: return
+        val year = schoolProgressionYearText.toIntOrNull()?.takeIf { it in 2020..2200 } ?: return
+        if (demoActive || schoolProgressionSavingId != null ||
+            schoolProgression?.candidates?.none { it.enrollmentId == candidate.enrollmentId } != false ||
+            decision !in setOf("promote", "repeat") ||
+            screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) return
+        if (decision == "promote" && candidate.nextGrade == null) return
+        schoolProgressionSavingId = candidate.enrollmentId
+        schoolProgressionMessage = null
+        schoolProgressionError = null
+        lifecycleScope.launch {
+            try {
+                api.submitSchoolProgression(organizationId, candidate.enrollmentId, year + 1, decision)
+                schoolProgressionMessage = "Learner ${candidate.learnerId} recorded for ${year + 1}."
+                schoolProgression = api.fetchSchoolProgression(organizationId, year)
+            } catch (_: Exception) {
+                schoolProgressionError = "That progression could not be saved. The enrolment may have changed; refresh and review it again."
+                try { schoolProgression = api.fetchSchoolProgression(organizationId, year) } catch (_: Exception) {}
+            } finally {
+                schoolProgressionSavingId = null
+            }
+        }
+    }
+
+    private fun closeSchoolProgression() {
+        selectedSchoolProgressionOrganization = null
+        schoolProgressionOrganizationName = ""
+        schoolProgression = null
+        schoolProgressionMessage = null
+        schoolProgressionError = null
+        schoolProgressionBusy = false
+        schoolProgressionSavingId = null
     }
 
     private fun closeMaterialUpload() {
@@ -1347,7 +1445,8 @@ internal fun NativeHome(
     learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
     openPassport: () -> Unit = {},
     openEducationCommand: () -> Unit = {},
-    openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> }
+    openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> },
+    openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -1534,7 +1633,8 @@ internal fun NativeHome(
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
                                 learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
                                 openEducationCommand = { openEducationCommand() },
-                                openSchoolIntelligence = openSchoolIntelligence
+                                openSchoolIntelligence = openSchoolIntelligence,
+                                openSchoolProgression = openSchoolProgression
                             )
                         }
                     } else {
@@ -1555,7 +1655,8 @@ internal fun NativeHome(
                             deleteSupportDraft = deleteSupportDraft,
                             learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
                             openEducationCommand = { openEducationCommand() },
-                            openSchoolIntelligence = openSchoolIntelligence
+                            openSchoolIntelligence = openSchoolIntelligence,
+                            openSchoolProgression = openSchoolProgression
                         )
                     }
                 }
@@ -1713,11 +1814,13 @@ private fun AssessmentWorkspaceCard(
 @Composable
 private fun SchoolOperationsCard(
     workspace: SchoolOperationsWorkspace,
+    demoActive: Boolean,
     busy: Boolean,
     publishNotice: (Int, String, String, String) -> Unit,
     recordAttendance: (Int, String, String, String, String) -> Unit,
     substituteTeacher: (Int, Int, String, String) -> Unit,
-    openSchoolIntelligence: (Int, String) -> Unit
+    openSchoolIntelligence: (Int, String) -> Unit,
+    openSchoolProgression: (Int, String) -> Unit
 ) {
     var subject by remember(workspace.organizationId) { mutableStateOf("") }
     var message by remember(workspace.organizationId) { mutableStateOf("") }
@@ -1748,10 +1851,16 @@ private fun SchoolOperationsCard(
                 workspace.attendance.forEach { Text("${it.day} · ${it.status.replaceFirstChar { c -> c.uppercase() }}") }
             }
             if (workspace.canManage) {
-                OutlinedButton(
-                    onClick = { openSchoolIntelligence(workspace.organizationId, workspace.organizationName) },
-                    enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) { Text("Open attendance & academic signals") }
+                if (!demoActive) {
+                    OutlinedButton(
+                        onClick = { openSchoolIntelligence(workspace.organizationId, workspace.organizationName) },
+                        enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("Open attendance & academic signals") }
+                    OutlinedButton(
+                        onClick = { openSchoolProgression(workspace.organizationId, workspace.organizationName) },
+                        enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("Open year-end progression") }
+                }
                 workspace.attendanceSummary?.let { summary ->
                     Text("Attendance overview · ${summary.year} · ${summary.records} records", fontWeight = FontWeight.SemiBold)
                     Text(summary.counts.entries.sortedBy { it.key }.joinToString("   ") { "${it.key}: ${it.value}" }, style = MaterialTheme.typography.bodySmall)
@@ -1958,7 +2067,8 @@ private fun RoleContent(
     learnerJourneyAction: (LearnerJourneyAction) -> Unit,
     openPassport: () -> Unit,
     openEducationCommand: () -> Unit = {},
-    openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> }
+    openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> },
+    openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp).testTag("native-role-content"),
@@ -1982,7 +2092,7 @@ private fun RoleContent(
         if (section == "school") {
             item { Text("School operations", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             items(data.schoolOperations, key = { "school-operations:${it.organizationId}" }) { workspace ->
-                SchoolOperationsCard(workspace, busy, publishSchoolNotice, recordSchoolAttendance, substituteSchoolTeacher, openSchoolIntelligence)
+                SchoolOperationsCard(workspace, demoActive, busy, publishSchoolNotice, recordSchoolAttendance, substituteSchoolTeacher, openSchoolIntelligence, openSchoolProgression)
             }
             if (data.schoolOperations.isEmpty()) item { NativeCard("No school membership", "Notices, attendance, and timetable details are available only through an institution that authorizes this account.") }
             return@LazyColumn

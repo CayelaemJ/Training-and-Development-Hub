@@ -19,7 +19,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | Guardian Connect | — | Invitations and optional notification consent | School verification | Admin | Android and iOS support invitations, protected reports, school review and institution-scoped email preference controls; the server enforces explicit guardian consent, recent verified sign-in, opt-in availability and always-available revocation |
 | Education reports | Learner preview | Verified reports | Assigned school scope | Admin | Learner/parent previews partial; reporting workflow missing |
 | University applications | Apply and track | — | — | Admin catalog | Missing native workspace |
-| School progression | — | — | School leadership | Admin | Missing native workspace |
+| School progression | — | — | School leadership | Admin | Android and iOS support authorized candidate review, year selection, explicit per-learner confirmation for promote/repeat, and recent decision history; high-stakes policy, notifications and school-leaving certification remain incomplete |
 | Institution setup and stages | — | — | School leadership | Admin | Missing native workspace |
 | Institution hub modules | Role-specific | Role-specific | Role-specific | Role-specific | Missing native workspace |
 | School operations | Own attendance, notices, published timetable | — | Scoped notices and timetable; authorised attendance and substitutions | Owner/admin attendance totals and notice management | Android and iOS: member-scoped reads plus server-authorized notice publishing, attendance recording and timetable substitutions; broader school setup and family views remain incomplete |
@@ -73,3 +73,6 @@ A capability moves to complete only when all of these are true on both native pl
 
 
 - Android and iOS now provide a school-manager-only, on-demand attendance and academic signals workspace. It uses existing server-authorized attendance-summary and academic-intelligence endpoints, supports selecting an academic year, displays recorded attendance totals, and presents subject/attendance thresholds as prompts for educator review. No new permission rules or automated decisions were added; data stays in memory while the screen is open.
+
+
+- Android and iOS now support school-manager year-end progression review from the existing authorized candidate, history and decision endpoints. Every promote/repeat action requires an explicit confirmation; the UI states CABO does not decide progression. Server-side membership, current-enrolment checks, framework rules and transaction safeguards remain authoritative. No high-stakes progression rules were changed.

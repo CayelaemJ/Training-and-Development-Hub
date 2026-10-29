@@ -121,6 +121,18 @@ internal data class SchoolIntelligenceSnapshot(
     val learners: List<SchoolIntelligenceLearner>,
     val subjectBelow: Double, val attendanceBelow: Double, val officialDistrictData: Boolean
 )
+internal data class SchoolProgressionCandidate(
+    val enrollmentId: Int, val learnerId: String, val stage: String,
+    val academicYear: Int, val nextGrade: String?
+)
+internal data class SchoolProgressionDecision(
+    val id: Int, val learnerId: String, val fromGrade: String,
+    val toGrade: String, val decision: String, val approvedAt: String
+)
+internal data class SchoolProgressionSnapshot(
+    val year: Int, val candidates: List<SchoolProgressionCandidate>,
+    val history: List<SchoolProgressionDecision>
+)
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
@@ -674,6 +686,41 @@ internal class NativeApi(private val context: Context) {
                 if (partialFailure) "Some school data could not load. Check your connection and refresh." else null)
         }
     }
+
+    suspend fun fetchSchoolProgression(organizationId: Int, year: Int): SchoolProgressionSnapshot =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && year in 2020..2200)
+            val candidatesJson = getArray("/api/organizations/$organizationId/progression/candidates?year=$year")
+            val historyJson = getArray("/api/organizations/$organizationId/progression/history")
+            val candidates = (0 until minOf(candidatesJson.length(), 400)).mapNotNull { index ->
+                val row = candidatesJson.optJSONObject(index) ?: return@mapNotNull null
+                val id = row.optInt("id")
+                val learnerId = row.optString("learnerId").trim().take(160)
+                val stage = row.optString("stage").trim().take(40)
+                val academicYear = row.optInt("academicYear")
+                if (id <= 0 || learnerId.isBlank() || stage.isBlank() || academicYear !in 2020..2200) null
+                else SchoolProgressionCandidate(id, learnerId, stage, academicYear,
+                    if (row.isNull("nextGrade")) null else row.optString("nextGrade").take(40))
+            }
+            val history = (0 until minOf(historyJson.length(), 100)).mapNotNull { index ->
+                val row = historyJson.optJSONObject(index) ?: return@mapNotNull null
+                val id = row.optInt("id")
+                val learnerId = row.optString("learnerId").trim().take(160)
+                if (id <= 0 || learnerId.isBlank()) null
+                else SchoolProgressionDecision(id, learnerId, row.optString("fromGrade").take(40),
+                    row.optString("toGrade").take(40), row.optString("decision").take(16),
+                    row.optString("approvedAt").take(40))
+            }
+            SchoolProgressionSnapshot(year, candidates, history)
+        }
+
+    suspend fun submitSchoolProgression(organizationId: Int, enrollmentId: Int, targetYear: Int, decision: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && enrollmentId > 0 && targetYear in 2020..2200 &&
+                decision in setOf("promote", "repeat"))
+            request("/api/organizations/$organizationId/progression/$enrollmentId",
+                JSONObject().put("targetYear", targetYear).put("decision", decision), method = "POST", auth = true)
+        }
 
     suspend fun fetchSchoolIntelligence(organizationId: Int, year: Int): SchoolIntelligenceSnapshot =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
