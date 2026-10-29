@@ -1288,7 +1288,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String) async throws -> NativeWrittenExam {
-        guard ["learner", "owner", "admin"].contains(role ?? ""), materialId > 0, (1...10).contains(questionCount),
+        guard (role == "learner" || canManageExamAssignments), materialId > 0, (1...10).contains(questionCount),
               ["beginner", "intermediate", "advanced"].contains(difficulty) else {
             throw NSError(domain: "CABO", code: 403)
         }
@@ -1310,13 +1310,13 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func loadWrittenExam(id: Int) async throws -> NativeWrittenExam {
-        guard role == "learner", id > 0 else { throw NSError(domain: "CABO", code: 403) }
+        guard (role == "learner" || canManageExamAssignments), id > 0 else { throw NSError(domain: "CABO", code: 403) }
         let data = try await request("api/written-exams/\(id)")
         return try JSONDecoder().decode(NativeWrittenExam.self, from: data)
     }
 
     func submitWrittenExam(id: Int, answers: [String], assignmentId: Int? = nil) async throws -> NativeWrittenExamResult {
-        guard role == "learner", id > 0, !answers.isEmpty, answers.count <= 15,
+        guard (role == "learner" || canManageExamAssignments), id > 0, !answers.isEmpty, answers.count <= 15,
               answers.allSatisfy({ $0.count <= 15_000 }) else {
             throw NSError(domain: "CABO", code: 400)
         }
@@ -1497,7 +1497,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func createExamAssignment(organizationId: Int, groupId: Int, examId: Int, dueAt: String?) async throws {
-        guard ["owner", "admin"].contains(role ?? ""), organizationId > 0, groupId > 0, examId > 0 else {
+        guard canManageExamAssignments, organizationId > 0, groupId > 0, examId > 0 else {
             throw NSError(domain: "CABO", code: 403)
         }
         var payload: [String: Any] = ["groupId": groupId, "examId": examId]
@@ -1515,7 +1515,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     func overrideExamSubmission(organizationId: Int, submissionId: Int, questionIndex: Int,
                                awardedMarks: Double, reason: String) async throws {
         let clean = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard ["owner", "admin"].contains(role ?? ""), organizationId > 0, submissionId > 0,
+        guard canManageExamAssignments, organizationId > 0, submissionId > 0,
               (0...14).contains(questionIndex), awardedMarks >= 0, awardedMarks <= 100,
               (5...2000).contains(clean.count) else { throw NSError(domain: "CABO", code: 400) }
         let body = try JSONSerialization.data(withJSONObject: [
