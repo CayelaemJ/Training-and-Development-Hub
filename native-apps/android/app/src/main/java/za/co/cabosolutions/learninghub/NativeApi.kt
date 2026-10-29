@@ -70,6 +70,7 @@ internal data class ExamManagementWorkspace(
     val assignments: List<ManagedExamAssignment>, val submissions: List<ManagedExamSubmission>,
     val notice: String? = null
 )
+internal data class ExamManagementResources(val materials: List<MaterialSummary>, val exams: List<WrittenExam>)
 
 internal data class SchoolNotice(val id: Int, val subject: String, val message: String, val audience: String, val createdAt: String)
 internal data class SchoolAttendanceRecord(val day: String, val status: String)
@@ -1325,6 +1326,28 @@ internal class NativeApi(private val context: Context) {
             questions.all { it.prompt.isNotBlank() && it.maxMarks in 1..25 }) { "Invalid written exam" }
         return WrittenExam(id, row.getString("title"), row.optString("difficulty", "intermediate"), questions)
     }
+
+    suspend fun fetchExamManagementResources(): ExamManagementResources =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val materials = try {
+                getArray("/api/materials").let { rows ->
+                    (0 until minOf(rows.length(), 30)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val title = row.optString("title")
+                            if (id > 0 && title.isNotBlank()) MaterialSummary(id, title.take(200)) else null
+                        }
+                    }
+                }
+            } catch (_: Exception) { emptyList() }
+            val exams = try {
+                getArray("/api/written-exams").let { rows ->
+                    (0 until minOf(rows.length(), 30)).mapNotNull { i ->
+                        try { rows.optJSONObject(i)?.let(::parseWrittenExam) } catch (_: Exception) { null }
+                    }
+                }
+            } catch (_: Exception) { emptyList() }
+            ExamManagementResources(materials, exams)
+        }
 
     suspend fun fetchExamManagementWorkspaces(): List<ExamManagementWorkspace> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { loadExamManagementWorkspaces() }
