@@ -326,7 +326,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else selectedWrittenExams = true
                         },
-                        openLearnerPassport = { openLearnerPassport() },
+                        openPassport = { openLearnerPassport() },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -1238,7 +1238,7 @@ internal fun NativeHome(
     offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
     offlineSupportCourses: List<SupportCourseOption> = emptyList(),
     learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
-    openLearnerPassport: () -> Unit = {}
+    openPassport: () -> Unit = {}
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -2003,7 +2003,7 @@ private fun RoleContent(
                     data.journey.forEach { milestone -> item { NativeCard(milestone, "Learning journey") } }
                     item { LearnerJourneyPanel(data, busy, learnerJourneyAction) }
                     item {
-                        OutlinedButton(onClick = openLearnerPassport, enabled = !busy,
+                        OutlinedButton(onClick = openPassport, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                             Text("Open my learner passport")
                         }
