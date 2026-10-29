@@ -1334,7 +1334,7 @@ internal fun NativeHome(
                                 createAssessmentQuestion = createAssessmentQuestion, decideAssessmentQuestion = decideAssessmentQuestion,
                                 createAssessmentPaper = createAssessmentPaper, decideAssessmentPaper = decideAssessmentPaper,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
-                            openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
+                            openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
                             learnerJourneyAction = learnerJourneyAction
