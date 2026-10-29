@@ -55,6 +55,14 @@ internal data class NativePortal(val role: String, val summary: List<String>, va
 internal data class GuardianInvite(
     val id: Int, val status: String, val learnerName: String?, val verified: Boolean
 )
+internal data class GuardianReview(val id: Int, val learnerId: String, val guardianId: String, val status: String)
+internal data class GuardianReviewWorkspace(val organizationId: Int, val reviews: List<GuardianReview>)
+internal data class ReportIssuanceRecord(
+    val id: Int, val learnerId: String, val academicYear: Int, val version: Int,
+    val status: String, val submittedBy: String, val reviewedBy: String?,
+    val contentHash: String, val issuedAt: String?
+)
+internal data class ReportIssuanceWorkspace(val organizationId: Int, val records: List<ReportIssuanceRecord>)
 internal data class GuardianSubject(val name: String, val percentage: Double, val assessmentCount: Int)
 internal data class GuardianAcademicReport(
     val learnerId: String, val learnerName: String, val organizationId: Int,
@@ -108,6 +116,8 @@ internal data class NativeLearning(
     val materials: List<String>,
     val quizzes: List<String>,
     val guardians: List<GuardianInvite> = emptyList(),
+    val guardianReviewWorkspaces: List<GuardianReviewWorkspace> = emptyList(),
+    val reportIssuanceWorkspaces: List<ReportIssuanceWorkspace> = emptyList(),
     val parentGuidance: String = "",
     val parentReports: List<GuardianAcademicReport> = emptyList(),
     val parentReportNotice: String = "",
@@ -521,6 +531,43 @@ internal class NativeApi(private val context: Context) {
         }
 
         if (role in listOf("teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head")) {
+            val guardianReviews = orgIds.mapNotNull { orgId ->
+                try {
+                    val rows = getArray("/api/organizations/$orgId/guardian-reviews")
+                    val reviews = (0 until minOf(rows.length(), 200)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val learnerId = row.optString("learnerId")
+                            val guardianId = row.optString("guardianId"); val status = row.optString("status")
+                            if (id <= 0 || learnerId.isBlank() || guardianId.isBlank() || status.isBlank()) null
+                            else GuardianReview(id, learnerId.take(200), guardianId.take(200), status.take(32))
+                        }
+                    }
+                    GuardianReviewWorkspace(orgId, reviews)
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    null
+                }
+            }
+            val reportIssuance = orgIds.mapNotNull { orgId ->
+                try {
+                    val rows = getArray("/api/organizations/$orgId/report-issuance")
+                    val records = (0 until minOf(rows.length(), 100)).mapNotNull { i ->
+                        rows.optJSONObject(i)?.let { row ->
+                            val id = row.optInt("id"); val learnerId = row.optString("learnerId")
+                            val hash = row.optString("contentHash"); val status = row.optString("status")
+                            if (id <= 0 || learnerId.isBlank() || hash.isBlank() || status.isBlank()) null
+                            else ReportIssuanceRecord(id, learnerId.take(200), row.optInt("academicYear"),
+                                row.optInt("version"), status.take(32), row.optString("submittedBy"),
+                                row.optString("reviewedBy").takeIf { it.isNotBlank() && it != "null" },
+                                hash.take(256), row.optString("issuedAt").takeIf { it.isNotBlank() && it != "null" })
+                        }
+                    }
+                    ReportIssuanceWorkspace(orgId, records)
+                } catch (error: Exception) {
+                    if (!hasSession()) throw error
+                    null
+                }
+            }
             val workspace = orgIds.map { orgId ->
                 try {
                     val response = request("/api/organizations/$orgId/support/options", auth = true)
@@ -566,7 +613,8 @@ internal class NativeApi(private val context: Context) {
                 }
             }
             return@withContext NativeLearning(
-                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace
+                NativePortal(role, summary, cards), emptyList(), emptyList(), staff = workspace,
+                guardianReviewWorkspaces = guardianReviews, reportIssuanceWorkspaces = reportIssuance
             )
         }
 
@@ -945,6 +993,30 @@ internal class NativeApi(private val context: Context) {
             require(invitationId > 0)
             request("/api/guardian-relationships/$invitationId/decision",
                 JSONObject().put("decision", if (accept) "accepted" else "declined"), auth = true)
+        }
+
+    suspend fun reviewGuardianRelationship(organizationId: Int, relationshipId: Int, decision: String): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(organizationId > 0 && relationshipId > 0 && decision in setOf("verified", "revoked"))
+            request("/api/organizations/$organizationId/guardian-reviews/$relationshipId",
+                JSONObject().put("decision", decision).put("evidenceReviewed", true), auth = true)
+        }
+
+    suspend fun submitSchoolReport(organizationId: Int, learnerId: String, academicYear: Int): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val learner = learnerId.trim()
+            require(organizationId > 0 && learner.isNotEmpty() && learner.length <= 200 && academicYear in 2000..2200)
+            request("/api/organizations/$organizationId/report-issuance",
+                JSONObject().put("learnerId", learner).put("academicYear", academicYear), auth = true)
+        }
+
+    suspend fun decideSchoolReport(organizationId: Int, reportId: Int, action: String, reason: String): Unit =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val cleanReason = reason.trim()
+            require(organizationId > 0 && reportId > 0 && action in setOf("approve", "reject", "issue", "revoke") && cleanReason.length <= 1000)
+            require(action !in setOf("reject", "revoke") || cleanReason.isNotEmpty())
+            request("/api/organizations/$organizationId/report-issuance/$reportId/decision",
+                JSONObject().put("action", action).put("reason", cleanReason), auth = true)
         }
 
     suspend fun signOut(): Unit = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

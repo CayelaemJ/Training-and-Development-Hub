@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -196,6 +197,15 @@ class MainActivity : ComponentActivity() {
                         signInTest = { startTestSignIn() },
                         signOut = { signOut() },
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
+                        reviewGuardian = { organizationId, relationshipId, decision ->
+                            reviewGuardianRelationship(organizationId, relationshipId, decision)
+                        },
+                        submitSchoolReport = { organizationId, learnerId, year ->
+                            submitSchoolReport(organizationId, learnerId, year)
+                        },
+                        decideSchoolReport = { organizationId, reportId, action, reason ->
+                            decideSchoolReport(organizationId, reportId, action, reason)
+                        },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
@@ -393,6 +403,49 @@ class MainActivity : ComponentActivity() {
             } finally {
                 busy = false
             }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun reviewGuardianRelationship(organizationId: Int, relationshipId: Int, decision: String) {
+        if (demoActive || busy || organizationId <= 0 || relationshipId <= 0 || decision !in setOf("verified", "revoked")) return
+        busy = true
+        lifecycleScope.launch {
+            try {
+                api.reviewGuardianRelationship(organizationId, relationshipId, decision)
+                status = if (decision == "verified") "Guardian authority review recorded."
+                    else "Guardian access revoked."
+            } catch (_: Exception) {
+                status = "Could not update this guardian relationship. Refresh and check the school review requirements."
+            } finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun submitSchoolReport(organizationId: Int, learnerId: String, year: Int) {
+        if (demoActive || busy) return
+        busy = true
+        lifecycleScope.launch {
+            try {
+                api.submitSchoolReport(organizationId, learnerId, year)
+                status = "Report snapshot submitted for independent review."
+            } catch (_: Exception) {
+                status = "Could not submit this report. Check enrolment and published assessment results."
+            } finally { busy = false }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun decideSchoolReport(organizationId: Int, reportId: Int, action: String, reason: String) {
+        if (demoActive || busy || action !in setOf("approve", "reject", "issue", "revoke")) return
+        busy = true
+        lifecycleScope.launch {
+            try {
+                api.decideSchoolReport(organizationId, reportId, action, reason)
+                status = "Report workflow updated: ${action.replaceFirstChar { it.uppercase() }}."
+            } catch (_: Exception) {
+                status = "Report action failed. Check the two-reviewer rule, report status, integrity, and required reason."
+            } finally { busy = false }
             if (api.hasSession()) loadDashboard()
         }
     }
@@ -875,6 +928,9 @@ internal fun NativeHome(
     signInTest: () -> Unit,
     signOut: () -> Unit,
     respondToInvite: (Int, Boolean) -> Unit,
+    reviewGuardian: (Int, Int, String) -> Unit = { _, _, _ -> },
+    submitSchoolReport: (Int, String, Int) -> Unit = { _, _, _ -> },
+    decideSchoolReport: (Int, Int, String, String) -> Unit = { _, _, _, _ -> },
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
@@ -1059,6 +1115,8 @@ internal fun NativeHome(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
                                 respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
+                                reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
+                                decideSchoolReport = decideSchoolReport,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
@@ -1070,6 +1128,8 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive,
                             respondToInvite = respondToInvite,
+                            reviewGuardian = reviewGuardian, submitSchoolReport = submitSchoolReport,
+                            decideSchoolReport = decideSchoolReport,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -1137,6 +1197,9 @@ private fun RoleContent(
     busy: Boolean,
     demoActive: Boolean,
     respondToInvite: (Int, Boolean) -> Unit,
+    reviewGuardian: (Int, Int, String) -> Unit,
+    submitSchoolReport: (Int, String, Int) -> Unit,
+    decideSchoolReport: (Int, Int, String, String) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -1148,7 +1211,7 @@ private fun RoleContent(
     learnerJourneyAction: (LearnerJourneyAction) -> Unit
 ) {
     LazyColumn(
-        modifier.padding(horizontal = 16.dp),
+        modifier.padding(horizontal = 16.dp).testTag("native-role-content"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(bottom = 22.dp)
     ) {
@@ -1314,6 +1377,122 @@ private fun RoleContent(
                 "teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head" -> {
                     item { Text("Learner support queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     item { Text("Requests shown here are limited to subjects assigned to your account.", style = MaterialTheme.typography.bodyMedium) }
+                    data.guardianReviewWorkspaces.forEach { workspace ->
+                        item(key = "guardian-review-title:${workspace.organizationId}") {
+                            Text("Family access review · school ${workspace.organizationId}",
+                                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        }
+                        item(key = "guardian-review-guidance:${workspace.organizationId}") {
+                            Text("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.",
+                                style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+                        }
+                        if (workspace.reviews.isEmpty()) item(key = "guardian-review-empty:${workspace.organizationId}") {
+                            NativeCard("No family reviews awaiting action", "Accepted family invitations will appear here when they need school verification.")
+                        }
+                        workspace.reviews.forEach { review ->
+                            item(key = "guardian-review:${workspace.organizationId}:${review.id}") {
+                                var evidenceReviewed by remember(data, workspace.organizationId, review.id) { mutableStateOf(false) }
+                                ElevatedCard(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Guardian relationship ${review.id}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                        Text("Learner ${review.learnerId} · guardian ${review.guardianId}", style = MaterialTheme.typography.bodySmall)
+                                        Text("${review.status.replace('_', ' ')} · school review required",
+                                            style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+                                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                            Checkbox(
+                                                checked = evidenceReviewed,
+                                                onCheckedChange = { evidenceReviewed = it },
+                                                enabled = !busy,
+                                                modifier = Modifier.testTag("guardian-evidence-confirmation")
+                                            )
+                                            Text("I independently reviewed legal authority", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                        when (review.status) {
+                                            "accepted" -> Button(onClick = { reviewGuardian(workspace.organizationId, review.id, "verified") },
+                                                enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                                Text("Verify guardian access")
+                                            }
+                                            "verified" -> OutlinedButton(onClick = { reviewGuardian(workspace.organizationId, review.id, "revoked") },
+                                                enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                                Text("Revoke guardian access")
+                                            }
+                                            else -> Text("This relationship cannot be changed from its current status.", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    data.reportIssuanceWorkspaces.forEach { workspace ->
+                        item(key = "report-issuance-title:${workspace.organizationId}") {
+                            Text("School report workflow · school ${workspace.organizationId}",
+                                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        }
+                        item(key = "report-issuance-guidance:${workspace.organizationId}") {
+                            Text("Reports are snapshots of published assessments. Approval must come from a different authorised school administrator; issue only after reviewing the snapshot and integrity status.",
+                                style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+                        }
+                        item(key = "report-issuance-create:${workspace.organizationId}") {
+                            var learnerId by remember(data, workspace.organizationId) { mutableStateOf("") }
+                            var year by remember(data, workspace.organizationId) {
+                                mutableStateOf(java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).toString())
+                            }
+                            val parsedYear = year.toIntOrNull()
+                            ElevatedCard(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("Prepare a report", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    OutlinedTextField(value = learnerId, onValueChange = { learnerId = it.take(200) },
+                                        label = { Text("Enrolled learner account ID") }, singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(), enabled = !busy)
+                                    OutlinedTextField(value = year, onValueChange = { year = it.filter { char -> char.isDigit() }.take(4) },
+                                        label = { Text("Academic year") }, singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(), enabled = !busy)
+                                    Button(onClick = { parsedYear?.let { submitSchoolReport(workspace.organizationId, learnerId, it) } },
+                                        enabled = !busy && learnerId.isNotBlank() && parsedYear != null && parsedYear in 2000..2200,
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                        Text("Submit report for review")
+                                    }
+                                }
+                            }
+                        }
+                        if (workspace.records.isEmpty()) item(key = "report-issuance-empty:${workspace.organizationId}") {
+                            NativeCard("No report versions", "Submitted school reports will appear here for independent review.")
+                        }
+                        workspace.records.forEach { report ->
+                            item(key = "report-issuance:${workspace.organizationId}:${report.id}") {
+                                var reason by remember(data, workspace.organizationId, report.id) { mutableStateOf("") }
+                                ElevatedCard(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Learner ${report.learnerId}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                        Text("${report.academicYear} · version ${report.version} · ${report.status.replace('_', ' ')}",
+                                            style = MaterialTheme.typography.bodySmall)
+                                        Text("SHA-256 ${report.contentHash.take(24)}…", style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF68736B))
+                                        if (report.reviewedBy != null) Text("Independent reviewer recorded", style = MaterialTheme.typography.bodySmall)
+                                        if (report.status in setOf("submitted", "issued")) {
+                                            OutlinedTextField(value = reason, onValueChange = { reason = it.take(1000) },
+                                                label = { Text("Reason for rejection or revocation") },
+                                                modifier = Modifier.fillMaxWidth().testTag("report-reason-${report.id}"), enabled = !busy)
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                            when (report.status) {
+                                                "submitted" -> {
+                                                    OutlinedButton(onClick = { decideSchoolReport(workspace.organizationId, report.id, "reject", reason) },
+                                                        enabled = !busy && reason.isNotBlank()) { Text("Reject") }
+                                                    Button(onClick = { decideSchoolReport(workspace.organizationId, report.id, "approve", "") },
+                                                        enabled = !busy) { Text("Approve") }
+                                                }
+                                                "approved" -> Button(onClick = { decideSchoolReport(workspace.organizationId, report.id, "issue", "") },
+                                                    enabled = !busy) { Text("Issue report") }
+                                                "issued" -> OutlinedButton(onClick = { decideSchoolReport(workspace.organizationId, report.id, "revoke", reason) },
+                                                    enabled = !busy && reason.isNotBlank()) { Text("Revoke") }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (data.staff.isEmpty() || data.staff.all { it.tickets.isEmpty() })
                         item { NativeCard("No requests to show", data.staff.firstOrNull()?.notice ?: "New support requests for your assigned subjects will appear here.") }
                     data.staff.forEach { workspace ->

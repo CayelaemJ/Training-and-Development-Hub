@@ -8,6 +8,8 @@ This is the native Kotlin and Jetpack Compose app. Open this folder as the proje
 
 The normal build opens secure browser-based sign-in and points to the configured CABO API. Demo mode and test-login controls are compiled out of this build.
 
+The API origin is a build-time setting (`-PcaboApiOrigin=...`), not embedded in app screens. Render remains the current default/test host while the Cloudflare migration is in progress. Once the Cloudflare API endpoint is ready, build against its HTTPS origin; do not point native builds at the web UI or add a WebView wrapper.
+
 ## CABO role demo
 
 The internal demo opens a locally simulated CABO workspace without a login or backend. Switch between the **Child**, **Teacher** and **Parent** roles from the preview bar; each role has its own Home, Learn, Progress and Help/Family/Support areas.
@@ -24,6 +26,8 @@ Every record is fictional. Demo actions stay in memory on the device and never w
   -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
   -PcaboEnableDemoMode=true
 ```
+
+For the Cloudflare deployment, replace the origin with the deployed Worker/API HTTPS hostname; keep the route and authentication contract unchanged.
 
 The default build never exposes demo mode. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
 

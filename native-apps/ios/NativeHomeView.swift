@@ -15,6 +15,7 @@ struct NativeHomeView: View {
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
+    @State private var reviewedGuardianEvidence: Set<Int> = []
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let clay = Color(red: 196.0 / 255.0, green: 103.0 / 255.0, blue: 58.0 / 255.0)
     private let gold = Color(red: 201.0 / 255.0, green: 168.0 / 255.0, blue: 76.0 / 255.0)
@@ -62,6 +63,7 @@ struct NativeHomeView: View {
                 selectedMaterial = nil
                 selectedStaffTicket = nil
                 testPassword = ""
+                reviewedGuardianEvidence = []
             }
         }
         .sheet(item: $selectedQuiz) { quiz in
@@ -348,6 +350,59 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
+        ForEach(session.guardianReviewWorkspaces) { workspace in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Family access review · school \(workspace.organizationId)")
+                    .font(.headline).accessibilityAddTraits(.isHeader)
+                Text("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.")
+                    .font(.footnote).foregroundColor(.secondary)
+                if workspace.reviews.isEmpty {
+                    Text("No family reviews awaiting action.")
+                        .font(.subheadline).foregroundColor(.secondary)
+                }
+                ForEach(workspace.reviews) { review in
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text("Guardian relationship \(review.id)").font(.subheadline.bold())
+                        Text("Learner \(review.learnerId) · guardian \(review.guardianId)")
+                            .font(.caption).foregroundColor(.secondary)
+                        Text("\(review.status.replacingOccurrences(of: "_", with: " ")) · school review required")
+                            .font(.caption).foregroundColor(.secondary)
+                        Toggle("I independently reviewed legal authority",
+                               isOn: Binding(
+                                get: { reviewedGuardianEvidence.contains(review.id) },
+                                set: { value in
+                                    if value { reviewedGuardianEvidence.insert(review.id) }
+                                    else { reviewedGuardianEvidence.remove(review.id) }
+                                }))
+                            .font(.footnote).disabled(session.busy)
+                        if review.status == "accepted" {
+                            Button("Verify guardian access") {
+                                Task { await session.reviewGuardianRelationship(
+                                    organizationId: workspace.organizationId, relationshipId: review.id,
+                                    decision: "verified", evidenceReviewed: reviewedGuardianEvidence.contains(review.id)) }
+                            }
+                            .buttonStyle(.borderedProminent).disabled(session.busy || !reviewedGuardianEvidence.contains(review.id))
+                        } else if review.status == "verified" {
+                            Button("Revoke guardian access", role: .destructive) {
+                                Task { await session.reviewGuardianRelationship(
+                                    organizationId: workspace.organizationId, relationshipId: review.id,
+                                    decision: "revoked", evidenceReviewed: reviewedGuardianEvidence.contains(review.id)) }
+                            }
+                            .buttonStyle(.bordered).disabled(session.busy || !reviewedGuardianEvidence.contains(review.id))
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        ForEach(session.reportIssuanceWorkspaces) { workspace in
+            NativeReportIssuanceSection(session: session, workspace: workspace)
+        }
         Text("Actions are limited by your server-assigned school and course permissions.")
             .font(.footnote).foregroundColor(.secondary)
     }
@@ -523,6 +578,102 @@ struct NativeHomeView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct NativeReportIssuanceSection: View {
+    @ObservedObject var session: NativeSession
+    let workspace: NativeReportIssuanceWorkspace
+    @State private var learnerId = ""
+    @State private var academicYear = Calendar.current.component(.year, from: Date())
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("School report workflow · school \(workspace.organizationId)")
+                .font(.headline).accessibilityAddTraits(.isHeader)
+            Text("Reports are snapshots of published assessments. Approval must come from a different authorised school administrator. The server checks content integrity before issue.")
+                .font(.footnote).foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Prepare a report").font(.subheadline.bold())
+                TextField("Enrolled learner account ID", text: $learnerId)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder).disabled(session.busy)
+                TextField("Academic year", value: $academicYear, format: .number)
+                    .keyboardType(.numberPad).textFieldStyle(.roundedBorder).disabled(session.busy)
+                Button("Submit report for review") {
+                    Task { await session.submitSchoolReport(organizationId: workspace.organizationId,
+                        learnerId: learnerId, academicYear: academicYear) }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(session.busy || learnerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !(2000...2200).contains(academicYear))
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+
+            if workspace.records.isEmpty {
+                Text("No report versions. Submitted school reports will appear here for independent review.")
+                    .font(.subheadline).foregroundColor(.secondary)
+            }
+            ForEach(workspace.records) { record in
+                NativeReportIssuanceRow(session: session, organizationId: workspace.organizationId, record: record)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct NativeReportIssuanceRow: View {
+    @ObservedObject var session: NativeSession
+    let organizationId: Int
+    let record: NativeReportIssuanceRecord
+    @State private var reason = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Learner \(record.learnerId)").font(.subheadline.bold())
+            Text("\(record.academicYear) · version \(record.version) · \(record.status.replacingOccurrences(of: "_", with: " "))")
+                .font(.caption).foregroundColor(.secondary)
+            Text("SHA-256 \(String(record.contentHash.prefix(24)))…")
+                .font(.caption.monospaced()).foregroundColor(.secondary).textSelection(.enabled)
+            if record.reviewedBy != nil {
+                Label("Independent reviewer recorded", systemImage: "person.2")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            if ["submitted", "issued"].contains(record.status) {
+                TextField("Reason for rejection or revocation", text: $reason)
+                    .textFieldStyle(.roundedBorder).disabled(session.busy)
+            }
+            HStack {
+                switch record.status {
+                case "submitted":
+                    Button("Reject", role: .destructive) { decide("reject") }
+                        .buttonStyle(.bordered).disabled(session.busy || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Approve") { decide("approve") }
+                        .buttonStyle(.borderedProminent).disabled(session.busy)
+                case "approved":
+                    Button("Issue report") { decide("issue") }
+                        .buttonStyle(.borderedProminent).disabled(session.busy)
+                case "issued":
+                    Button("Revoke", role: .destructive) { decide("revoke") }
+                        .buttonStyle(.bordered).disabled(session.busy || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                default:
+                    EmptyView()
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func decide(_ action: String) {
+        Task {
+            await session.decideSchoolReport(organizationId: organizationId, reportId: record.id,
+                                             action: action, reason: reason)
+        }
     }
 }
 
