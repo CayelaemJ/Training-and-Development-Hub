@@ -12,7 +12,7 @@
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundleVersion</key><string>1</string>
   <!-- Set these only in a signed, disposable test configuration. -->
-  <key>CABO_API_ORIGIN</key><string>https://cabo-learning-hub-pilot.onrender.com</string>
+  <key>CABO_API_ORIGIN</key><string>$(CABO_API_ORIGIN)</string>
   <key>CABO_ENABLE_TEST_LOGIN</key><false/>
   <key>LSRequiresIPhoneOS</key><true/>
   <key>CFBundleURLTypes</key>

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -196,6 +197,9 @@ class MainActivity : ComponentActivity() {
                         signInTest = { startTestSignIn() },
                         signOut = { signOut() },
                         respondToInvite = { invitationId, accept -> respondToInvite(invitationId, accept) },
+                        reviewGuardian = { organizationId, relationshipId, decision ->
+                            reviewGuardianRelationship(organizationId, relationshipId, decision)
+                        },
                         openSupportTicket = { openSupportTicket(it) },
                         openQuiz = { openQuiz(it) },
                         openMaterial = { openMaterial(it) },
@@ -393,6 +397,21 @@ class MainActivity : ComponentActivity() {
             } finally {
                 busy = false
             }
+            if (api.hasSession()) loadDashboard()
+        }
+    }
+
+    private fun reviewGuardianRelationship(organizationId: Int, relationshipId: Int, decision: String) {
+        if (demoActive || busy || organizationId <= 0 || relationshipId <= 0 || decision !in setOf("verified", "revoked")) return
+        busy = true
+        lifecycleScope.launch {
+            try {
+                api.reviewGuardianRelationship(organizationId, relationshipId, decision)
+                status = if (decision == "verified") "Guardian authority review recorded."
+                    else "Guardian access revoked."
+            } catch (_: Exception) {
+                status = "Could not update this guardian relationship. Refresh and check the school review requirements."
+            } finally { busy = false }
             if (api.hasSession()) loadDashboard()
         }
     }
@@ -875,6 +894,7 @@ internal fun NativeHome(
     signInTest: () -> Unit,
     signOut: () -> Unit,
     respondToInvite: (Int, Boolean) -> Unit,
+    reviewGuardian: (Int, Int, String) -> Unit = { _, _, _ -> },
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
     openMaterial: (MaterialSummary) -> Unit,
@@ -1058,7 +1078,8 @@ internal fun NativeHome(
                             RoleContent(
                                 modifier = Modifier.weight(1f).fillMaxHeight(), data = data,
                                 section = section, busy = busy, demoActive = demoActive,
-                                respondToInvite = respondToInvite, createSupportRequest = createSupportRequest,
+                                respondToInvite = respondToInvite, reviewGuardian = reviewGuardian,
+                                createSupportRequest = createSupportRequest,
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
@@ -1070,6 +1091,7 @@ internal fun NativeHome(
                             modifier = Modifier.fillMaxSize(), data = data, section = section, busy = busy,
                             demoActive = demoActive,
                             respondToInvite = respondToInvite,
+                            reviewGuardian = reviewGuardian,
                             createSupportRequest = createSupportRequest, openSupportTicket = openSupportTicket,
                             openQuiz = openQuiz, openMaterial = openMaterial, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
@@ -1137,6 +1159,7 @@ private fun RoleContent(
     busy: Boolean,
     demoActive: Boolean,
     respondToInvite: (Int, Boolean) -> Unit,
+    reviewGuardian: (Int, Int, String) -> Unit,
     createSupportRequest: () -> Unit,
     openSupportTicket: (SupportTicketSummary) -> Unit,
     openQuiz: (QuizSummary) -> Unit,
@@ -1314,6 +1337,52 @@ private fun RoleContent(
                 "teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head" -> {
                     item { Text("Learner support queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     item { Text("Requests shown here are limited to subjects assigned to your account.", style = MaterialTheme.typography.bodyMedium) }
+                    data.guardianReviewWorkspaces.forEach { workspace ->
+                        item(key = "guardian-review-title:${workspace.organizationId}") {
+                            Text("Family access review · school ${workspace.organizationId}",
+                                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        }
+                        item(key = "guardian-review-guidance:${workspace.organizationId}") {
+                            Text("Confirm legal authority using your school's safeguarding process. CABO does not collect or upload identity documents here.",
+                                style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+                        }
+                        if (workspace.reviews.isEmpty()) item(key = "guardian-review-empty:${workspace.organizationId}") {
+                            NativeCard("No family reviews awaiting action", "Accepted family invitations will appear here when they need school verification.")
+                        }
+                        workspace.reviews.forEach { review ->
+                            item(key = "guardian-review:${workspace.organizationId}:${review.id}") {
+                                var evidenceReviewed by remember(data, workspace.organizationId, review.id) { mutableStateOf(false) }
+                                ElevatedCard(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Guardian relationship ${review.id}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                        Text("Learner ${review.learnerId} · guardian ${review.guardianId}", style = MaterialTheme.typography.bodySmall)
+                                        Text("${review.status.replace('_', ' ')} · school review required",
+                                            style = MaterialTheme.typography.bodySmall, color = Color(0xFF68736B))
+                                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                            Checkbox(
+                                                checked = evidenceReviewed,
+                                                onCheckedChange = { evidenceReviewed = it },
+                                                enabled = !busy,
+                                                modifier = Modifier.testTag("guardian-evidence-confirmation")
+                                            )
+                                            Text("I independently reviewed legal authority", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                        when (review.status) {
+                                            "accepted" -> Button(onClick = { reviewGuardian(workspace.organizationId, review.id, "verified") },
+                                                enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                                Text("Verify guardian access")
+                                            }
+                                            "verified" -> OutlinedButton(onClick = { reviewGuardian(workspace.organizationId, review.id, "revoked") },
+                                                enabled = evidenceReviewed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                                Text("Revoke guardian access")
+                                            }
+                                            else -> Text("This relationship cannot be changed from its current status.", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (data.staff.isEmpty() || data.staff.all { it.tickets.isEmpty() })
                         item { NativeCard("No requests to show", data.staff.firstOrNull()?.notice ?: "New support requests for your assigned subjects will appear here.") }
                     data.staff.forEach { workspace ->
