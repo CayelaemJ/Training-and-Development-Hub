@@ -31,6 +31,7 @@ struct NativeStaffSupportTicket: Codable, Identifiable {
     let version: Int
     var assignedTo: String? = nil
     var reviewAt: String? = nil
+    var feedback: String? = nil
     var educators: [NativeSupportEducator]? = nil
 }
 struct NativeSupportEducator: Codable, Identifiable { let id: String; let firstName: String?; let lastName: String? }
@@ -90,7 +91,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var journeyIdentity = NativeJourneyIdentity(displayName: "")
     @Published var journeyEntries: [NativeJourneyEntry] = []
     @Published var journeyMilestones: [NativeJourneyMilestone] = []
-    @Published var learnerHelp: [String] = []
+    @Published var learnerHelp: [NativeStaffSupportTicket] = []
     @Published var learnerReports: [NativeLearnerReport] = []
     @Published var learnerReportNotice = ""
     @Published var supportCourses: [NativeSupportCourse] = []
@@ -304,7 +305,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextJourneyIdentity = NativeJourneyIdentity(displayName: "")
             var nextJourneyEntries: [NativeJourneyEntry] = []
             var nextJourneyMilestones: [NativeJourneyMilestone] = []
-            var nextLearnerHelp: [String] = []
+            var nextLearnerHelp: [NativeStaffSupportTicket] = []
             var nextLearnerReports: [NativeLearnerReport] = []
             var nextLearnerReportNotice = ""
             var nextMaterials: [String] = []
@@ -450,8 +451,15 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                        let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                         let items = Array((obj["items"] as? [[String: Any]] ?? []).prefix(15))
                         nextLearnerHelp += items.compactMap { row in
-                            guard let topic = row["concept"] as? String else { return nil }
-                            return "\(String(topic.prefix(80))) · \(row["status"] as? String ?? "open")"
+                            guard let id = row["id"] as? Int, let ticketOrg = row["organizationId"] as? Int,
+                                  let courseId = row["courseId"] as? Int, let topic = row["concept"] as? String,
+                                  let question = row["question"] as? String, let attempted = row["attempted"] as? String,
+                                  let status = row["status"] as? String, let version = row["version"] as? Int else { return nil }
+                            return NativeStaffSupportTicket(id: id, organizationId: ticketOrg, courseId: courseId,
+                                concept: String(topic.prefix(160)), question: String(question.prefix(4000)),
+                                attempted: String(attempted.prefix(2000)), status: String(status.prefix(32)),
+                                version: max(1, version), reviewAt: row["reviewAt"] as? String,
+                                feedback: row["feedback"] as? String)
                         }
                     }
                 }
@@ -607,7 +615,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func loadStaffSupportTicket(_ ticket: NativeStaffSupportTicket) async throws -> NativeStaffSupportTicket {
-        guard ["teacher", "assessor"].contains(role ?? "") else { throw NSError(domain: "CABO", code: 403) }
+        guard ["teacher", "assessor", "learner"].contains(role ?? "") else { throw NSError(domain: "CABO", code: 403) }
         let data = try await request("api/organizations/\(ticket.organizationId)/support/\(ticket.id)")
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         guard let raw = object["ticket"] as? [String: Any], raw["id"] as? Int == ticket.id else {
@@ -621,7 +629,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             concept: ticket.concept, question: String((raw["question"] as? String ?? ticket.question).prefix(4000)),
             attempted: String((raw["attempted"] as? String ?? ticket.attempted).prefix(2000)),
             status: raw["status"] as? String ?? ticket.status, version: raw["version"] as? Int ?? ticket.version,
-            assignedTo: raw["assignedTo"] as? String, reviewAt: raw["reviewAt"] as? String, educators: educators)
+            assignedTo: raw["assignedTo"] as? String, reviewAt: raw["reviewAt"] as? String,
+            feedback: raw["feedback"] as? String, educators: educators)
     }
 
     func assignSupportTicket(_ ticket: NativeStaffSupportTicket, staffId: String) async throws {
@@ -636,6 +645,25 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         let reviewAt = ISO8601DateFormatter().string(from: date)
         try await sendStaffSupportAction(ticket, action: ["kind": "practice", "body": String(clean.prefix(4000)), "reviewAt": reviewAt])
+    }
+
+    func respondToSupportTicket(_ ticket: NativeStaffSupportTicket, feedback: String) async throws {
+        guard role == "learner", ["helpful", "needs_more_help"].contains(feedback) else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "version": ticket.version,
+            "action": ["kind": "feedback", "feedback": feedback]
+        ])
+        let data = try await request("api/organizations/\(ticket.organizationId)/support/\(ticket.id)/actions",
+                                     method: "POST", body: body)
+        guard let updated = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              updated["id"] as? Int == ticket.id,
+              (updated["version"] as? Int ?? 0) == ticket.version + 1 else {
+            throw NSError(domain: "CABO", code: 409,
+                          userInfo: [NSLocalizedDescriptionKey: "This request changed. Refresh before trying again."])
+        }
+        await refresh()
     }
 
     private func sendStaffSupportAction(_ ticket: NativeStaffSupportTicket, action: [String: Any]) async throws {

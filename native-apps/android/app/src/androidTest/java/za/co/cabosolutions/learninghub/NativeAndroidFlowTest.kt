@@ -201,6 +201,43 @@ class NativeAndroidSupportTest {
     }
 
     @Test
+    fun learnerCanRecordWhetherSupportHelped() {
+        var feedback = ""
+        val ticket = SupportTicket(
+            SupportTicketSummary(3, 18, "Fractions", "awaiting_learner", 2, "", reviewAt = "2026-11-02T09:00:00Z"),
+            "How do I add unlike fractions?", "I added the denominators.",
+            listOf(SupportTicketEvent("reply", "Find a common denominator first.", "Today"))
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeSupportTicketScreen(
+                    ticket = ticket,
+                    canManageSupport = false,
+                    reply = "",
+                    onReply = {},
+                    triageReason = "",
+                    onTriageReason = {},
+                    guidance = null,
+                    busy = false,
+                    message = null,
+                    requestGuidance = {},
+                    useGuidance = {},
+                    sendReply = {},
+                    triage = {},
+                    assign = {},
+                    schedulePractice = { _, _ -> },
+                    close = {},
+                    isLearnerOwner = true,
+                    submitFeedback = { feedback = it }
+                )
+            }
+        }
+
+        compose.onNodeWithText("I understood the help").performScrollTo().performClick()
+        assertEquals("helpful", feedback)
+    }
+
+    @Test
     fun learnerCanCreateSyntheticDemoSupportRequest() {
         var submitted: List<String>? = null
         compose.setContent {

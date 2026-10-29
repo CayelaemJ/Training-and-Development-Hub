@@ -29,7 +29,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | Platform administration | — | — | — | Superadmin | Read-only organisation list only |
 | Organizations, academics, governance, records | Role scoped | Verified family records | Assigned school scope | Role scoped | Missing native management flows |
 | Materials, practice quizzes, written exams | Learn and submit | — | Create/assign/review | Assigned scope | Materials and practice quizzes partial on Android/iOS; written exams missing |
-| Support requests and learner-help queue | Create and follow | — | Read/reply/triage/assign/practice checkpoints | Assigned oversight | Android and iOS support educator flows include assigned-course request access, replies, triage, authorised educator assignment and review checkpoints; learner feedback, outcome evidence, Learning DNA and full status lifecycle remain incomplete |
+| Support requests and learner-help queue | Create and follow | — | Read/reply/triage/assign/practice checkpoints | Assigned oversight | Android and iOS support educator flows include assigned-course request access, replies, triage, authorised educator assignment and review checkpoints; learner support request detail and feedback are implemented on Android/iOS; evidence-based outcomes, Learning DNA and full status lifecycle remain incomplete |
 
 Roles and page access must always come from the authenticated backend response. Native navigation may hide unavailable pages for usability, but it cannot grant access or infer authorization from the device.
 

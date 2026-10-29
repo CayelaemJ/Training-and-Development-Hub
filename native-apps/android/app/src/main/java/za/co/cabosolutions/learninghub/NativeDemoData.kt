@@ -29,6 +29,7 @@ internal object NativeDemoData {
             quizzes = listOf("Fractions checkpoint", "Reading comprehension"),
             journey = listOf("Current stage: Form 2", "4 learning milestones", "Next review: end of term"),
             learnerHelp = helpSummary,
+            learnerSupportTickets = listOf(demoTicket.summary),
             materialEntries = listOf(
                 MaterialSummary(73011, "Fractions made visual"),
                 MaterialSummary(73012, "Reading with evidence")

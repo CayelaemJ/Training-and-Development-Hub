@@ -155,7 +155,9 @@ class MainActivity : ComponentActivity() {
                         triage = { triageSupportTicket() },
                         assign = { staffId -> assignSupportEducator(staffId) },
                         schedulePractice = { body, reviewAt -> scheduleSupportPractice(body, reviewAt) },
-                        close = { closeSupportTicket() }
+                        close = { closeSupportTicket() },
+                        isLearnerOwner = (!demoActive && screen?.portal?.role == "learner") || (demoActive && demoRole == "learner"),
+                        submitFeedback = { value -> submitLearnerSupportFeedback(value) }
                     )
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
@@ -634,11 +636,15 @@ class MainActivity : ComponentActivity() {
 
     private fun updateSupportSummary(summary: SupportTicketSummary) {
         screen = screen?.let { current ->
+            val learnerTickets = current.learnerSupportTickets.map {
+                if (it.id == summary.id && it.organizationId == summary.organizationId) summary else it
+            }
             current.copy(staff = current.staff.map { workspace ->
                 if (workspace.organizationId != summary.organizationId) workspace else workspace.copy(
                     tickets = workspace.tickets.map { if (it.id == summary.id) summary else it }
                 )
-            })
+            }, learnerSupportTickets = learnerTickets,
+                learnerHelp = learnerTickets.map { "${it.concept} · ${it.status.replace('_', ' ')}" })
         }
     }
 
@@ -777,6 +783,29 @@ class MainActivity : ComponentActivity() {
                 supportMessage = "Practice and review checkpoint saved."
             } catch (_: Exception) { supportMessage = "Could not save the practice checkpoint. Choose a future time and retry." }
             finally { supportBusy = false }
+        }
+    }
+
+    private fun submitLearnerSupportFeedback(value: String) {
+        val current = supportTicket ?: return
+        if (supportBusy) return
+        if (demoActive) {
+            supportTicket = NativeDemoSession.feedback(current.summary, value)
+            updateSupportSummary(supportTicket!!.summary)
+            supportMessage = "Synthetic demo feedback saved on this device. Nothing was sent to a school."
+            return
+        }
+        supportBusy = true; supportMessage = null
+        lifecycleScope.launch {
+            try {
+                val updated = api.submitLearnerSupportFeedback(current, value)
+                updateSupportSummary(updated)
+                supportTicket = api.fetchSupportTicket(updated)
+                selectedSupportTicket = supportTicket?.summary
+                supportMessage = if (value == "helpful") "Thanks for letting your educator know." else "Your educator will see that you still need help."
+            } catch (_: Exception) {
+                supportMessage = "Could not send your response. Refresh this request and try again."
+            } finally { supportBusy = false }
         }
     }
 }
@@ -1278,8 +1307,17 @@ private fun RoleContent(
                             }
                         }
                     }
-                    if (data.learnerHelp.isEmpty()) item { NativeCard("No open requests", "When you ask your school for help, updates will appear here.") }
-                    items(data.learnerHelp) { NativeCard(it, "Your personal support request") }
+                    if (data.learnerSupportTickets.isEmpty()) item { NativeCard("No open requests", "When you ask your school for help, updates will appear here.") }
+                    items(data.learnerSupportTickets, key = { "learner-ticket:${it.organizationId}:${it.id}" }) { ticket ->
+                        ElevatedCard(onClick = { openSupportTicket(ticket) }, modifier = Modifier.fillMaxWidth(), enabled = !busy) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(ticket.concept, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text("${ticket.status.replace('_', ' ')} · request ${ticket.id}", style = MaterialTheme.typography.bodySmall)
+                                ticket.reviewAt?.let { Text("Practice review · $it", style = MaterialTheme.typography.bodySmall) }
+                                Text("View request and reply  ›", style = MaterialTheme.typography.labelLarge, color = Color(0xFFC4673A))
+                            }
+                        }
+                    }
                     if (demoActive) item {
                         Button(onClick = createSupportRequest, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                             Text("Ask your educator for help")

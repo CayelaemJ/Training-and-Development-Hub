@@ -57,4 +57,22 @@ internal object NativeDemoSession {
         )
         return current
     }
+
+    fun feedback(summary: SupportTicketSummary, value: String): SupportTicket {
+        require(summary.id == current.summary.id && summary.version == current.summary.version)
+        require(value in setOf("helpful", "needs_more_help"))
+        current = current.copy(
+            summary = current.summary.copy(
+                version = current.summary.version + 1,
+                feedback = value,
+                status = if (value == "needs_more_help") "in_progress" else current.summary.status
+            ),
+            history = current.history + SupportTicketEvent(
+                "feedback",
+                if (value == "helpful") "Learner understood the assistance." else "Learner requested further assistance.",
+                "Just now · demo"
+            )
+        )
+        return current
+    }
 }
