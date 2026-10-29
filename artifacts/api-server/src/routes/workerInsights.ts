@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
+import { schoolManager } from "./reportCards";
 
 /**
  * Feature-gated internal integration; accepts only pre-aggregated, coded
@@ -33,11 +34,19 @@ const outputSchema = z.object({
   disclaimer: z.string().max(180),
 }).strict();
 
-router.post("/learning/insights/draft", async (req, res) => {
+router.post("/organizations/:orgId/learning/insights/draft", async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   if (!req.isAuthenticated()) { res.sendStatus(401); return; }
   if (process.env.ENABLE_CABO_DJANGO_INSIGHTS !== "true") {
     res.status(404).json({error: "Learning insights draft is not enabled"});
+    return;
+  }
+  const org = z.coerce.number().int().positive().safeParse(req.params.orgId);
+  if (!org.success) { res.sendStatus(400); return; }
+  // Only institution managers can submit exploratory aggregate metrics.
+  // This is not a substitute for verified source data or teacher review.
+  if (!await schoolManager(org.data, req.user!.id)) {
+    res.sendStatus(403);
     return;
   }
   const parsed = inputSchema.safeParse(req.body);
@@ -50,8 +59,13 @@ router.post("/learning/insights/draft", async (req, res) => {
   let target: URL;
   try {
     if (!rawUrl || !token || token.length < 24) throw Error("Not configured");
-    target = new URL("/v1/insights/draft", rawUrl);
-    if (target.protocol !== "https:" || target.username || target.password) throw Error("Insecure worker URL");
+    const base = new URL(rawUrl);
+    if (base.protocol !== "https:" || base.username || base.password ||
+        base.port || base.search || base.hash ||
+        base.hostname !== "cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev") {
+      throw Error("Unapproved worker origin");
+    }
+    target = new URL("/v1/insights/draft", base);
   } catch {
     res.status(503).json({error: "Learning insights worker is not configured"});
     return;
