@@ -8,8 +8,10 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
 import { logger } from "./lib/logger";
-import {permittedBrowserOrigin} from "./lib/originPolicy";
+import {permittedBrowserOrigin, permittedMutationOrigin} from "./lib/originPolicy";
 import {apiRateLimit} from "./middlewares/rateLimit";
+import { safeRequestCategory, safeErrorType, safeRequestReference } from "./lib/httpPrivacy";
+import { randomUUID } from "node:crypto";
 
 const app: Express = express();
 app.set("trust proxy", process.env.TRUST_PROXY_HOPS === "1" ? 1 : false);
@@ -22,7 +24,7 @@ app.use(
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          routeGroup: safeRequestCategory(req.url),
         };
       },
       res(res) {
@@ -35,7 +37,7 @@ app.use(
 );
 app.use((req,res,next)=>{res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("X-Frame-Options","DENY");next()});
 app.use(cors({credentials:true,origin:(origin,callback)=>callback(null,origin&&permittedBrowserOrigin(origin,process.env)?origin:false)}));
-app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedBrowserOrigin(req.headers.origin,process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
+app.use((req,res,next)=>{if(["POST","PATCH","PUT","DELETE"].includes(req.method)&&!permittedMutationOrigin({origin:req.headers.origin,referer:req.headers.referer,cookie:req.headers.cookie},process.env)){res.status(403).json({error:"Untrusted browser origin"});return}next()});
 // Protect the API before parsing bodies or retrieving sessions.
 app.use("/api", apiRateLimit);
 app.use(cookieParser());
@@ -57,7 +59,20 @@ app.use((error: any, _req: express.Request, res: express.Response, next: express
   next(error);
 });
 
-// Optional single-origin Railway deployment: deliver the built React SPA from the API server.
+// Final privacy-preserving API error boundary: never print raw exception
+// messages, learner IDs, document names, auth tokens or SQL text.
+app.use((error: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) { next(error); return; }
+  const requestId = safeRequestReference((req as express.Request & {id?: unknown}).id) ?? randomUUID();
+  req.log.error({
+    requestId, errorType: safeErrorType(error), method: req.method,
+    routeGroup: safeRequestCategory(req.originalUrl), statusCode: 500,
+  }, "Unhandled request failure");
+  res.setHeader("Cache-Control", "no-store");
+  res.status(500).json({ error: "This request could not be completed.", reference: requestId });
+});
+
+// Optional single-origin deployment: deliver the built React SPA from the API server.
 // Keep /api separate so unknown API requests do not receive HTML.
 const uiDist = path.resolve(process.cwd(), process.env.FRONTEND_DIST_DIR || "artifacts/training-platform/dist/public");
 if (fs.existsSync(path.join(uiDist, "index.html"))) {
