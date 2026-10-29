@@ -93,7 +93,7 @@ internal fun NativeEducationCommandScreen(
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(school.name, style = MaterialTheme.typography.titleMedium)
                             Text(
-                                school.learnerCount?.let { "At least $it active verified learners" }
+                                school.learnerCount?.let { "Active verified learners: $it" }
                                     ?: "Learner count suppressed for privacy (fewer than ${result.minimumCohort})",
                                 style = MaterialTheme.typography.bodyMedium
                             )
