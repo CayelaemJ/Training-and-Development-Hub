@@ -952,3 +952,60 @@ class NativeEducationCommandPrivacyTest {
         compose.onNodeWithText("CABO has not verified this as national or official education data.").assertIsDisplayed()
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeSchoolIntelligencePrivacyTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun signalsAreLabeledForHumanReviewAndAttendanceAsRecordedData() {
+        compose.setContent {
+            MaterialTheme {
+                NativeSchoolIntelligenceScreen(
+                    organizationName = "Cabo Valley School",
+                    yearText = "2026",
+                    snapshot = SchoolIntelligenceSnapshot(
+                        year = 2026,
+                        attendanceRecords = 3,
+                        attendanceCounts = mapOf("present" to 2, "absent" to 1),
+                        studentsReviewed = 1,
+                        attentionNeeded = 1,
+                        learners = listOf(SchoolIntelligenceLearner(
+                            learnerId = "learner-123",
+                            grade = "Form 2",
+                            average = 45.0,
+                            attendanceRate = 66.0,
+                            subjectsAtRisk = listOf("Mathematics"),
+                            supportPlans = 1
+                        )),
+                        subjectBelow = 50.0,
+                        attendanceBelow = 80.0,
+                        officialDistrictData = false
+                    ),
+                    busy = false,
+                    message = null,
+                    onYearText = {},
+                    refresh = {},
+                    close = {}
+                )
+            }
+        }
+
+        val content = compose.onNodeWithTag("school-intelligence-content")
+        content.performScrollToNode(hasText("Low marks and absences are prompts for human support. They are not automated punishments, psychological labels or progression decisions."))
+        compose.onNodeWithText("Educator review only").assertIsDisplayed()
+        content.performScrollToNode(hasText(
+            "Only accounts authorised by this school can load these records. Attendance figures are recorded entries, not verified district data.",
+            substring = true
+        ))
+        compose.onNodeWithText(
+            "Only accounts authorised by this school can load these records. Attendance figures are recorded entries, not verified district data.",
+            substring = true
+        ).assertIsDisplayed()
+        content.performScrollToNode(hasText("learner-123"))
+        compose.onNodeWithText("Educator review: Mathematics").assertExists()
+        compose.onNodeWithText("Official district data").assertExists()
+    }
+}

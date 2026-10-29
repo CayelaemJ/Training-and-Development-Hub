@@ -15,6 +15,7 @@ targets:
       - path: CABOLearningHubApp.swift
       - path: NativeHomeView.swift
       - path: NativeEducationCommandView.swift
+      - path: NativeSchoolIntelligenceView.swift
       - path: NativeSession.swift
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift
