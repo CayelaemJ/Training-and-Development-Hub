@@ -1281,7 +1281,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     }
 
     func generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String) async throws -> NativeWrittenExam {
-        guard role == "learner", materialId > 0, (1...10).contains(questionCount),
+        guard ["learner", "owner", "admin"].contains(role ?? ""), materialId > 0, (1...10).contains(questionCount),
               ["beginner", "intermediate", "advanced"].contains(difficulty) else {
             throw NSError(domain: "CABO", code: 403)
         }
