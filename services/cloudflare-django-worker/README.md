@@ -73,3 +73,17 @@ The repository includes a pipeline parameter `deploy_django_staging` (default `f
 - `CABO_ENVIRONMENT=staging` and `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` (both required by the CI deploy preflight; do not add these approval flags to production).
 
 Restrict context access to approved maintainers and staging jobs; do not use live student records. The job writes secrets to a temporary mode-0600 file, deploys via Pywrangler, deletes that file, then runs `node scripts/test-django-worker-staging.mjs` to check HTTP health, authentication, advisory output, and privacy rejection. A failed test is a failed release even if the Worker upload succeeded: revert staging before proceeding. **There is currently no authorised Cloudflare deployment credential configured in this connected environment, so this remains a prepared, untriggered workflow.**
+
+## Local cold-start diagnostics
+
+Before an approved staging deployment, the gated `django_worker_local_smoke` job exercises **real local workerd HTTP** with synthetic-only metrics. It never uses Cloudflare or database credentials, and the test runner forwards only a small allowlist of operating-system variables to workerd.
+
+The local test reports two distinct phases:
+- `listener=false`: Wrangler/workerd did not open the local TCP port; investigate CLI startup, runtime availability and resource starvation.
+- `listener=true`, `lastHttpStatus=none`: the TCP listener opened but no HTTP response arrived; investigate initial Python/Pyodide isolation, imported dependencies, or resource pressure.
+- `lastHttpStatus=400`: check `DJANGO_ALLOWED_HOST` and the exact `Host` request header. The test deliberately sends a forged host and expects its rejection.
+- A `PASS` requires the complete warmed HTTP contract: health, unauthorised and invalid-bearer rejection, authorised advisory output, extra-field rejection and forged-host rejection. A listening socket is **not** a passing result.
+
+In an isolated low-resource test environment on 29 October 2026, a minimal JavaScript Worker also took minutes to become responsive, while the Django/Python Worker packaged approximately 41 MiB across 7,112 modules and did not complete its initial local HTTP response within six minutes. This is **not** proof that a deployed Worker is broken: Cloudflare's production Python Workers use deploy-time memory snapshots, whereas the local `workerd` path performs additional initialization. See [Cloudflare's Python Worker lifecycle](https://developers.cloudflare.com/workers/languages/python/how-python-workers-work/).
+
+**Do not remove or waive the local smoke gate to force a release.** Investigate runtime cold start with resource-aware CI, retain bounded timeouts, and subsequently verify the real staging Worker with `node scripts/test-django-worker-staging.mjs`. The pilot remains disabled unless all protected staging and privacy controls pass.
