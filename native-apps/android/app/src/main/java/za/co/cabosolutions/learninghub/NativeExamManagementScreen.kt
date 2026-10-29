@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +43,8 @@ internal fun NativeExamManagementScreen(
     val examSelections = remember { mutableStateMapOf<Int, Int>() }
     val deadlines = remember { mutableStateMapOf<Int, String>() }
     val reasons = remember { mutableStateMapOf<String, String>() }
+    var expandedGroupFor by remember { mutableStateOf<Int?>(null) }
+    var expandedExamFor by remember { mutableStateOf<Int?>(null) }
     val marks = remember { mutableStateMapOf<String, String>() }
     var message by remember { mutableStateOf<String?>(null) }
 
@@ -53,6 +57,9 @@ internal fun NativeExamManagementScreen(
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Button(onClick = createExam, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text("Create a written exam")
+        }
+        if (workspaces.isEmpty()) {
+            Text("No organization owner/admin assignment workspace is available for this signed-in account.")
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             items(workspaces, key = { "exam-management:${it.organizationId}" }) { workspace ->
@@ -69,13 +76,19 @@ internal fun NativeExamManagementScreen(
                                 ?: workspace.groups.first().id.also { groupSelections[workspace.organizationId] = it }
                             val selectedGroupName = workspace.groups.firstOrNull { it.id == selectedGroup }?.name ?: "Choose group"
                             OutlinedButton(
-                                onClick = {
-                                    val index = workspace.groups.indexOfFirst { it.id == selectedGroup }.coerceAtLeast(0)
-                                    groupSelections[workspace.organizationId] = workspace.groups[(index + 1) % workspace.groups.size].id
-                                },
+                                onClick = { expandedGroupFor = workspace.organizationId },
                                 enabled = !busy,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("assignment-group-${workspace.organizationId}")
                             ) { Text("Learner group · $selectedGroupName") }
+                            DropdownMenu(expanded = expandedGroupFor == workspace.organizationId,
+                                onDismissRequest = { expandedGroupFor = null }) {
+                                workspace.groups.forEach { group ->
+                                    DropdownMenuItem(text = { Text(group.name) }, onClick = {
+                                        groupSelections[workspace.organizationId] = group.id
+                                        expandedGroupFor = null
+                                    })
+                                }
+                            }
                         }
                         if (exams.isEmpty()) {
                             Text("Create an exam from your study material before assigning it.")
@@ -84,13 +97,19 @@ internal fun NativeExamManagementScreen(
                                 ?: exams.first().id.also { examSelections[workspace.organizationId] = it }
                             val selectedExamTitle = exams.firstOrNull { it.id == selectedExam }?.title ?: "Choose exam"
                             OutlinedButton(
-                                onClick = {
-                                    val index = exams.indexOfFirst { it.id == selectedExam }.coerceAtLeast(0)
-                                    examSelections[workspace.organizationId] = exams[(index + 1) % exams.size].id
-                                },
+                                onClick = { expandedExamFor = workspace.organizationId },
                                 enabled = !busy,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("assignment-exam-${workspace.organizationId}")
                             ) { Text("Written exam · $selectedExamTitle") }
+                            DropdownMenu(expanded = expandedExamFor == workspace.organizationId,
+                                onDismissRequest = { expandedExamFor = null }) {
+                                exams.forEach { exam ->
+                                    DropdownMenuItem(text = { Text(exam.title) }, onClick = {
+                                        examSelections[workspace.organizationId] = exam.id
+                                        expandedExamFor = null
+                                    })
+                                }
+                            }
                         }
                         OutlinedTextField(
                             value = deadlines[workspace.organizationId].orEmpty(),
