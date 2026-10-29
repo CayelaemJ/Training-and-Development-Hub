@@ -163,7 +163,7 @@ struct NativeWrittenExamView: View {
         .navigationTitle("Written exams")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Done") { dismiss() }.disabled(busy)
             }
         }
@@ -184,7 +184,6 @@ struct NativeWrittenExamView: View {
         busy = true; message = nil; result = nil
         defer { busy = false }
         do {
-            try await Task.sleep(nanoseconds: 1)
             let created = try await session.generateWrittenExam(
                 materialId: selected, questionCount: questionCount, difficulty: difficulty
             )
