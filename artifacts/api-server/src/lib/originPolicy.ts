@@ -27,3 +27,13 @@ export function oidcRequestOrigin(host: string | undefined, env: NodeJS.ProcessE
   for (const origin of approved) if (new URL(origin).host.toLowerCase() === host.toLowerCase()) return origin;
   return null;
 }
+
+/** A cookie-backed browser mutation must prove its site. Native clients may omit these headers only when they send no cookies. */
+export function permittedMutationOrigin(headers: { origin?: string; referer?: string; cookie?: string }, env: NodeJS.ProcessEnv): boolean {
+  if (headers.origin !== undefined) return headers.origin.length > 0 && permittedBrowserOrigin(headers.origin, env);
+  if (headers.referer !== undefined) {
+    try { return trustedOrigins(env).has(new URL(headers.referer).origin); }
+    catch { return false; }
+  }
+  return !headers.cookie?.trim();
+}
