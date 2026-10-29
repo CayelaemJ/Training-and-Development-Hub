@@ -1850,14 +1850,16 @@ private fun SchoolOperationsCard(
                 workspace.attendance.forEach { Text("${it.day} · ${it.status.replaceFirstChar { c -> c.uppercase() }}") }
             }
             if (workspace.canManage) {
-                OutlinedButton(
-                    onClick = { openSchoolIntelligence(workspace.organizationId, workspace.organizationName) },
-                    enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) { Text("Open attendance & academic signals") }
-                OutlinedButton(
-                    onClick = { openSchoolProgression(workspace.organizationId, workspace.organizationName) },
-                    enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) { Text("Open year-end progression") }
+                if (!demoActive) {
+                    OutlinedButton(
+                        onClick = { openSchoolIntelligence(workspace.organizationId, workspace.organizationName) },
+                        enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("Open attendance & academic signals") }
+                    OutlinedButton(
+                        onClick = { openSchoolProgression(workspace.organizationId, workspace.organizationName) },
+                        enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    ) { Text("Open year-end progression") }
+                }
                 workspace.attendanceSummary?.let { summary ->
                     Text("Attendance overview · ${summary.year} · ${summary.records} records", fontWeight = FontWeight.SemiBold)
                     Text(summary.counts.entries.sortedBy { it.key }.joinToString("   ") { "${it.key}: ${it.value}" }, style = MaterialTheme.typography.bodySmall)
