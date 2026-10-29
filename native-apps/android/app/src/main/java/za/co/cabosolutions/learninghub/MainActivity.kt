@@ -1878,7 +1878,7 @@ private fun RoleContent(
                     item {
                         OutlinedButton(onClick = openWrittenExams, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text("Create or take a written exam")
+                            Text(if (role in setOf("owner", "admin")) "Manage written exam assignments" else "Create or take a written exam")
                         }
                     }
                     if (data.writtenExams.isNotEmpty()) {
