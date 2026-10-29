@@ -22,6 +22,7 @@ export function isNotificationEligible(e:EligibilityEvidence):boolean {
   if(!e.emailMatches || !e.preference?.optedIn ||
       !(e.preference.confirmedAt instanceof Date) ||
       !Number.isFinite(e.preference.confirmedAt.getTime()) ||
+      e.preference.confirmedAt.getTime() > Date.now() + 60_000 ||
       e.preference.revokedAt !== null ||
       !Number.isSafeInteger(e.source.id) || e.source.id < 1 ||
       !e.activeEnrollment) return false;
