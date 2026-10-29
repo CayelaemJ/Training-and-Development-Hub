@@ -39,9 +39,9 @@ async function request(endpoint, options = {}) {
   });
 }
 async function untilHealthy() {
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + 150_000;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw Error("Worker runtime exited before healthy");
+    if (child.exitCode !== null || child.signalCode !== null) throw Error("Worker runtime exited before healthy");
     try {
       const response = await request("/health");
       if (response.status === 200) return;
@@ -50,7 +50,7 @@ async function untilHealthy() {
     }
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
-  throw Error("Worker runtime did not return healthy within 120 seconds");
+  throw Error("Worker runtime did not return healthy within 150 seconds");
 }
 
 try {
@@ -65,8 +65,8 @@ try {
     await fh.close();
   }
   port = await unusedPort();
-  child = spawn("npx", [
-    "--yes", "wrangler@4.151.3", "dev", "--local",
+  child = spawn("uvx", [
+    "--from", "workers-py==1.17.9", "pywrangler", "dev", "--local",
     "--port", String(port), "--ip", "127.0.0.1",
     "--show-interactive-dev-session", "false", "--log-level", "error",
   ], { cwd, env: { ...process.env, CI: "1" }, detached: true, stdio: ["ignore", "ignore", "ignore"] });
