@@ -3,7 +3,8 @@ version: 2.1
 jobs:
   django_worker:
     docker:
-      - image: cimg/python:3.12
+      # Pywrangler runs the Pyodide interpreter via Node during packaging.
+      - image: cimg/python:3.12-node
     resource_class: small
     steps:
       - checkout
