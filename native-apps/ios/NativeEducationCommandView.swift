@@ -43,7 +43,7 @@ struct NativeEducationCommandView: View {
                         ForEach(overview.schools) { school in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(school.name).font(.headline)
-                                Text(school.learnerCount.map { "At least \($0) active verified learners" }
+                                Text(school.learnerCount.map { "Active verified learners: \($0)" }
                                      ?? "Learner count suppressed for privacy (fewer than \(overview.minimumCohort))")
                                     .font(.subheadline)
                                 Text(school.attendanceRate.map { "Recorded attendance: \($0)% · \(overview.year)" }
