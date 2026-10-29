@@ -567,6 +567,19 @@ struct NativeHomeView: View {
                 infoTile(exam.title, "\(exam.questions.count) questions · \(exam.difficulty.capitalized)", system: "doc.text")
             }
         }
+        if session.canManageExamAssignments {
+            Button {
+                Task {
+                    await session.refreshExamManagement()
+                    showExamManagement = true
+                }
+            } label: {
+                Label("Manage school exam assignments", systemImage: "building.2.crop.circle")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.bordered)
+            .disabled(session.busy || session.examManagementBusy)
+        }
         title("My learning support")
         Button { showSupportRequests = true } label: {
             Label("Ask for help or manage drafts", systemImage: "questionmark.bubble")
