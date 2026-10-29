@@ -243,9 +243,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var materials: [String] = []
     @Published var materialSummaries: [NativeMaterialSummary] = []
     @Published var quizzes: [String] = []
-    @Published var quizSummaries: [NativeQuizSummary] =     @Published var writtenExams: [NativeWrittenExam] = []
-    @Published var guardians: []
- [GuardianInvitation] = []
+    @Published var quizSummaries: [NativeQuizSummary] = []
+    @Published var writtenExams: [NativeWrittenExam] = []
+    @Published var guardians: [GuardianInvitation] = []
     @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
     @Published var reportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
