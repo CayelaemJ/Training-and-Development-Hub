@@ -4,6 +4,7 @@ import { db, sessionsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 import { type Request, type Response } from 'express';
 import * as client from 'openid-client';
+import type { TrustedMfaEvidence } from './mfaAssurance';
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? 'https://replit.com/oidc';
 export const SESSION_COOKIE = 'sid';
@@ -14,6 +15,7 @@ export interface SessionData {
   access_token: string;
   refresh_token?: string;
   expires_at?: number;
+  trusted_mfa?: TrustedMfaEvidence;
 }
 
 let oidcConfig: client.Configuration | null = null;
