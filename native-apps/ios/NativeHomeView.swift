@@ -359,8 +359,7 @@ struct NativeHomeView: View {
                     Label(subject, systemImage: "book.closed")
                 }
                 if !school.support.isEmpty {
-                    Text("Learning support").font(.headline).padding(.top, 8)
-                    ForEach(school.support, id: \.self) { item in Text(item) }
+                    SupportAccountabilityCard(summary: school.support)
                 }
                 if !school.ticketSummaries.isEmpty {
                     Text("Learner help requests").font(.headline).padding(.top, 8)
@@ -1154,3 +1153,55 @@ private struct NativeIssuedReportCard: View {
     }
 }
 
+
+
+private struct SupportAccountabilityCard: View {
+    let summary: [String]
+
+    private var metrics: [(String, Int)] {
+        let values = Dictionary(summary.compactMap { item -> (String, Int)? in
+            guard let separator = item.firstIndex(of: ":"),
+                  let count = Int(item[item.index(after: separator)...].trimmingCharacters(in: .whitespacesAndNewlines))
+            else { return nil }
+            let key = item[..<separator].lowercased().filter { $0.isLetter || $0.isNumber }
+            return (key, count)
+        }, uniquingKeysWith: { first, _ in first })
+
+        func value(_ keys: String...) -> Int? {
+            keys.compactMap { values[$0] }.first
+        }
+
+        return [
+            value("total", "openrequests").map { ("Open requests", $0) },
+            value("unassigned").map { ("Unassigned", $0) },
+            value("overduecheckpoints", "followupsdue").map { ("Follow-ups due", $0) },
+            value("awaitinglearner").map { ("Awaiting learner", $0) },
+            value("needsmorehelp").map { ("Needs more help", $0) },
+            value("measuredoutcomes").map { ("Measured outcomes", $0) }
+        ].compactMap { $0 }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Support accountability").font(.headline)
+            Text("Counts include only requests your account can view. They are not a staff ranking.")
+                .font(.footnote).foregroundColor(.secondary)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(Array(metrics.enumerated()), id: \.offset) { element in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(element.element.1))
+                            .font(.title2.weight(.semibold))
+                            .accessibilityLabel("\(element.element.1) \(element.element.0)")
+                        Text(element.element.0).font(.caption).foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+}
