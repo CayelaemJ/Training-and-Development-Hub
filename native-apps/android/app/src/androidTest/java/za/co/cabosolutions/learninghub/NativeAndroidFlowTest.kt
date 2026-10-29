@@ -787,6 +787,9 @@ class NativeAndroidWrittenExamTest {
         }
 
         compose.onNodeWithTag("assigned-written-exam-73032").assertIsDisplayed().performClick()
+        compose.waitUntil(timeoutMillis = 10000) {
+            compose.onAllNodesWithText("CABO Demo School").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText("CABO Demo School").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Due 2026-11-10").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("written-answer-0").performScrollTo()
