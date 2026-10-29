@@ -293,7 +293,7 @@ class NativeAndroidDemoFlowTest {
         val teacherTicket = NativeDemoData.teacher().staff.single().tickets.single()
         assertEquals("Equivalent fractions", teacherTicket.concept)
         val replied = NativeDemoSession.reply(teacherTicket, "Multiply the numerator and denominator by the same number.")
-        assertEquals(2, replied.version)
+        assertEquals(2, replied.summary.version)
         assertEquals("reply", replied.history.last().kind)
         assertEquals(true, NativeDemoData.learner().learnerHelp.any { it.contains("Educator reply") })
         NativeDemoSession.reset()
