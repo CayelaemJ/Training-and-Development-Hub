@@ -33,7 +33,48 @@ jobs:
             node scripts/run-learner-success-browser.mjs --pwa
       - store_artifacts:
           path: test-results
+  cloudflare_full_stack_candidate:
+    docker:
+      - image: node:24-bookworm
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Verify original Express API plus branded React UI safety gates
+          command: |
+            set -euo pipefail
+            node --test tests/cloudflare-full-stack.test.mjs
+            node --check cloudflare/full-stack/worker.mjs
+            node --check cloudflare/full-stack/gate.mjs
+            test -s Dockerfile.cloudflare
+      - run:
+          name: Compile actual Learning Hub workspace without secrets or database writes
+          command: |
+            set -euo pipefail
+            npm install --global pnpm@10.28.2
+            pnpm install --frozen-lockfile
+            pnpm --filter @workspace/training-platform build
+            pnpm --filter @workspace/api-server build
+            test -s artifacts/api-server/dist/index.mjs
+            test -s artifacts/training-platform/dist/public/index.html
+      - run:
+          name: Bundle independent Cloudflare Container Worker in non-deploy dry-run
+          command: |
+            set -euo pipefail
+            npm ci --prefix cloudflare/full-stack --no-audit --no-fund
+            cloudflare/full-stack/node_modules/.bin/wrangler deploy --dry-run --containers-rollout=none --config wrangler.cabo-full-stack.jsonc --outdir cloudflare-output/full-stack
+            test -s cloudflare-output/full-stack/worker.js
+      - store_artifacts:
+          path: cloudflare-output/full-stack
+          destination: cloudflare-learning-full-app-candidate
+
 workflows:
   release_checks:
     jobs:
       - verify
+  cloudflare_full_stack_migration:
+    jobs:
+      - cloudflare_full_stack_candidate:
+          filters:
+            branches:
+              only: feat/cloudflare-learning-hub-full-stack-20261029
