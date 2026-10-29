@@ -63,6 +63,21 @@ struct NativeLearnerPassport: Decodable {
     let provenance: String
     let interpretation: String
 }
+struct NativeEducationCommandSchool: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let learnerCount: Int?
+    let attendanceRate: Int?
+    let privacySuppressed: Bool
+}
+struct NativeEducationCommand: Decodable {
+    let year: Int
+    let institutions: Int
+    let schools: [NativeEducationCommandSchool]
+    let nationalVerified: Bool
+    let officialDbEData: Bool
+    let minimumCohort: Int
+}
 
 
 import Foundation
@@ -340,6 +355,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var learnerPassportJSON: String?
     @Published var learnerPassportNotice = ""
     @Published var learnerPassportBusy = false
+    @Published var educationCommand: NativeEducationCommand?
+    @Published var educationCommandBusy = false
+    @Published var educationCommandNotice = ""
     @Published var supportCourses: [NativeSupportCourse] = []
     @Published var supportDrafts: [NativeSupportDraft] = []
 
@@ -1715,6 +1733,39 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Unable to verify this report right now. Check your connection and access."
         }
         busy = false
+    }
+
+    private var canOpenEducationCommand: Bool {
+        ["superadmin", "owner", "admin", "national_director", "provincial_director", "district_director", "group_executive"]
+            .contains(role ?? "")
+    }
+
+    func refreshEducationCommand() async {
+        guard canOpenEducationCommand else {
+            educationCommand = nil
+            educationCommandNotice = "Education Command is not available to this account."
+            return
+        }
+        guard !educationCommandBusy else { return }
+        educationCommandBusy = true
+        educationCommandNotice = ""
+        defer { educationCommandBusy = false }
+        let year = Calendar.current.component(.year, from: Date())
+        do {
+            let data = try await request("api/education-command/overview?year=\(year)")
+            let result = try JSONDecoder().decode(NativeEducationCommand.self, from: data)
+            educationCommand = result
+            educationCommandNotice = ""
+        } catch {
+            educationCommand = nil
+            educationCommandNotice = "Education Command is unavailable for this account right now. Refresh to try again."
+        }
+    }
+
+    func clearEducationCommand() {
+        educationCommand = nil
+        educationCommandNotice = ""
+        educationCommandBusy = false
     }
 
     func signOut() async {
