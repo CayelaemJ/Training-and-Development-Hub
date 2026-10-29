@@ -182,6 +182,9 @@ importers:
       '@napi-rs/canvas':
         specifier: 0.1.80
         version: 0.1.80
+      '@upstash/blob':
+        specifier: 0.0.11
+        version: 0.0.11(react@19.1.0)
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
@@ -1838,6 +1841,15 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
+  '@upstash/blob@0.0.11':
+    resolution: {integrity: sha512-UHudxISoPLqMchQ9HyOK7yJcFqsIgOShkdDvZ/1yL5UlDz88LPORSFYJ4BA7HPvfI3PcSjRrXdyVs6LDKiZgjg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      react: '>=18'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
@@ -4828,6 +4840,10 @@ snapshots:
       '@types/node': 25.9.6
 
   '@types/unist@3.0.3': {}
+
+  '@upstash/blob@0.0.11(react@19.1.0)':
+    optionalDependencies:
+      react: 19.1.0
 
   '@vitejs/plugin-react@5.2.0(vite@7.3.7(@types/node@25.9.6)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
