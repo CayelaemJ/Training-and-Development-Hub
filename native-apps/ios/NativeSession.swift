@@ -1762,6 +1762,50 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
+    func fetchSchoolIntelligence(organizationId: Int, year: Int) async throws -> NativeSchoolIntelligenceSnapshot {
+        guard (2000...2200).contains(year), organizationId > 0,
+              schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }) else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        let attendanceData = try await request("api/organizations/\(organizationId)/attendance/summary?year=\(year)")
+        let academicData = try await request("api/organizations/\(organizationId)/academic-intelligence?year=\(year)")
+        guard let attendance = try JSONSerialization.jsonObject(with: attendanceData) as? [String: Any],
+              let academic = try JSONSerialization.jsonObject(with: academicData) as? [String: Any] else {
+            throw NSError(domain: "CABO", code: 502)
+        }
+        let countsObject = attendance["counts"] as? [String: Any] ?? [:]
+        let counts = countsObject.reduce(into: [String: Int]()) { result, pair in
+            if let value = pair.value as? Int { result[pair.key] = max(0, value) }
+        }
+        let rows = academic["learners"] as? [[String: Any]] ?? []
+        let learners = rows.prefix(400).compactMap { row -> NativeSchoolIntelligenceLearner? in
+            guard let rawId = row["learnerId"] as? String else { return nil }
+            let learnerId = String(rawId.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))
+            guard !learnerId.isEmpty else { return nil }
+            let average = (row["average"] as? NSNumber)?.doubleValue
+            let attendanceRate = (row["attendanceRate"] as? NSNumber)?.doubleValue
+            let subjects = (row["subjectsAtRisk"] as? [String] ?? []).prefix(20).map { String($0.prefix(120)) }
+            return NativeSchoolIntelligenceLearner(
+                learnerId: learnerId, grade: String((row["grade"] as? String ?? "").prefix(40)),
+                average: average.flatMap { (0...100).contains($0) ? $0 : nil },
+                attendanceRate: attendanceRate.flatMap { (0...100).contains($0) ? $0 : nil },
+                subjectsAtRisk: subjects, supportPlans: max(0, row["supportPlans"] as? Int ?? 0)
+            )
+        }
+        let thresholds = academic["thresholds"] as? [String: Any] ?? [:]
+        return NativeSchoolIntelligenceSnapshot(
+            year: academic["year"] as? Int ?? year,
+            attendanceRecords: max(0, attendance["records"] as? Int ?? 0),
+            attendanceCounts: counts,
+            studentsReviewed: max(0, academic["studentsReviewed"] as? Int ?? 0),
+            attentionNeeded: max(0, academic["attentionNeeded"] as? Int ?? 0),
+            learners: Array(learners),
+            subjectBelow: (thresholds["subjectBelow"] as? NSNumber)?.doubleValue ?? 50,
+            attendanceBelow: (thresholds["attendanceBelow"] as? NSNumber)?.doubleValue ?? 80,
+            officialDistrictData: attendance["officialDistrictData"] as? Bool ?? false
+        )
+    }
+
     func clearEducationCommand() {
         educationCommand = nil
         educationCommandNotice = ""
