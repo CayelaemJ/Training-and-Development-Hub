@@ -28,7 +28,7 @@ export async function enqueueApprovedNotice(
 }
 
 type Claim = {
-  id:number; eventId:string; recipientCiphertext:string;
+  id:number; eventId:string; recipientCiphertext:string; recipientUserId:string; organizationId:number|null;
   kind:NoticeInput["kind"]; leaseToken:string;
 };
 async function claimOne():Promise<Claim|null> {
@@ -36,6 +36,8 @@ async function claimOne():Promise<Claim|null> {
     const [candidate]=await tx.select({
       id:notificationOutboxTable.id,eventId:notificationOutboxTable.eventId,
       kind:notificationOutboxTable.kind,
+      recipientUserId:notificationOutboxTable.recipientUserId,
+      organizationId:notificationOutboxTable.organizationId,
       recipientCiphertext:notificationOutboxTable.recipientCiphertext,
     }).from(notificationOutboxTable)
       .where(eq(notificationOutboxTable.status,"queued"))
@@ -71,17 +73,24 @@ async function finish(
 }
 
 export type OutboxDeliveryResult="idle"|"sent"|"needs_review"|"disabled";
+export type DispatchAuthorization = (row:{ eventId:string; recipientUserId:string; organizationId:number|null; kind:NoticeInput["kind"] })=>Promise<boolean>;
 export async function processOneApprovedNotice(
+  authorize:DispatchAuthorization|undefined,
   fetcher:typeof fetch=fetch,
   env:NodeJS.ProcessEnv=process.env,
 ):Promise<OutboxDeliveryResult> {
-  if(env.CABO_NOTIFICATION_OUTBOX_WORKER_ENABLED!=="true" ||
+  if(!authorize || env.CABO_NOTIFICATION_OUTBOX_WORKER_ENABLED!=="true" ||
      env.CABO_NOTIFICATION_OUTBOX_ENABLED!=="true" ||
      !noticesEnabled(env)) return "disabled";
   const key=readOutboxKey(env);
   const claim=await claimOne();
   if(!claim) return "idle";
   try {
+    // Always revalidate tenant, guardian/legal consent and preferences *now*.
+    // Missing or revoked authorization cannot send; never trust only enqueue-time approval.
+    const permitted=await authorize({eventId:claim.eventId,recipientUserId:claim.recipientUserId,
+      organizationId:claim.organizationId,kind:claim.kind});
+    if(!permitted){await finish(claim,"needs_review","authorization_revoked");return "needs_review";}
     const address=decryptRecipient(claim.recipientCiphertext,claim.eventId,key);
     const result=await sendTransactionalNotice({
       to:address,eventId:claim.eventId,kind:claim.kind,deliveryApproved:true,
