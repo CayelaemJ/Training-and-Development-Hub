@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
  * lawful purpose and organisation membership before invoking this module.
  */
 export type NoticeKind = "guardian_review_requested" | "learner_support_updated" | "account_security";
-export type NoticeOutcome = "accepted" | "disabled" | "limit_reached";
+export type NoticeOutcome = "accepted" | "deduplicated" | "disabled" | "limit_reached";
 export type NoticeInput = {
   to: string;
   eventId: string;
@@ -89,7 +89,7 @@ export async function sendTransactionalNotice(
   if (!result || typeof result!=="object" || !("result" in result)) throw new Error("Invalid notification quota response");
   const allowance=(result as {result:unknown}).result;
   if (allowance===0) return "limit_reached";
-  if (allowance===2) return "accepted"; // Duplicated event: never re-send.
+  if (allowance===2) return "deduplicated"; // Already reserved; never claim a new send.
   if (allowance!==1) throw new Error("Unverified notification quota state");
 
   const sent=await fetcher(EMAIL_API,{
