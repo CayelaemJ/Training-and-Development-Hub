@@ -12,7 +12,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | --- | --- | --- | --- | --- | --- |
 | Role dashboard | Yes | Yes | Yes | Yes | Partial summaries on Android and iOS |
 | Learner Success Loop | Yes | — | Teacher / school leaders | Admin | Android and iOS show the signed-in learner's support progress, published result comparisons and educator-reviewed Learning DNA; private JSON export uses the authenticated learner-passport endpoint. School-wide accountability and broader educator administration remain incomplete |
-| Education Command | — | — | Limited | National to school leaders | Missing native workspace |
+| Education Command | — | — | Limited | National to school leaders | Android and iOS offer an on-demand, read-only overview from the existing authorized endpoint; counts below 10 are suppressed and the screen states the data is not an official national census |
 | Assessment question bank | — | — | Teacher / school leaders | Admin | Android and iOS support institution-scoped, attributed question drafts, independent question review/publishing, paper drafts and independent review/publishing; invigilation, written responses and marking remain incomplete |
 | School intelligence | — | — | School leaders | Admin | Missing native workspace |
 | Report issuance and integrity | Draft previews and issued report snapshots | Verified previews and issued report snapshots | School leaders | Admin | Android and iOS support school submission/approval/issue/reject/revoke plus learner and verified-guardian issued report viewing and integrity checks; school analytics and wider administration remain missing |
@@ -67,3 +67,6 @@ A capability moves to complete only when all of these are true on both native pl
 
 
 - Educator and leadership native workspaces now render the existing school-authorized support accountability summary as labeled metrics on Android and iOS. Counts cover only records the signed-in role is allowed to see and are explicitly not staff rankings. Existing endpoint authorization, tenant scoping and feature flag remain authoritative.
+
+
+- Android and iOS now include an on-demand, read-only Education Command view for roles allowed by the existing endpoint. It shows authorized school aggregates, suppresses learner cohorts below ten, and identifies attendance as recorded data. Server membership and management grants remain authoritative; the screen does not present the figures as a verified national census.

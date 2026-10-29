@@ -61,6 +61,10 @@ class MainActivity : ComponentActivity() {
     private var learnerPassport by mutableStateOf<LearnerPassport?>(null)
     private var learnerPassportBusy by mutableStateOf(false)
     private var learnerPassportMessage by mutableStateOf<String?>(null)
+    private var selectedEducationCommand by mutableStateOf(false)
+    private var educationCommand by mutableStateOf<EducationCommandSnapshot?>(null)
+    private var educationCommandBusy by mutableStateOf(false)
+    private var educationCommandMessage by mutableStateOf<String?>(null)
     private var managerCreatingExam by mutableStateOf(false)
     private var selectedMaterial by mutableStateOf<MaterialSummary?>(null)
     private var selectedUploadUri by mutableStateOf<Uri?>(null)
@@ -119,9 +123,10 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedEducationCommand) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
+                        selectedEducationCommand -> closeEducationCommand()
                         selectedLearnerPassport -> closeLearnerPassport()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
@@ -233,6 +238,13 @@ class MainActivity : ComponentActivity() {
                             } else selectedWrittenExams = false
                         }
                     )
+                    selectedEducationCommand -> NativeEducationCommandScreen(
+                        snapshot = educationCommand,
+                        busy = educationCommandBusy,
+                        message = educationCommandMessage,
+                        refresh = { loadEducationCommand() },
+                        close = { closeEducationCommand() }
+                    )
                     selectedLearnerPassport -> NativeLearnerPassportScreen(
                         passport = learnerPassport,
                         busy = learnerPassportBusy,
@@ -327,6 +339,7 @@ class MainActivity : ComponentActivity() {
                             } else selectedWrittenExams = true
                         },
                         openPassport = { openLearnerPassport() },
+                        openEducationCommand = { openEducationCommand() },
                         pickMaterial = { if (!demoActive) materialPicker.launch(arrayOf("*/*")) },
                         openSupportDraft = { draft -> selectedSupportDraft = draft; supportFormMessage = null; creatingSupportRequest = true },
                         sendSupportDraft = { sendSupportDraft(it) },
@@ -410,6 +423,37 @@ class MainActivity : ComponentActivity() {
         selectedLearnerPassport = false
         learnerPassport = null
         learnerPassportMessage = null
+    }
+
+    private fun openEducationCommand() {
+        if (demoActive) return
+        selectedEducationCommand = true
+        educationCommand = null
+        educationCommandMessage = null
+        loadEducationCommand()
+    }
+
+    private fun loadEducationCommand() {
+        if (demoActive || educationCommandBusy) return
+        educationCommandBusy = true
+        educationCommandMessage = null
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        lifecycleScope.launch {
+            try {
+                educationCommand = api.fetchEducationCommand(year)
+            } catch (_: Exception) {
+                educationCommand = null
+                educationCommandMessage = "Education Command is unavailable for this account right now. Refresh to try again."
+            } finally {
+                educationCommandBusy = false
+            }
+        }
+    }
+
+    private fun closeEducationCommand() {
+        selectedEducationCommand = false
+        educationCommand = null
+        educationCommandMessage = null
     }
 
     private fun closeMaterialUpload() {
@@ -1238,7 +1282,8 @@ internal fun NativeHome(
     offlineSupportDrafts: List<NativeSupportDraft> = emptyList(),
     offlineSupportCourses: List<SupportCourseOption> = emptyList(),
     learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
-    openPassport: () -> Unit = {}
+    openPassport: () -> Unit = {},
+    openEducationCommand: () -> Unit = {}
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
     val sections = listOf(
@@ -1423,7 +1468,8 @@ internal fun NativeHome(
                                 openSupportTicket = openSupportTicket, openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams,
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
-                                learnerJourneyAction = learnerJourneyAction, openPassport = openPassport
+                                learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
+                                openEducationCommand = { openEducationCommand() }
                             )
                         }
                     } else {
@@ -1442,7 +1488,8 @@ internal fun NativeHome(
                             openQuiz = openQuiz, openMaterial = openMaterial, openWrittenExams = openWrittenExams, pickMaterial = pickMaterial,
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
-                            learnerJourneyAction = learnerJourneyAction, openPassport = openPassport
+                            learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
+                            openEducationCommand = { openEducationCommand() }
                         )
                     }
                 }
@@ -1838,7 +1885,8 @@ private fun RoleContent(
     sendSupportDraft: (NativeSupportDraft) -> Unit,
     deleteSupportDraft: (NativeSupportDraft) -> Unit,
     learnerJourneyAction: (LearnerJourneyAction) -> Unit,
-    openPassport: () -> Unit
+    openPassport: () -> Unit,
+    openEducationCommand: () -> Unit = {}
 ) {
     LazyColumn(
         modifier.padding(horizontal = 16.dp).testTag("native-role-content"),
@@ -1976,6 +2024,14 @@ private fun RoleContent(
                 }
             }
         } else if (section == "progress") {
+            if (!demoActive && role in setOf("superadmin", "owner", "admin", "national_director", "provincial_director", "district_director", "group_executive")) {
+                item {
+                    OutlinedButton(onClick = openEducationCommand, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text("Open Education Command")
+                    }
+                }
+            }
             when (role) {
                 "parent" -> {
                     item { Text("School-verified progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }

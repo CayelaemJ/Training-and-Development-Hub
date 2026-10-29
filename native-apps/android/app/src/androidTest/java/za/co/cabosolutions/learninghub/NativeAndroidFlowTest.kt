@@ -911,3 +911,44 @@ class NativeAndroidLearnerPassportTest {
         assertEquals(1, exports)
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeEducationCommandPrivacyTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun overviewExplainsSuppressionAndUnofficialStatus() {
+        compose.setContent {
+            MaterialTheme {
+                NativeEducationCommandScreen(
+                    snapshot = EducationCommandSnapshot(
+                        year = 2026,
+                        institutions = 1,
+                        schools = listOf(EducationCommandSchool(
+                            id = 9001,
+                            name = "Cabo Valley School",
+                            learnerCount = null,
+                            attendanceRate = 84,
+                            privacySuppressed = true
+                        )),
+                        minimumCohort = 10,
+                        nationalVerified = false,
+                        officialDbEData = false
+                    ),
+                    busy = false,
+                    message = null,
+                    refresh = {},
+                    close = {}
+                )
+            }
+        }
+
+        val content = compose.onNodeWithTag("education-command-content")
+        content.performScrollToNode(hasText("Learner count suppressed for privacy (fewer than 10)"))
+        compose.onNodeWithText("Learner count suppressed for privacy (fewer than 10)").assertIsDisplayed()
+        content.performScrollToNode(hasText("CABO has not verified this as national or official education data."))
+        compose.onNodeWithText("CABO has not verified this as national or official education data.").assertIsDisplayed()
+    }
+}
