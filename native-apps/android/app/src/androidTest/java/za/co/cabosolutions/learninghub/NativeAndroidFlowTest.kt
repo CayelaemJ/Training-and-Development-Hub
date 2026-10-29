@@ -223,13 +223,14 @@ class NativeAndroidSupportTest {
         val role = mutableStateOf("learner")
         val data = mutableStateOf(NativeDemoData.forRole("learner"))
         var openedTicket: SupportTicketSummary? = null
+        var openedWebApp = 0
         compose.setContent {
             MaterialTheme {
                 NativeHome(
                     status = "CABO demo · sample data only",
                     busy = false,
                     data = data.value,
-                    signIn = {}, refresh = {}, demoEnabled = true, demoActive = true,
+                    signIn = {}, openWebExperience = { openedWebApp++ }, refresh = {}, demoEnabled = true, demoActive = true,
                     demoRole = role.value, startDemo = {},
                     setDemoRole = { selected ->
                         role.value = selected
@@ -249,6 +250,8 @@ class NativeAndroidSupportTest {
         }
 
         compose.onNodeWithText("CABO PREVIEW · sample workspace").assertIsDisplayed()
+        compose.onNodeWithText("Open the full CABO web app").performScrollTo().performClick()
+        assertEquals(1, openedWebApp)
         compose.onNodeWithText("Learn").performClick()
         assertEquals(0, compose.onAllNodesWithText("Add material from this device").fetchSemanticsNodes().size)
         compose.onNodeWithText("Teacher").performClick()
