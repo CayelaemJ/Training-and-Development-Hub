@@ -10,6 +10,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -439,7 +441,9 @@ class NativeAndroidReportIssuanceTest {
         compose.onNodeWithText("Submit report for review").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("Enrolled learner account ID").performScrollTo().performTextInput("learner-19")
         compose.onNodeWithText("Submit report for review").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithTag("native-role-content").performScrollToNode(hasText("Approve"))
         compose.onNodeWithText("Approve").performScrollTo().performClick()
+        compose.onNodeWithTag("native-role-content").performScrollToNode(hasText("Revoke"))
         compose.onNodeWithText("Revoke").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("Reason for rejection or revocation").performScrollTo().performTextInput("Duplicate record")
         compose.onNodeWithText("Revoke").performScrollTo().assertIsEnabled().performClick()

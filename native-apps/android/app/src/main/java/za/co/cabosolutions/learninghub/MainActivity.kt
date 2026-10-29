@@ -1211,7 +1211,7 @@ private fun RoleContent(
     learnerJourneyAction: (LearnerJourneyAction) -> Unit
 ) {
     LazyColumn(
-        modifier.padding(horizontal = 16.dp),
+        modifier.padding(horizontal = 16.dp).testTag("native-role-content"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(bottom = 22.dp)
     ) {
