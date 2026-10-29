@@ -6,7 +6,7 @@ This is a **narrow, opt-in processing service**, not a replacement for the CABO 
 - `POST /v1/insights/draft`: validates **coded, aggregate-only** learning metrics and returns deterministic, advisory intervention labels. Never use output as final assessment, progression, diagnosis or automatic learner decisions.
 - `GET /health`: safe service liveness.
 - Strict schema allowlisting rejects personal-data fields such as names, emails, learner IDs, essay answers and documents. Short machine-readable concept codes still require upstream review to prevent accidental identifying labels. The worker must not receive children's personal records.
-- Bearer authentication is mandatory. Only the existing signed-in CABO API can proxy input; the browser must never receive the Worker token.
+- Bearer authentication is mandatory. Only authorised institution managers on the signed-in CABO API can proxy input; the browser must never receive the Worker token.
 - This is synchronous stateless processing. Cloudflare Queues/R2 should be added only when durable completion status, consumer idempotency, consent revocation and rollback have been implemented and tested.
 
 ## Local and deployment
@@ -15,12 +15,14 @@ From this folder with Python 3.12+, uv and workers-py/Pywrangler installed:
 DJANGO_SECRET_KEY=local-only-test-secret DJANGO_WORKER_TOKEN=long-test-only-token-for-ci-tests-1234 uv run python -m django test --settings=cabo_worker.settings
 uvx --from workers-py pywrangler dev
 ```
-Set strong random values for `DJANGO_WORKER_TOKEN` and `DJANGO_SECRET_KEY` using Cloudflare Worker **secret** bindings (never use test values):
+Deploy using `pywrangler` from an authenticated trusted environment, uploading fresh strong random `DJANGO_WORKER_TOKEN` and `DJANGO_SECRET_KEY` values as **Worker secrets in the same deployment** (never use local test values or commit credentials):
 ```sh
-uvx --from workers-py pywrangler secret put DJANGO_WORKER_TOKEN
-uvx --from workers-py pywrangler secret put DJANGO_SECRET_KEY
-uvx --from workers-py pywrangler deploy
+# Create a local, untracked JSON file with the two random keys.
+# Use an account-scoped Cloudflare deployment identity.
+uvx --from workers-py pywrangler deploy --secrets-file /secure/path/staging-secrets.json
+# Delete the temporary secrets file securely after deployment.
 ```
+Cloudflare supports `--secrets-file` for atomic code/secret upload. Do not deploy the Python Worker without both secrets; its Django settings fail closed when the signing secret is absent. A previously attempted automated authenticated deploy was blocked by the connector's security checks; its temporary deployment credential was revoked. Deployment must be performed through an authorised trusted build workflow.
 The `DJANGO_ALLOWED_HOST` Wrangler variable is restricted to the verified `cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev` hostname. Change it only when the Cloudflare account/route changes and re-test hostile Host headers.
 
 Confirm the deployed Worker URL and authorized health+POST smoke tests first; do not configure a custom public route until security review. Avoid logging inputs, token material or learner data.
@@ -30,7 +32,7 @@ Confirm the deployed Worker URL and authorized health+POST smoke tests first; do
 - `CABO_DJANGO_WORKER_URL=https://<verified-worker-host>` (server-side only)
 - `CABO_DJANGO_WORKER_TOKEN=<same secret as Cloudflare>` (server-side only)
 
-`POST /api/learning/insights/draft` requires an authenticated CABO session. It accepts `{"concepts":[{"code":"fractions","masteryPercent":45,"evidenceCount":5}]}` and returns advisory labels only. Metrics are supplied by the caller and are **not institution-verified**. This endpoint must not be used for real learner decisions until scoped source evidence and consent checks are implemented.
+`POST /api/organizations/:orgId/learning/insights/draft` requires an authenticated CABO session and verified **owner/admin (or platform superadmin)** authorisation for that institution. Unscoped users and users belonging to other institutions are denied. It accepts `{"concepts":[{"code":"fractions","masteryPercent":45,"evidenceCount":5}]}` and returns advisory labels only. Metrics are supplied by the caller and are **not institution-verified**. This endpoint must not be used for real learner decisions until scoped source evidence and consent checks are implemented.
 
 ### Release gates
 - Django unit tests, main CABO typecheck/build and security regressions.
@@ -47,9 +49,9 @@ The connected Cloudflare account now has two **EU-jurisdiction** queues:
 **These queues are presently unbound, empty and inactive.** Do not publish messages until an authenticated producer, durable job-status store, idempotent consumer, failure classification, DLQ monitoring, consent/revocation checks and cross-border review are implemented. Cloudflare's Workers Free plan includes 10,000 queue operations/day with 24-hour retention, so it is unsuitable as the only durable job store.
 
 ### Expected staging verification
-1. Django test suite: `python -m django test --settings=cabo_worker.settings`.
+1. Django test suite: `DJANGO_SECRET_KEY=local-only-test-secret DJANGO_WORKER_TOKEN=long-test-only-token-for-ci-tests-1234 python -m django test --settings=cabo_worker.settings`.
 2. CircleCI `django_worker`, `verify`, `security_suite` must be green; an unrelated failure requires diagnosis, not bypass.
 3. Pywrangler deployment with the exact Cloudflare hostname and *runtime* secrets.
 4. Call `GET /health` (200), unauthenticated `POST /v1/insights/draft` (401), authenticated synthetic POST (200).
-5. Enable the main API feature only in isolated staging; verify anonymous requests (401), disabled path (404), and unavailable worker handling (503).
+5. Enable the main API feature only in isolated staging; verify anonymous requests (401), non-manager/other-institution requests (403), disabled path (404), and unavailable worker handling (503).
 6. Verify no PII reaches Cloudflare logs or queues and no existing academic marks are changed.
