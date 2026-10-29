@@ -3,7 +3,7 @@ import json
 import os
 from django.test import SimpleTestCase, Client
 
-TOKEN = "long-test-only-token"
+TOKEN = "long-test-only-token-for-ci-tests-1234"
 URL = "/v1/insights/draft"
 
 
