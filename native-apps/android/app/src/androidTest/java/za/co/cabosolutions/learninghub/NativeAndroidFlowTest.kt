@@ -667,3 +667,42 @@ class NativeAndroidAssessmentWorkspaceTest {
         compose.onNodeWithText("Calculate 3/4 + 1/8 and show your working.").assertExists()
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidNotificationPreferenceTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun optInRequiresExplicitAcknowledgementAndOptOutIsDirect() {
+        val preference = mutableStateOf(NotificationPreferences(true, true, listOf(
+            NotificationPreferenceSchool(7, "Cabo Sample School", listOf(
+                NotificationPreferenceChoice("guardian_review_requested", false, true)
+            ))
+        )))
+        val changes = mutableListOf<List<Any>>()
+        compose.setContent {
+            MaterialTheme {
+                NotificationPreferencesCard(preference.value, false) { org, kind, enabled, acknowledged ->
+                    changes.add(listOf(org, kind, enabled, acknowledged))
+                    preference.value = preference.value.copy(schools = preference.value.schools.map { school ->
+                        if (school.id != org) school else school.copy(choices = school.choices.map { choice ->
+                            if (choice.kind == kind) choice.copy(enabled = enabled) else choice
+                        })
+                    })
+                }
+            }
+        }
+
+        compose.onNodeWithTag("notification-preference-guardian_review_requested").performClick()
+        compose.onNodeWithText("Confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("notification-consent-acknowledgement").performClick()
+        compose.onNodeWithText("Confirm").assertIsEnabled().performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(7, "guardian_review_requested", true, true), changes.first())
+
+        compose.onNodeWithTag("notification-preference-guardian_review_requested").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf(7, "guardian_review_requested", false, false), changes.last())
+    }
+}

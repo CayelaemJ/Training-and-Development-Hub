@@ -230,6 +230,7 @@ struct NativeHomeView: View {
         title("My family")
         Text(session.guardianGuidance)
             .font(.subheadline).foregroundColor(.secondary)
+        NativeNotificationPreferencesPanel(session: session)
         if session.guardians.isEmpty {
             infoTile("No invitations yet", "A learner can invite your account through CABO.", system: "envelope")
         }
@@ -595,6 +596,69 @@ struct NativeHomeView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct NativeNotificationPreferencesPanel: View {
+    @ObservedObject var session: NativeSession
+    @State private var pending: NativePendingNotificationPreference?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Email preferences").font(.headline)
+            Text("Optional school-related updates. You can turn these off at any time.")
+                .font(.subheadline).foregroundColor(.secondary)
+            if !session.notificationPreferences.enabled {
+                Text("Preference controls are currently unavailable. You will not receive these optional updates.")
+                    .font(.subheadline)
+            } else if session.notificationPreferences.schools.isEmpty {
+                Text("No school email preferences are available for this account.")
+                    .font(.subheadline)
+            } else {
+                ForEach(session.notificationPreferences.schools) { school in
+                    Text(school.name).font(.subheadline.bold()).padding(.top, 4)
+                    ForEach(school.choices) { choice in
+                        Toggle(isOn: Binding(
+                            get: { choice.enabled },
+                            set: { enabled in
+                                if !enabled && choice.enabled {
+                                    Task { await session.setNotificationPreference(
+                                        organizationId: school.id, kind: choice.kind,
+                                        enabled: false, acknowledged: false) }
+                                } else if enabled && !choice.enabled && choice.canEnable &&
+                                            session.notificationPreferences.optInAvailable {
+                                    pending = NativePendingNotificationPreference(
+                                        organizationId: school.id, kind: choice.kind)
+                                }
+                            }
+                        )) {
+                            Text(choice.title).font(.subheadline)
+                        }
+                        .disabled(session.busy || (!choice.enabled &&
+                            (!choice.canEnable || !session.notificationPreferences.optInAvailable)))
+                        if !choice.enabled && !choice.canEnable {
+                            Text("This former school preference can only be turned off.")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .alert(item: $pending) { request in
+            Alert(
+                title: Text("Confirm optional email updates"),
+                message: Text("I agree to receive this school-related email. It is optional and can be turned off at any time."),
+                primaryButton: .default(Text("I agree")) {
+                    Task { await session.setNotificationPreference(
+                        organizationId: request.organizationId, kind: request.kind,
+                        enabled: true, acknowledged: true) }
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 }
 

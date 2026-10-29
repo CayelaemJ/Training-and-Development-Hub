@@ -85,6 +85,32 @@ private struct NativeSchoolAttendanceEnvelope: Decodable {
     let attendance: [NativeSchoolAttendance]
 }
 
+struct NativeNotificationPreferenceChoice: Decodable, Identifiable {
+    let kind: String
+    let enabled: Bool
+    let canEnable: Bool
+    var id: String { kind }
+    var title: String {
+        kind == "guardian_review_requested" ? "Family access review requests" : "Assigned learner support updates"
+    }
+}
+struct NativeNotificationPreferenceSchool: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let choices: [NativeNotificationPreferenceChoice]
+}
+struct NativeNotificationPreferences: Decodable {
+    let enabled: Bool
+    let optInAvailable: Bool
+    let schools: [NativeNotificationPreferenceSchool]
+    static let unavailable = NativeNotificationPreferences(enabled: false, optInAvailable: false, schools: [])
+}
+struct NativePendingNotificationPreference: Identifiable {
+    let organizationId: Int
+    let kind: String
+    var id: String { "\(organizationId):\(kind)" }
+}
+
 struct NativeAssessmentQuestion: Identifiable, Decodable {
     let id: Int
     let organizationId: Int
@@ -219,6 +245,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var quizzes: [String] = []
     @Published var quizSummaries: [NativeQuizSummary] = []
     @Published var guardians: [GuardianInvitation] = []
+    @Published var notificationPreferences = NativeNotificationPreferences.unavailable
     @Published var guardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
     @Published var reportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
     @Published var schoolOperations: [NativeSchoolOperationsWorkspace] = []
@@ -442,6 +469,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             let nextWorkspaces = (decoded["cards"] as? [[String: Any]] ?? [])
                 .compactMap { $0["label"] as? String }
             var nextGuardians: [GuardianInvitation] = []
+            var nextNotificationPreferences = NativeNotificationPreferences.unavailable
             var nextGuardianReviewWorkspaces: [NativeGuardianReviewWorkspace] = []
             var nextReportIssuanceWorkspaces: [NativeReportIssuanceWorkspace] = []
             var nextSchoolOperations: [NativeSchoolOperationsWorkspace] = []
@@ -473,6 +501,10 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 nextAdminOrganizations = (registry["organizations"] as? [[String: Any]] ?? [])
                     .prefix(100).compactMap { row in row["name"] as? String }
             } else if verifiedRole == "parent" {
+                if let preferenceData = try? await request("api/notifications/preferences"),
+                   let decodedPreferences = try? JSONDecoder().decode(NativeNotificationPreferences.self, from: preferenceData) {
+                    nextNotificationPreferences = decodedPreferences
+                }
                 let parentData = try await request("api/native/mobile/parent")
                 let parent = try JSONSerialization.jsonObject(with: parentData) as? [String: Any] ?? [:]
                 nextGuidance = parent["guidance"] as? String ?? ""
@@ -686,6 +718,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             summary = nextSummary
             workspaces = nextWorkspaces
             guardians = nextGuardians
+            notificationPreferences = nextNotificationPreferences
             guardianReviewWorkspaces = nextGuardianReviewWorkspaces
             reportIssuanceWorkspaces = nextReportIssuanceWorkspaces
             schoolOperations = nextSchoolOperations
@@ -1322,6 +1355,24 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
 
     private struct NativeQuizAnswers: Encodable {
         let answers: [Int]
+    }
+
+    func setNotificationPreference(organizationId: Int, kind: String, enabled: Bool, acknowledged: Bool) async {
+        guard role == "parent", !busy, organizationId > 0,
+              ["guardian_review_requested", "learner_support_updated"].contains(kind) else { return }
+        busy = true
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["enabled": enabled, "acknowledged": acknowledged])
+            _ = try await request("api/notifications/preferences/\(organizationId)/\(kind)", method: "PATCH", body: body)
+            busy = false
+            await refresh()
+            status = enabled ? "Email preference confirmed." : "Email preference turned off."
+        } catch {
+            busy = false
+            status = enabled
+                ? "Could not enable this preference. Verified sign-in and explicit consent are required."
+                : "Could not turn this preference off. Check your connection and retry."
+        }
     }
 
     func decideGuardian(invitationId: Int, accept: Bool) async {

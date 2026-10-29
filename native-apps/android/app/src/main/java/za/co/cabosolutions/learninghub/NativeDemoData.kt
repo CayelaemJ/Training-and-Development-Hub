@@ -130,6 +130,13 @@ internal object NativeDemoData {
                 GuardianInvite(73042, "pending", null, false)
             ),
             parentGuidance = "Demo records only. School verification controls which progress can be viewed.",
+            notificationPreferences = NotificationPreferences(
+                enabled = true, optInAvailable = true,
+                schools = listOf(NotificationPreferenceSchool(
+                    DEMO_ORGANIZATION_ID, "Cabo Valley Learning Centre",
+                    listOf(NotificationPreferenceChoice("guardian_review_requested", false, true))
+                ))
+            ),
             parentReports = listOf(
                 GuardianAcademicReport(
                     learnerId = "synthetic-learner-7301",
