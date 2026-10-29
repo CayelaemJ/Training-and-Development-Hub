@@ -5,6 +5,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { privilegedMfaGuard } from "./middlewares/privilegedMfaGuard";
 import router from "./routes";
 import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
 import { logger } from "./lib/logger";
@@ -50,6 +51,8 @@ app.use("/api/internal/qstash/material-preview", express.json({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
+// Off until production OIDC provider and admin MFA flows are verified.
+app.use("/api", privilegedMfaGuard);
 
 app.use("/api", qstashMaterialPreviewRouter);
 app.use("/api", router);

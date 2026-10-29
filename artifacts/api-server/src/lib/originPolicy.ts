@@ -13,6 +13,17 @@ export function permittedBrowserOrigin(origin:string|undefined,env:NodeJS.Proces
  return trustedOrigins(env).has(origin);
 }
 
+
+/** A cookie-backed browser mutation must prove its site. Native clients may omit these headers only when they send no cookies. */
+export function permittedMutationOrigin(headers: { origin?: string; referer?: string; cookie?: string }, env: NodeJS.ProcessEnv): boolean {
+  if (headers.origin !== undefined) return headers.origin.length > 0 && permittedBrowserOrigin(headers.origin, env);
+  if (headers.referer !== undefined) {
+    try { return trustedOrigins(env).has(new URL(headers.referer).origin); }
+    catch { return false; }
+  }
+  return !headers.cookie?.trim();
+}
+
 /** Build OIDC origins only from an approved deployment origin matching request Host. */
 export function oidcRequestOrigin(host: string | undefined, env: NodeJS.ProcessEnv): string | null {
   if (!host || !/^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(host)) return null;
@@ -28,12 +39,12 @@ export function oidcRequestOrigin(host: string | undefined, env: NodeJS.ProcessE
   return null;
 }
 
-/** A cookie-backed browser mutation must prove its site. Native clients may omit these headers only when they send no cookies. */
-export function permittedMutationOrigin(headers: { origin?: string; referer?: string; cookie?: string }, env: NodeJS.ProcessEnv): boolean {
-  if (headers.origin !== undefined) return headers.origin.length > 0 && permittedBrowserOrigin(headers.origin, env);
-  if (headers.referer !== undefined) {
-    try { return trustedOrigins(env).has(new URL(headers.referer).origin); }
-    catch { return false; }
-  }
-  return !headers.cookie?.trim();
+/** Accept safe same-origin paths only; reject parser slash tricks and header injection. */
+export function safeReturnPath(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") ||
+      /[\\\u0000-\u001f\u007f]/.test(value) || /%(?:2f|5c|0d|0a)/i.test(value)) return "/";
+  try {
+    const base = "https://auth-boundary.invalid";
+    return new URL(value, base).origin === base ? value : "/";
+  } catch { return "/"; }
 }
