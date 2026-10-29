@@ -141,6 +141,7 @@ class MainActivity : ComponentActivity() {
                     )
                     selectedSupportTicket != null -> NativeSupportTicketScreen(
                         ticket = supportTicket,
+                        canManageSupport = if (demoActive) demoRole in listOf("teacher", "assessor") else (screen?.portal?.role ?: "") in listOf("teacher", "assessor"),
                         reply = supportReply,
                         onReply = { supportReply = it.take(4000) },
                         triageReason = supportTriageReason,
@@ -152,6 +153,8 @@ class MainActivity : ComponentActivity() {
                         useGuidance = { supportReply = suggestedReply(supportGuidance) },
                         sendReply = { sendSupportReply() },
                         triage = { triageSupportTicket() },
+                        assign = { staffId -> assignSupportEducator(staffId) },
+                        schedulePractice = { body, reviewAt -> scheduleSupportPractice(body, reviewAt) },
                         close = { closeSupportTicket() }
                     )
                     selectedQuiz != null -> NativeQuizScreen(
@@ -732,6 +735,48 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {
                 supportMessage = "The request changed or could not be triaged. Refresh it before trying again."
             } finally { supportBusy = false }
+        }
+    }
+
+    private fun assignSupportEducator(staffId: String) {
+        val current = supportTicket ?: return
+        if (supportBusy || staffId.isBlank()) return
+        supportBusy = true; supportMessage = null
+        lifecycleScope.launch {
+            try {
+                val updated = api.assignSupportTicket(current, staffId)
+                updateSupportSummary(updated)
+                supportTicket = api.fetchSupportTicket(updated)
+                selectedSupportTicket = supportTicket?.summary
+                supportMessage = "Authorised educator assigned."
+            } catch (_: Exception) { supportMessage = "Could not assign this request. Refresh it before trying again." }
+            finally { supportBusy = false }
+        }
+    }
+
+    private fun scheduleSupportPractice(body: String, reviewAt: String) {
+        val current = supportTicket ?: return
+        if (supportBusy || body.trim().length !in 5..4000) return
+        if (demoActive) {
+            val updated = current.copy(
+                summary = current.summary.copy(reviewAt = reviewAt),
+                history = current.history + SupportTicketEvent("practice", body.trim(), reviewAt)
+            )
+            supportTicket = updated
+            updateSupportSummary(updated.summary)
+            supportMessage = "Synthetic practice checkpoint saved on this device. Nothing was sent to a school."
+            return
+        }
+        supportBusy = true; supportMessage = null
+        lifecycleScope.launch {
+            try {
+                val updated = api.scheduleSupportPractice(current, body, reviewAt)
+                updateSupportSummary(updated)
+                supportTicket = api.fetchSupportTicket(updated)
+                selectedSupportTicket = supportTicket?.summary
+                supportMessage = "Practice and review checkpoint saved."
+            } catch (_: Exception) { supportMessage = "Could not save the practice checkpoint. Choose a future time and retry." }
+            finally { supportBusy = false }
         }
     }
 }
