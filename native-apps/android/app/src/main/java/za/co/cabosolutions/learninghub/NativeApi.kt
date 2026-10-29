@@ -27,6 +27,16 @@ private val materialContentTypes = mapOf(
 )
 
 internal data class MaterialSummary(val id: Int, val title: String)
+internal data class LearnerJourneyIdentity(val displayName: String = "")
+internal data class LearnerJourneyEntry(val id: Int, val institutionName: String, val stage: String, val academicYear: Int, val note: String)
+internal data class LearnerJourneyMilestone(val id: Int, val title: String, val description: String, val kind: String, val year: Int)
+internal sealed class LearnerJourneyAction {
+    data class SaveIdentity(val displayName: String) : LearnerJourneyAction()
+    data class AddEntry(val institution: String, val stage: String, val year: Int, val note: String) : LearnerJourneyAction()
+    data class AddMilestone(val title: String, val description: String, val kind: String, val year: Int) : LearnerJourneyAction()
+    data class DeleteEntry(val id: Int) : LearnerJourneyAction()
+    data class DeleteMilestone(val id: Int) : LearnerJourneyAction()
+}
 internal data class SupportCourseOption(val organizationId: Int, val courseId: Int, val name: String)
 internal data class NativeSupportDraft(
     val requestKey: String, val organizationId: Int, val courseId: Int,
@@ -94,6 +104,9 @@ internal data class NativeLearning(
     val parentReportNotice: String = "",
     val staff: List<StaffWorkspace> = emptyList(),
     val journey: List<String> = emptyList(),
+    val journeyIdentity: LearnerJourneyIdentity = LearnerJourneyIdentity(),
+    val journeyEntries: List<LearnerJourneyEntry> = emptyList(),
+    val journeyMilestones: List<LearnerJourneyMilestone> = emptyList(),
     val learnerHelp: List<String> = emptyList(),
     val materialEntries: List<MaterialSummary> = emptyList(),
     val supportCourses: List<SupportCourseOption> = emptyList(),
@@ -376,7 +389,8 @@ internal class NativeApi(private val context: Context) {
             }
         } catch (_: Exception) { "Native sign-in could not complete. Please try again." }
     }
-    private fun request(route: String, body: JSONObject? = null, auth: Boolean = false, requestKey: String? = null): JSONObject {
+    private fun request(route: String, body: JSONObject? = null, method: String? = null,
+                        auth: Boolean = false, requestKey: String? = null): JSONObject {
         val url = URL(origin + route)
         val connection = url.openConnection() as HttpURLConnection
         connection.connectTimeout = 9000
@@ -389,8 +403,8 @@ internal class NativeApi(private val context: Context) {
             val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
             connection.setRequestProperty("Authorization", "Bearer $token")
         }
+        connection.requestMethod = method ?: if (body != null) "POST" else "GET"
         if (body != null) {
-            connection.requestMethod = "POST"
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
         }
@@ -402,7 +416,7 @@ internal class NativeApi(private val context: Context) {
                 throw IllegalStateException("CABO API HTTP $status")
             }
             val text = connection.inputStream.bufferedReader().use { it.readText() }
-            return JSONObject(text)
+            return if (text.isBlank()) JSONObject() else JSONObject(text)
         } finally { connection.disconnect() }
     }
     private fun getArray(route: String): JSONArray {
@@ -602,10 +616,28 @@ internal class NativeApi(private val context: Context) {
                 null
             }
         }
+        var journeyIdentity = LearnerJourneyIdentity()
+        var journeyEntries = emptyList<LearnerJourneyEntry>()
+        var journeyMilestones = emptyList<LearnerJourneyMilestone>()
         val journey = try {
             val obj = request("/api/learner-journey/me", auth = true)
             val stages = obj.optJSONArray("journeys") ?: JSONArray()
             val milestones = obj.optJSONArray("milestones") ?: JSONArray()
+            journeyIdentity = LearnerJourneyIdentity(obj.optJSONObject("identity")?.optString("displayName", "")?.take(160) ?: "")
+            journeyEntries = (0 until minOf(stages.length(), 100)).mapNotNull { i ->
+                stages.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id"); val school = row.optString("institutionName")
+                    if (id <= 0 || school.isBlank()) null else LearnerJourneyEntry(id,
+                        school.take(160), row.optString("stage").take(32), row.optInt("academicYear"), row.optString("note").take(2000))
+                }
+            }
+            journeyMilestones = (0 until minOf(milestones.length(), 100)).mapNotNull { i ->
+                milestones.optJSONObject(i)?.let { row ->
+                    val id = row.optInt("id"); val title = row.optString("title"); val detail = row.optString("description")
+                    if (id <= 0 || title.isBlank() || detail.isBlank()) null else LearnerJourneyMilestone(
+                        id, title.take(160), detail.take(4000), row.optString("kind").take(32), row.optInt("year"))
+                }
+            }
             listOf("Learning stages: ${stages.length()}", "Milestones: ${milestones.length()}")
         } catch (error: Exception) {
             if (!hasSession()) throw error
@@ -649,7 +681,29 @@ internal class NativeApi(private val context: Context) {
         NativeLearning(NativePortal(role, summary, cards), materialEntries.map { it.title },
             quizEntries.map { it.title }, journey = journey, learnerHelp = learnerHelp,
             materialEntries = materialEntries, supportCourses = supportCourses, quizEntries = quizEntries,
+            journeyIdentity = journeyIdentity, journeyEntries = journeyEntries, journeyMilestones = journeyMilestones,
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice)
+    }
+
+    suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        request("/api/learner-journey/me", JSONObject().put("displayName", displayName.trim().take(160)), method = "PUT", auth = true)
+    }
+
+    suspend fun addJourneyEntry(institutionName: String, stage: String, academicYear: Int, note: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            request("/api/learner-journey/entries", JSONObject().put("institutionName", institutionName.trim())
+                .put("stage", stage).put("academicYear", academicYear).put("note", note.take(2000)), auth = true)
+        }
+
+    suspend fun addJourneyMilestone(title: String, description: String, kind: String, year: Int) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            request("/api/learner-journey/milestones", JSONObject().put("title", title.trim())
+                .put("description", description.trim()).put("kind", kind).put("year", year), auth = true)
+        }
+
+    suspend fun deleteJourneyItem(path: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(path.matches(Regex("/api/learner-journey/(entries|milestones)/[1-9][0-9]*")))
+        request(path, method = "DELETE", auth = true)
     }
 
     suspend fun fetchSupportTicket(summary: SupportTicketSummary): SupportTicket =
