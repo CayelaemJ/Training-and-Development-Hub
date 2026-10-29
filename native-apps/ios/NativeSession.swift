@@ -137,6 +137,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var guardianGuidance = ""
     @Published var guardianReports: [NativeGuardianReport] = []
     @Published var guardianReportNotice = ""
+    @Published var issuedReports: [NativeIssuedSchoolReport] = []
+    @Published var issuedReportIntegrity: [String: NativeReportIntegrityCheck] = [:]
     @Published var staffSchools: [StaffSchool] = []
     @Published var adminOrganizations: [String] = []
     @Published var journey: [String] = []
@@ -270,7 +272,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             clearToken()
             role = nil
             summary = []; workspaces = []; materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
-            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
+            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
             status = "Session expired. Sign in again."
@@ -369,6 +371,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
             var nextGuardianReportNotice = ""
+            var nextIssuedReports: [NativeIssuedSchoolReport] = []
             var nextSupportCourses: [NativeSupportCourse] = []
             var nextSupportDrafts = loadSupportDrafts()
 
@@ -399,6 +402,27 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                 } catch {
                     if keychainToken() == nil { throw error }
                     nextGuardianReportNotice = "Verified academic reports are unavailable. Check your connection or ask the school."
+                }
+                for report in nextGuardianReports {
+                    do {
+                        let safeLearnerId = report.learnerId.addingPercentEncoding(
+                            withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")) ?? ""
+                        guard !safeLearnerId.isEmpty else { continue }
+                        let data = try await request("api/guardian/issued-reports/\(safeLearnerId)?organizationId=\(report.organizationId)")
+                        let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
+                        for row in rows.prefix(50) {
+                            guard row["organizationId"] == nil else { continue }
+                            var enriched = row
+                            enriched["organizationId"] = report.organizationId
+                            enriched["learnerName"] = report.learnerName
+                            if let encoded = try? JSONSerialization.data(withJSONObject: enriched),
+                               let issued = try? JSONDecoder().decode(NativeIssuedSchoolReport.self, from: encoded) {
+                                nextIssuedReports.append(issued)
+                            }
+                        }
+                    } catch {
+                        if keychainToken() == nil { throw error }
+                    }
                 }
             } else if ["teacher", "assessor", "headmaster", "deputy_headmaster", "department_head", "grade_head"]
                         .contains(verifiedRole) {
@@ -465,6 +489,19 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     }
                 }
             } else {
+                if verifiedRole == "learner" {
+                    for organizationId in Array((decoded["organizationIds"] as? [Int] ?? []).prefix(5)) {
+                        do {
+                            let data = try await request("api/organizations/\(organizationId)/report-issuance/me")
+                            let reports = try JSONDecoder().decode([NativeIssuedSchoolReport].self, from: data)
+                            nextIssuedReports.append(contentsOf: reports
+                                .filter { $0.organizationId == organizationId }
+                                .prefix(max(0, 100 - nextIssuedReports.count)))
+                        } catch {
+                            if keychainToken() == nil { throw error }
+                        }
+                    }
+                }
                 nextMaterialSummaries = Array((try? JSONDecoder().decode([NativeMaterialSummary].self,
                     from: await request("api/materials")))?.prefix(30) ?? [])
                 nextMaterials = nextMaterialSummaries.map(\.title)
@@ -555,6 +592,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             guardianGuidance = nextGuidance
             guardianReports = nextGuardianReports
             guardianReportNotice = nextGuardianReportNotice
+            issuedReports = Dictionary(nextIssuedReports.map { ($0.key, $0) },
+                uniquingKeysWith: { first, _ in first }).values.sorted { $0.academicYear > $1.academicYear }
+            issuedReportIntegrity = [:]
             staffSchools = nextStaff
             adminOrganizations = nextAdminOrganizations
             journey = nextJourney
@@ -574,7 +614,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
             supportCourses = loadSupportCourses()
@@ -1078,6 +1118,35 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
+    func verifyIssuedReport(_ report: NativeIssuedSchoolReport) async {
+        guard !busy, ["learner", "parent"].contains(role ?? ""),
+              issuedReports.contains(where: { $0.key == report.key }),
+              report.reportId > 0, report.organizationId > 0 else {
+            status = "This issued report is not available to the current account."
+            return
+        }
+        busy = true
+        do {
+            let data = try await request("api/organizations/\(report.organizationId)/report-issuance/\(report.reportId)/integrity")
+            let result = try JSONDecoder().decode(NativeReportIntegrityCheck.self, from: data)
+            issuedReportIntegrity[report.key] = result
+            if result.hashValid == nil {
+                status = "This report uses a legacy digest that cannot be verified."
+            } else if result.hashValid == false {
+                status = "Warning: the report content hash does not match."
+            } else if result.signatureValid {
+                status = "Cryptographic signature verified. Issuer accreditation is not asserted."
+            } else if result.cryptographicallySigned {
+                status = "A signature is present but is not trusted or did not validate."
+            } else {
+                status = "Report content integrity checked. No cryptographic signature is configured."
+            }
+        } catch {
+            status = "Unable to verify this report right now. Check your connection and access."
+        }
+        busy = false
+    }
+
     func signOut() async {
         guard !busy else { return }
         busy = true
@@ -1093,7 +1162,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         clearSupportStorage()
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []
-        guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+        guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
         busy = false

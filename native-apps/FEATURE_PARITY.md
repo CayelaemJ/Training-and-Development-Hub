@@ -15,7 +15,7 @@ The native apps are currently **partial clients**, not feature-complete releases
 | Education Command | — | — | Limited | National to school leaders | Missing native workspace |
 | Assessment question bank | — | — | Teacher / school leaders | Admin | Missing native workspace |
 | School intelligence | — | — | School leaders | Admin | Missing native workspace |
-| Report issuance and integrity | Learner previews | Guardian previews | School leaders | Admin | Native school submission, independent approval, issue, reject and revoke actions are implemented; learner/guardian integrity verification and official report viewing remain partial |
+| Report issuance and integrity | Draft previews and issued report snapshots | Verified previews and issued report snapshots | School leaders | Admin | Android and iOS support school submission/approval/issue/reject/revoke plus learner and verified-guardian issued report viewing and integrity checks; school analytics and wider administration remain missing |
 | Guardian Connect | — | Invitations | School verification | Admin | Android and iOS support invitations, protected reports, and the server-authorized school review action; institutional ownership and evidence must still be confirmed in end-to-end acceptance |
 | Education reports | Learner preview | Verified reports | Assigned school scope | Admin | Learner/parent previews partial; reporting workflow missing |
 | University applications | Apply and track | — | — | Admin catalog | Missing native workspace |
@@ -56,5 +56,6 @@ A capability moves to complete only when all of these are true on both native pl
 ## Recent native additions
 
 - The native family-access review surfaces accepted and verified guardian relationships only when the existing school review endpoint authorizes the signed-in account. Both clients require an explicit reviewer confirmation before submitting a decision. The API remains authoritative for institution ownership, active enrollment, invitation acceptance, and revocation rules. No identity documents are collected by the native review flow.
-- Native school report issuance now supports report submission, independent approval, issue, reject and revoke on both platforms. The server remains authoritative for school-manager access, two-person review, valid report transitions and snapshot integrity. Learner and guardian issued-report presentation and explicit integrity verification still need native completion.
+- Native school report issuance supports report submission, independent approval, issue, reject and revoke on both platforms. The server remains authoritative for school-manager access, two-person review, valid report transitions and snapshot integrity. Native school analytics and the wider report-administration tools remain incomplete.
+- Learners and verified guardians can now view issued report snapshots and request the existing server integrity check on Android and iOS. The UI states that a hash or configured signature does not establish institutional accreditation.
 - Android and iOS support lifecycle changes, learner feedback, published result comparison, and Learning DNA review are in the current delivery sequence. They are not a substitute for the missing route families listed above or for complete device acceptance.
