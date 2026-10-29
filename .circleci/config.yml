@@ -45,6 +45,9 @@ jobs:
             if [ "${CABO_DJANGO_WORKER_URL:-}" != "https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev" ]; then
               echo "Refusing unexpected staging destination"; exit 2
             fi
+            if [ "${CABO_ENVIRONMENT:-}" != "staging" ] || [ "${CABO_DJANGO_STAGING_PRIVACY_APPROVED:-}" != "true" ]; then
+              echo "Refusing deploy without staging environment and privacy approval"; exit 2
+            fi
             : "${CLOUDFLARE_API_TOKEN:?A scoped Cloudflare Workers deployment token is required}"
             : "${DJANGO_SECRET_KEY:?Django signing secret is required}"
             : "${DJANGO_WORKER_TOKEN:?Worker-to-API authentication secret is required}"
