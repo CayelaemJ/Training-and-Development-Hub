@@ -895,7 +895,7 @@ internal class NativeApi(private val context: Context) {
         } catch (error: Exception) {
             if (!hasSession()) throw error
             emptyList()
-        }
+        } else emptyList()
         val examManagementWorkspaces = emptyList<ExamManagementWorkspace>()
         val writtenAssignments = if (role != "learner") emptyList() else try {
             getArray("/api/my-assignments").let { arr ->
