@@ -293,7 +293,13 @@ class MainActivity : ComponentActivity() {
                             if (!demoActive && screen?.canManageExamAssignments == true) {
                                 busy = true
                                 lifecycleScope.launch {
-                                    try { screen = screen?.copy(examManagementWorkspaces = api.fetchExamManagementWorkspaces()) }
+                                    try {
+                                        val workspaces = api.fetchExamManagementWorkspaces()
+                                        val resources = api.fetchExamManagementResources()
+                                        screen = screen?.copy(examManagementWorkspaces = workspaces,
+                                            materialEntries = resources.materials, materials = resources.materials.map { it.title },
+                                            writtenExams = resources.exams)
+                                    }
                                     catch (_: Exception) { status = "Exam workspace could not be loaded. Check your connection and try again." }
                                     finally { busy = false; selectedWrittenExams = true }
                                 }
