@@ -665,7 +665,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     }
                 }
             } else {
-                if ["learner", "owner", "admin"].contains(verifiedRole) {
+                if verifiedRole == "learner" || nextCanManageExamAssignments {
                     nextWrittenExams = Array((try? JSONDecoder().decode([NativeWrittenExam].self,
                         from: await request("api/written-exams")))?.prefix(30) ?? [])
                 }
