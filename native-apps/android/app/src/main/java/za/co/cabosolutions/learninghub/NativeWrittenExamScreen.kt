@@ -15,9 +15,11 @@ import kotlinx.coroutines.launch
 internal fun NativeWrittenExamScreen(
     materials: List<MaterialSummary>,
     exams: List<WrittenExam>,
+    assignments: List<WrittenExamAssignment> = emptyList(),
     generate: suspend (Int, Int, String) -> WrittenExam,
     open: suspend (Int) -> WrittenExam,
-    submit: suspend (Int, List<String>) -> WrittenExamResult,
+    openAssignment: suspend (Int) -> WrittenExam = open,
+    submit: suspend (Int, Int?, List<String>) -> WrittenExamResult,
     isDemo: Boolean = false,
     close: () -> Unit
 ) {
@@ -27,14 +29,16 @@ internal fun NativeWrittenExamScreen(
     var questionCount by remember { mutableStateOf(5) }
     var difficulty by remember { mutableStateOf("intermediate") }
     var exam by remember { mutableStateOf<WrittenExam?>(null) }
+    var assignmentId by remember { mutableStateOf<Int?>(null) }
     var answers by remember { mutableStateOf(emptyList<String>()) }
     var result by remember { mutableStateOf<WrittenExamResult?>(null) }
     var busy by remember { mutableStateOf(false) }
     var submitted by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    fun selectExam(value: WrittenExam) {
+    fun selectExam(value: WrittenExam, assignedId: Int? = null) {
         exam = value
+        assignmentId = assignedId
         answers = List(value.questions.size) { "" }
         result = null
         submitted = false
@@ -103,6 +107,31 @@ internal fun NativeWrittenExamScreen(
                 ) { Text("Generate written exam") }
             }
 
+            if (assignments.isNotEmpty()) {
+                Text("Assigned to you", style = MaterialTheme.typography.titleMedium)
+                assignments.forEach { assignment ->
+                    OutlinedButton(
+                        onClick = {
+                            if (busy) return@OutlinedButton
+                            busy = true; message = null
+                            scope.launch {
+                                try { selectExam(openAssignment(assignment.id), assignment.id) }
+                                catch (_: Exception) { message = "This assigned exam could not be opened. Check your connection and try again." }
+                                finally { busy = false }
+                            }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .testTag("assigned-written-exam-${assignment.id}")
+                    ) {
+                        Column {
+                            Text("${assignment.title} · ${assignment.organization}")
+                            assignment.dueAt?.let { Text("Due ${it.take(10)}", style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                }
+            }
+
             if (exams.isNotEmpty()) {
                 Text("Your saved exams", style = MaterialTheme.typography.titleMedium)
                 exams.forEach { saved ->
@@ -111,7 +140,7 @@ internal fun NativeWrittenExamScreen(
                             if (busy) return@OutlinedButton
                             busy = true; message = null
                             scope.launch {
-                                try { selectExam(open(saved.id)) }
+                                try { selectExam(open(saved.id), null) }
                                 catch (_: Exception) { message = "This exam could not be opened. Check your connection and try again." }
                                 finally { busy = false }
                             }
@@ -127,6 +156,7 @@ internal fun NativeWrittenExamScreen(
             exam?.let { current ->
                 HorizontalDivider()
                 Text(current.title, style = MaterialTheme.typography.headlineSmall)
+                if (assignmentId != null) Text("Assigned exam · ${assignments.firstOrNull { it.id == assignmentId }?.organization ?: "School"}")
                 Text("${current.questions.sumOf { it.maxMarks }} marks · ${current.difficulty}",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 current.questions.forEachIndexed { index, question ->
@@ -164,7 +194,7 @@ internal fun NativeWrittenExamScreen(
                         busy = true
                         message = null
                         scope.launch {
-                            try { result = submit(current.id, answers) }
+                            try { result = submit(current.id, assignmentId, answers) }
                             catch (_: Exception) {
                                 message = "CABO could not confirm the marking result. Do not submit again yet; check with your educator before retrying."
                             } finally { busy = false }
