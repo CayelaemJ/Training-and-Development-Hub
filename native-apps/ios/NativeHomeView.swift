@@ -749,6 +749,7 @@ private struct NativeSchoolOperationsPanel: View {
     @State private var attendanceNote = ""
     @State private var replacementTeacherId = ""
     @State private var substitutionReason = ""
+    @State private var selectedIntelligenceWorkspace: NativeSchoolOperationsWorkspace?
 
     var body: some View {
         if !session.schoolOperations.isEmpty {
@@ -795,6 +796,13 @@ private struct NativeSchoolOperationsPanel: View {
                             }
                         }
                         if workspace.canManage {
+                            Button {
+                                selectedIntelligenceWorkspace = workspace
+                            } label: {
+                                Label("Attendance & academic signals", systemImage: "chart.bar.xaxis")
+                                    .frame(maxWidth: .infinity, minHeight: 48)
+                            }
+                            .buttonStyle(.bordered)
                             Divider()
                             Text("Publish a school notice").font(.subheadline.bold())
                             TextField("Notice title", text: $subject).textFieldStyle(.roundedBorder)
@@ -832,6 +840,13 @@ private struct NativeSchoolOperationsPanel: View {
                     .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
                 }
             }.padding(.vertical, 8)
+                .sheet(item: $selectedIntelligenceWorkspace) { workspace in
+                    NativeSchoolIntelligenceView(
+                        session: session,
+                        organizationId: workspace.organizationId,
+                        organizationName: workspace.organizationName
+                    )
+                }
         }
     }
 
