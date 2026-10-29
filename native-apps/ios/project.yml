@@ -17,6 +17,7 @@ targets:
       - path: NativeSession.swift
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift
+      - path: NativeMaterialUploadView.swift
       - path: NativeGuardianReport.swift
     settings:
       base:
