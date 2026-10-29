@@ -28,7 +28,7 @@ From a developer terminal with the approved database access and the **private** 
 \`\`\`bash
 CABO_BLOB_AUDIT_ENABLED=true \
   UPSTASH_BLOB_TOKEN="<server-side private bucket token>" \
-  pnpm --filter @workspace/api-server exec tsx src/scripts/auditBlobStorage.ts
+  pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/auditBlobStorage.ts
 \`\`\`
 
 The script never uploads, deletes, changes permissions or migrates any data. It lists at most 5,000 private Blob objects and 5,000 paths per database table, refusing to report success on a truncated inventory. It classifies provider objects as matched to saved study materials, matched to recent upload intents, or **unreferenced candidates for human review**. Expired upload-intent counts are reported separately.
