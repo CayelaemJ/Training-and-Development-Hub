@@ -1,30 +1,39 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { db, notificationOutboxTable } from "@workspace/db";
+import { db, notificationOutboxTable, notificationEventSourcesTable } from "@workspace/db";
+import { currentSourceAuthorization } from "./currentNotificationAuthorization";
+import type { NoticeSource } from "./notificationEligibility";
 import { composeSafeNotice, noticesEnabled, sendTransactionalNotice, type NoticeInput } from "./transactionalNotices";
 import { decryptRecipient, encryptRecipient, readOutboxKey } from "./outboxCrypto";
 
 /** No public HTTP route calls this module. Authorization belongs to the producer. */
 export async function enqueueApprovedNotice(
-  args: NoticeInput & { recipientUserId: string; organizationId?: number },
+  args: NoticeInput & { recipientUserId: string; organizationId: number; source:NoticeSource },
   env: NodeJS.ProcessEnv = process.env,
 ):Promise<"queued"|"duplicate"|"disabled"> {
   if (env.CABO_NOTIFICATION_OUTBOX_ENABLED!=="true") return "disabled";
   composeSafeNotice(args);
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(args.recipientUserId) ||
-      (args.organizationId!==undefined && (!Number.isSafeInteger(args.organizationId) || args.organizationId<1))) {
+      (!Number.isSafeInteger(args.organizationId) || args.organizationId<1)) {
     throw new Error("Notification recipient authorization context is invalid");
   }
+  if(!await currentSourceAuthorization({eventId:args.eventId,recipientUserId:args.recipientUserId,
+    organizationId:args.organizationId,kind:args.kind,to:args.to},args.source)) {
+    throw new Error("Current notification recipient or guardian consent is not verified");
+  }
   const recipientCiphertext=encryptRecipient(args.to.trim(),args.eventId,readOutboxKey(env));
-  const inserted=await db.insert(notificationOutboxTable).values({
-    eventId:args.eventId.toLowerCase(),
-    recipientUserId:args.recipientUserId,
-    organizationId:args.organizationId??null,
-    recipientCiphertext,
-    kind:args.kind,
-    status:"queued",
-  }).onConflictDoNothing({target:notificationOutboxTable.eventId}).returning({id:notificationOutboxTable.id});
-  return inserted.length ? "queued" : "duplicate";
+  return db.transaction(async tx=>{
+    const inserted=await tx.insert(notificationOutboxTable).values({
+      eventId:args.eventId.toLowerCase(),recipientUserId:args.recipientUserId,
+      organizationId:args.organizationId,recipientCiphertext,
+      kind:args.kind,status:"queued",
+    }).onConflictDoNothing({target:notificationOutboxTable.eventId}).returning({id:notificationOutboxTable.id});
+    if(!inserted.length)return "duplicate" as const;
+    await tx.insert(notificationEventSourcesTable).values({
+      eventId:args.eventId.toLowerCase(),sourceKind:args.source.kind,sourceId:args.source.id,
+    });
+    return "queued" as const;
+  });
 }
 
 type Claim = {
@@ -73,7 +82,7 @@ async function finish(
 }
 
 export type OutboxDeliveryResult="idle"|"sent"|"needs_review"|"disabled";
-export type DispatchAuthorization = (row:{ eventId:string; recipientUserId:string; organizationId:number|null; kind:NoticeInput["kind"] })=>Promise<boolean>;
+export type DispatchAuthorization = (row:{ eventId:string; recipientUserId:string; organizationId:number|null; kind:NoticeInput["kind"]; to:string })=>Promise<boolean>;
 export async function processOneApprovedNotice(
   authorize:DispatchAuthorization|undefined,
   fetcher:typeof fetch=fetch,
@@ -88,10 +97,10 @@ export async function processOneApprovedNotice(
   try {
     // Always revalidate tenant, guardian/legal consent and preferences *now*.
     // Missing or revoked authorization cannot send; never trust only enqueue-time approval.
-    const permitted=await authorize({eventId:claim.eventId,recipientUserId:claim.recipientUserId,
-      organizationId:claim.organizationId,kind:claim.kind});
-    if(!permitted){await finish(claim,"needs_review","authorization_revoked");return "needs_review";}
     const address=decryptRecipient(claim.recipientCiphertext,claim.eventId,key);
+    const permitted=await authorize({eventId:claim.eventId,recipientUserId:claim.recipientUserId,
+      organizationId:claim.organizationId,kind:claim.kind,to:address});
+    if(!permitted){await finish(claim,"needs_review","authorization_revoked");return "needs_review";}
     const result=await sendTransactionalNotice({
       to:address,eventId:claim.eventId,kind:claim.kind,deliveryApproved:true,
     },fetcher,env);
