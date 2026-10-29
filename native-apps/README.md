@@ -25,7 +25,7 @@ These are standalone native interfaces, **not browser wrappers, PWAs or React We
 ## Android emulator and internal build workflow
 
 - CI runs instrumentation tests on an Android 6.0 / API 23 emulator, the current minimum supported Android version.
-- The tests cover the default secure sign-in screen, hidden-by-default test credentials, quiz answer requirements, one-shot submission behavior, and uncertain-submission recovery controls.
+- The tests cover the default secure sign-in screen, hidden-by-default test credentials, quiz answer requirements, one-shot submission behavior, uncertain-submission recovery, learner written-exam marking, and assignment-scoped exam submission.
 - Each run creates a standard debug APK and a separate short-retention test APK pinned to the isolated Render preview. Neither build contains account credentials or release signing keys.
 - The test-login APK is for the isolated dummy-data service only. Never redistribute it as a production app.
 
