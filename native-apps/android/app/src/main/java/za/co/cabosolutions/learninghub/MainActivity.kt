@@ -1472,7 +1472,7 @@ private fun RoleContent(
                                         if (report.status in setOf("submitted", "issued")) {
                                             OutlinedTextField(value = reason, onValueChange = { reason = it.take(1000) },
                                                 label = { Text("Reason for rejection or revocation") },
-                                                modifier = Modifier.fillMaxWidth(), enabled = !busy)
+                                                modifier = Modifier.fillMaxWidth().testTag("report-reason-${report.id}"), enabled = !busy)
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                                             when (report.status) {
