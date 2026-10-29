@@ -65,5 +65,6 @@ The repository includes a pipeline parameter `deploy_django_staging` (default `f
 - `DJANGO_SECRET_KEY`: strong randomly generated Django signing key, at least 32 characters.
 - `DJANGO_WORKER_TOKEN`: strong random shared bearer secret, at least 32 characters, also configured in the **staging CABO API only**.
 - `CABO_DJANGO_WORKER_URL=https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev`.
+- `CABO_ENVIRONMENT=staging` and `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` (both required by the CI deploy preflight; do not add these approval flags to production).
 
 Restrict context access to approved maintainers and staging jobs; do not use live student records. The job writes secrets to a temporary mode-0600 file, deploys via Pywrangler, deletes that file, then runs `node scripts/test-django-worker-staging.mjs` to check HTTP health, authentication, advisory output, and privacy rejection. A failed test is a failed release even if the Worker upload succeeded: revert staging before proceeding. **There is currently no authorised Cloudflare deployment credential configured in this connected environment, so this remains a prepared, untriggered workflow.**
