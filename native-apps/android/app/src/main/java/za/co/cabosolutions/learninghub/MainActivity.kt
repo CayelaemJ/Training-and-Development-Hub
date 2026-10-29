@@ -103,10 +103,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val caboColors = lightColorScheme(
-                primary = Color(0xFF37876E), onPrimary = Color.White,
-                secondary = Color(0xFFC4673A), onSecondary = Color.White,
+                primary = Color(0xFFC4673A), onPrimary = Color(0xFF0D1117),
+                secondary = Color(0xFF1D6B6B), onSecondary = Color.White,
                 background = Color(0xFFF8F6EF), surface = Color(0xFFFFFEFA),
-                surfaceVariant = Color(0xFFE8F0E9), onSurface = Color(0xFF29372F),
+                surfaceVariant = Color(0xFFF3E6DA), onSurface = Color(0xFF29372F),
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
@@ -764,10 +764,10 @@ internal fun NativeHome(
                 actions = {
                     if (data != null) {
                         IconButton(onClick = refresh, enabled = !busy) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh dashboard", tint = Color(0xFF37876E))
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh dashboard", tint = Color(0xFFC4673A))
                         }
                         IconButton(onClick = signOut, enabled = !busy) {
-                            Icon(Icons.Default.Logout, contentDescription = if (demoActive) "Exit demo" else "Sign out", tint = Color(0xFF37876E))
+                            Icon(Icons.Default.Logout, contentDescription = if (demoActive) "Exit demo" else "Sign out", tint = Color(0xFFC4673A))
                         }
                     }
                 },
@@ -784,9 +784,9 @@ internal fun NativeHome(
                             icon = { Icon(icon, contentDescription = null) },
                             label = { Text(label) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF37876E),
-                                selectedTextColor = Color(0xFF37876E),
-                                indicatorColor = Color(0xFFDCECE2)
+                                selectedIconColor = Color(0xFFC4673A),
+                                selectedTextColor = Color(0xFFC4673A),
+                                indicatorColor = Color(0xFFF3E6DA)
                             )
                         )
                     }
@@ -846,7 +846,7 @@ internal fun NativeHome(
                         }
                     }
                     Text("LEARNER · FAMILY · EDUCATOR", style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF37876E), letterSpacing = 1.2.sp)
+                        color = Color(0xFFC4673A), letterSpacing = 1.2.sp)
                     NativeCard("Your learning space", "Study resources, practice and progress in one place.")
                     NativeCard("Family connection", "Guardian access follows school verification and enrolment rules.")
                     NativeCard("Educator workspace", "Assigned subjects and learner support stay scoped to your school.")
@@ -870,10 +870,10 @@ internal fun NativeHome(
                     }
                     if (demoActive) {
                         ElevatedCard(Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(
-                            containerColor = Color(0xFFDCECE2))) {
+                            containerColor = Color(0xFFF3E6DA))) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("CABO PREVIEW · sample workspace", style = MaterialTheme.typography.labelLarge,
-                                    color = Color(0xFF14554F), fontWeight = FontWeight.Bold)
+                                    color = Color(0xFF7A4126), fontWeight = FontWeight.Bold)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     listOf("learner" to "Child", "teacher" to "Teacher", "parent" to "Parent").forEach { (role, label) ->
                                         FilterChip(selected = demoRole == role, onClick = { setDemoRole(role) },
@@ -890,7 +890,7 @@ internal fun NativeHome(
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Column(Modifier.width(224.dp).padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("YOUR SPACE", color = Color(0xFF37876E),
+                                Text("YOUR SPACE", color = Color(0xFFC4673A),
                                     style = MaterialTheme.typography.labelLarge, letterSpacing = 1.2.sp)
                                 Text(data.portal.role.replace('_', ' ').replaceFirstChar { it.uppercase() },
                                     style = MaterialTheme.typography.headlineSmall, color = Color(0xFF29372F),
@@ -1018,10 +1018,10 @@ private fun RoleContent(
                             role == "superadmin" -> "Governance tools are read-only and never expose learner records."
                             else -> "Lessons, practice, support and progress come together in your CABO learning space."
                         }, style = MaterialTheme.typography.bodyLarge, color = Color(0xFF68736B))
-                        Surface(color = Color(0xFFDCECE2), shape = MaterialTheme.shapes.large) {
+                        Surface(color = Color(0xFFF3E6DA), shape = MaterialTheme.shapes.large) {
                             Text("${role.replace('_', ' ').uppercase()} SPACE",
                                 Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                color = Color(0xFF37876E), style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFFC4673A), style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     }
@@ -1089,7 +1089,7 @@ private fun RoleContent(
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(quiz.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text("${quiz.questionCount} questions", style = MaterialTheme.typography.bodySmall)
-                                quiz.latestScore?.let { Text("Previous practice: $it%", color = Color(0xFF37876E)) }
+                                quiz.latestScore?.let { Text("Previous practice: $it%", color = Color(0xFFC4673A)) }
                             }
                         }
                     }
@@ -1166,7 +1166,7 @@ private fun RoleContent(
                                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(ticket.concept, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                         Text("${ticket.status.replace('_', ' ')} · request ${ticket.id}", style = MaterialTheme.typography.bodySmall)
-                                        Text("Review request  ›", style = MaterialTheme.typography.labelLarge, color = Color(0xFF37876E))
+                                        Text("Review request  ›", style = MaterialTheme.typography.labelLarge, color = Color(0xFFC4673A))
                                     }
                                 }
                             }
@@ -1224,7 +1224,7 @@ private fun ReportCard(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text("$grade · $year", color = Color(0xFF68736B))
-            average?.let { Text("Average  $it%", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF37876E)) }
+            average?.let { Text("Average  $it%", style = MaterialTheme.typography.headlineSmall, color = Color(0xFFC4673A)) }
             if (subjects.isNotEmpty()) {
                 HorizontalDivider()
                 subjects.forEach { subject ->
@@ -1252,3 +1252,4 @@ private fun NativeCard(title: String, subtitle: String) {
         }
     }
 }
+
