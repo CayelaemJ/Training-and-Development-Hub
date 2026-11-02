@@ -1,69 +1,58 @@
-# CABO Learning Hub — Connected Education Platform
+# CABO Learning Hub — Engineering Case Study
 
-> **Status:** Iterative prototype / active feature development; consult delivery register  
-> **Technology focus:** React · TypeScript · Express · PostgreSQL · AI-supported assessment  
-> **Maintainer:** Cayelaem Jantjies
+**Status:** Prototype and staged feature development. [Delivery register](PHASES_1_TO_4_DELIVERY_REGISTER.md) determines what is verified.
 
-## At a glance
+## Product question
 
-**The challenge:** Connect learner progress, teaching workflows and education intelligence beyond a conventional LMS.
+How can learning content, assessment, institutional roles and learner progression be connected beyond a conventional LMS?
 
-This is a project-specific technical showcase, not a claim that every proposed capability is live. The repository's README and implementation remain the source of truth for release status.
+## Logical architecture
 
-## System journey (conceptual)
+```mermaid
+flowchart TB
+  Learner --> Web["React / TypeScript"]
+  Teacher --> Web
+  Web --> API["Express authenticated API"]
+  API --> Materials["Materials + written exams"]
+  API --> Orgs["Organisations + groups"]
+  API --> Academic["Subjects + gradebook"]
+  Materials --> DB[("PostgreSQL / Drizzle")]
+  Orgs --> DB
+  Academic --> DB
+  Materials -. "AI-assisted marking" .-> Review["Feedback + human oversight"]
+```
+
+**Repository evidence:** Root `package.json` uses pnpm 10 and defines `pnpm run typecheck` and `pnpm run build`. The main README documents materials uploads, advisory written-exam marking, group assignments and academic workflows.
+
+## Engineering decisions and boundaries
+
+1. **Source-grounded assessments.** Questions and rubrics derive from uploaded materials. The README documents partial-credit grading and review flags. AI results are advisory, not official academic certification.
+2. **Role separation.** Learner, educator and institutional scopes require distinct authorization checks. The README lists multi-account permission and tenant-isolation validation as rollout gates.
+3. **Academic semantics.** Subjects, modules, periods and mark weights cannot assume universal NSC/IEB rules. Official qualification support has not been established.
+4. **Cross-platform product direction.** Native Android/Kotlin, iOS and desktop parity are roadmap and validation goals, not shipped binaries.
+
+## Cross-platform design roadmap
 
 ```mermaid
 flowchart LR
-  N0["Learner / teacher journeys"]
-  N1["Material + assessment workflows"]
-  N2["Authenticated API"]
-  N3["Academic / progress data"]
-  N4["Feedback + human review"]
-  N0 --> N1
-  N1 --> N2
-  N2 --> N3
-  N3 --> N4
+ Requirements --> WebApp["Web implementation"]
+ Requirements --> Android["Android / Kotlin goal"]
+ Requirements --> IOS["Native iOS goal"]
+ Requirements --> Desktop["Desktop goal"]
+ WebApp --> Parity["Journey + accessibility verification"]
+ Android --> Parity
+ IOS --> Parity
+ Desktop --> Parity
 ```
 
-*Diagram describes the documented workflow at a high level, not a verified live infrastructure topology.*
+## Quality and visual evidence
 
-## Engineering deep dive
+| Item | Evidence or next validation |
+|---|---|
+| Build | `pnpm run typecheck && pnpm run build` is defined; not run in this documentation pass |
+| Architecture | [Platform identity](PLATFORM_IDENTITY.md) |
+| Release claims | [Phased delivery register](PHASES_1_TO_4_DELIVERY_REGISTER.md) |
+| UI images | Capture synthetic learner/teacher screens, sanitise, then place in `docs/media/` |
+| Charts | Add only measured, sourced assessment or usage data |
 
-### 1. Document-grounded question generation and assessment experiences
-
-This area illustrates a concrete engineering consideration in the project. Inspect the implementation, tests, and source contracts to establish the precise current behaviour and implementation maturity before using it in a live environment.
-
-### 2. Role-based institutional workflows and academic reporting concepts
-
-This area illustrates a concrete engineering consideration in the project. Inspect the implementation, tests, and source contracts to establish the precise current behaviour and implementation maturity before using it in a live environment.
-
-### 3. Human moderation and learner-centred progression
-
-This area illustrates a concrete engineering consideration in the project. Inspect the implementation, tests, and source contracts to establish the precise current behaviour and implementation maturity before using it in a live environment.
-
-### 4. Native Android/Kotlin and iOS parity are development goals, not shipped releases
-
-This area illustrates a concrete engineering consideration in the project. Inspect the implementation, tests, and source contracts to establish the precise current behaviour and implementation maturity before using it in a live environment.
-
-## Engineering evidence checklist
-
-| Evidence | How to evaluate |
-| --- | --- |
-| Architecture | Trace actual components, data flow, trust boundaries and dependencies in this repository |
-| Data integrity | Verify schema, validation, migrations and failure handling against test cases |
-| Reliability | Check logging, error recovery, retries and existing test outcomes |
-| Security | Review auth, tenant isolation, secrets handling and data access controls |
-| Product quality | Check accessible UX, responsive layouts, empty/error states and real screenshots |
-| Deployment | Verify runtime variables, CI results and the currently active hosting configuration |
-
-## Visual gallery
-
-Real, approved screenshots, device mockups and dashboard visuals belong in a future `docs/media/` gallery. **No screenshot is displayed here until a real application view is captured, sanitised and approved.** The Mermaid flowchart above is a renderable architecture visual that works directly on GitHub.
-
-## Known limitations and honest status
-
-Consult docs/PHASES_1_TO_4_DELIVERY_REGISTER.md for verified phase status; formal assessment rules and cross-tenant security require specific validation.
-
-## Further reading
-
-[Back to repository README](../README.md) · [Cayelaem's engineering profile](https://github.com/CayelaemJ)
+[Back to README](../README.md)
