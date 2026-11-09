@@ -73,6 +73,8 @@ test("network operations fail closed and sign only private R2 endpoints", async 
     await assert.rejects(putR2StagingObject(key, Buffer.alloc(0)), /between 1 byte/);
     await assert.rejects(putR2StagingObject(key, Buffer.alloc(8 * 1024 * 1024 + 1)), /8 MiB/);
     assert.equal(calls.length, 0);
+    await assert.rejects(putR2StagingObject(newStagingKey("approved"), Buffer.from("abc")), /must enter quarantine/);
+    assert.equal(calls.length, 0);
     await putR2StagingObject(key, Buffer.from("abc"));
     assert.equal((await getR2StagingObject(key)).toString(), "abc");
     assert.equal(await headR2StagingObject(key), 3);
