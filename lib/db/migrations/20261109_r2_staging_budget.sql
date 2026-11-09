@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS cabo_r2_objects (
   state varchar(24) NOT NULL DEFAULT 'reserved'
     CHECK (state IN ('reserved', 'quarantined', 'approved', 'deleting', 'deleted')),
   ai_read_consent boolean NOT NULL DEFAULT false,
+  -- Retain accounting category during tombstone so remote-delete acknowledgement is exact.
+  billing_stage varchar(12) NOT NULL DEFAULT 'reserved' CHECK (billing_stage IN ('reserved','stored')),
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes'),
   updated_at timestamptz NOT NULL DEFAULT now(),
