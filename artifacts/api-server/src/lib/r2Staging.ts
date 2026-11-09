@@ -135,10 +135,28 @@ export async function getR2StagingObject(key: string): Promise<Buffer> {
     await response.body?.cancel();
     throw new Error("Invalid R2 response size");
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  enforceLength(bytes);
-  if (bytes.length !== Number(reported)) throw new Error("R2 download size mismatch");
-  return bytes;
+  if (!response.body) throw new Error("R2 response body missing");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const part = await reader.read();
+      if (part.done) break;
+      received += part.value.byteLength;
+      if (received > MAX_BYTES || received > Number(reported)) {
+        throw new Error("R2 download exceeds declared limit");
+      }
+      chunks.push(part.value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  if (received !== Number(reported)) throw new Error("R2 download size mismatch");
+  return Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), received);
 }
 export async function deleteR2StagingObject(key: string): Promise<void> {
   await send("DELETE", key);
