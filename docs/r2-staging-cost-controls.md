@@ -26,3 +26,24 @@
 5. Only after reviews, turn on staging flags. Production rollout requires separate approval.
 
 Reference: `docs/r2-ai-knowledge-foundation.md` and issue #164.
+
+## Implemented in draft PR #165 (9 November)
+- `artifacts/api-server/src/lib/r2Staging.ts`: disabled-by-default private R2 API adapter, 8 MiB cap, bounded GET stream, opaque keys and strict staging bucket identity.
+- `lib/db/migrations/20261109_r2_staging_budget.sql`: **not applied**. New accounting and institution-bound object tables.
+- `artifacts/api-server/src/lib/r2BudgetLedger.ts`: PostgreSQL-transaction-backed quota reservations, quarantined-byte confirmation, approved-object read budget, tombstone and verified-delete acknowledgement. This module is NOT connected to the HTTP layer; tenant membership still needs to be resolved and verified there.
+- `artifacts/api-server/src/tests/r2Staging.test.mjs` and `r2BudgetMigration.test.mjs`: negative contract and isolated PGlite schema tests. Do not claim passing before CI confirms them.
+- R2 synthetic remote upload/download/delete was successful and the temporary object was removed.
+
+## Testing (from repository root)
+```sh
+pnpm --filter @workspace/api-server exec node --test src/tests/r2Staging.test.mjs src/tests/r2BudgetMigration.test.mjs
+pnpm run typecheck
+```
+Do not run schema changes against production as part of this procedure. Use a disposable staging PostgreSQL database for integration concurrency tests. Migration SQL contains `CREATE TABLE` statements, not sensitive data.
+
+## Important limitations
+- The 2 GiB budget counts data routed through this ledger, not objects uploaded directly with separate Cloudflare credentials or other services in the account.
+- Read/write counters reserve *application operations*, not every Cloudflare billable Class A/B operation (e.g., retries, cleanup calls, scanning and manual operations). Reconciliation and observability must be implemented before declaring a hard cost guard.
+- Automatically deleting a quarantine R2 object after 7 days does not automatically decrement DB accounting. A reconciler must verify R2 absence and settle the tombstone safely.
+- The R2 bucket has a Western Europe location hint but the default jurisdiction; a geographical hint is not a legal EU residency guarantee.
+- Approval of an uploaded object and AI indexing are deliberately absent until scanning, explicit consent and access checks exist.
