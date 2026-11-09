@@ -89,6 +89,11 @@ test("network operations fail closed and sign only private R2 endpoints", async 
     await assert.rejects(getR2StagingObject(key), /failed \(503\)/);
     globalThis.fetch = async () => new Response(Buffer.from("abc"), { status: 200 });
     await assert.rejects(getR2StagingObject(key), /Invalid R2 response size/);
+    // A hostile/misconfigured storage gateway can understate Content-Length.
+    globalThis.fetch = async () => new Response(Buffer.from("oversized"), {
+      status: 200, headers: { "content-length": "3" },
+    });
+    await assert.rejects(getR2StagingObject(key), /exceeds declared limit/);
     process.env.CABO_R2_STORAGE_ENABLED = "false";
     await assert.rejects(getR2StagingObject(key), /not approved/);
   } finally {
