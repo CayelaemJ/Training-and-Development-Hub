@@ -126,6 +126,11 @@ async function send(
 }
 /** Uploads must already have a tenant-authorised, reserved and scanned intent. */
 export async function putR2StagingObject(key: string, bytes: Buffer): Promise<void> {
+  // Never allow an uploader to bypass quarantine by choosing an approved key.
+  validateStagingKey(key);
+  if (!key.startsWith("quarantine/")) {
+    throw new Error("Staging uploads must enter quarantine");
+  }
   await send("PUT", key, bytes);
 }
 export async function getR2StagingObject(key: string): Promise<Buffer> {
