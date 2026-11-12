@@ -9,14 +9,17 @@ permissions:
   contents: read
 jobs:
   ios-simulator-build:
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Select installed Xcode
         run: xcodebuild -version
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          fi
       - name: Generate Xcode project from source
         working-directory: native-apps/ios
         run: xcodegen generate
