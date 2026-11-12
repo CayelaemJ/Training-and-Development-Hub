@@ -43,6 +43,7 @@ import admissionEvidenceRouter from "./admissionEvidence";
 
 import lifelongPassportRouter from "./lifelongPassport";
 import passportTrustRouter from "./passportTrustRoutes";
+import learnerAiProfileRouter from "./learnerAiProfile";
 
 const router: IRouter = Router();
 
@@ -89,5 +90,6 @@ router.use(educationCommandRouter);
 router.use(admissionEvidenceRouter);
 router.use(lifelongPassportRouter);
 router.use(passportTrustRouter);
+router.use(learnerAiProfileRouter);
 
 export default router;

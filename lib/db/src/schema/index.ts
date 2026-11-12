@@ -60,3 +60,4 @@ export * from "./passportTrustLayers";
 export * from "./mlops";
 export * from "./notificationOutbox";
 export * from "./notificationConsent";
+export * from "./learnerAiProfile";
