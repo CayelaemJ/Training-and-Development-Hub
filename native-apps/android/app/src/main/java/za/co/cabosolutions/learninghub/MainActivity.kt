@@ -297,6 +297,7 @@ class MainActivity : ComponentActivity() {
                         passport = learnerPassport,
                         busy = learnerPassportBusy,
                         message = learnerPassportMessage,
+                        api = api,
                         refresh = { loadLearnerPassport() },
                         share = {
                             learnerPassport?.let { passport ->
@@ -444,11 +445,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLearnerPassport() {
+        if (screen?.portal?.role != "learner" || demoActive) return
         selectedLearnerPassport = true
-        if (demoActive) {
-            learnerPassport = null
-            learnerPassportMessage = "Passport export needs a connected learner account. Synthetic demo data is not exported."
-        } else loadLearnerPassport()
+        learnerPassport = null
+        learnerPassportMessage = null
+        loadLearnerPassport()
     }
 
     private fun loadLearnerPassport() {

@@ -1266,6 +1266,82 @@ internal class NativeApi(private val context: Context) {
         )
     }
 
+    suspend fun fetchLifelongLearningPassport(): LifelongLearningPassport = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val payload = request("/api/learning-passport/me", auth = true)
+        val preferences = payload.optJSONObject("preferences") ?: JSONObject()
+        val linksJson = payload.optJSONArray("links") ?: JSONArray()
+        val links = (0 until minOf(linksJson.length(), 100)).mapNotNull { index ->
+            val row = linksJson.optJSONObject(index) ?: return@mapNotNull null
+            val id = row.optInt("id")
+            val provider = row.optString("provider").take(80)
+            val url = row.optString("url").take(2048)
+            if (id <= 0 || provider.isBlank() || !url.startsWith("https://")) null else PassportEvidenceLink(
+                id, provider, url, row.optString("description").take(2000),
+                row.optString("evidenceType").take(32), row.optString("verificationStatus").take(32)
+            )
+        }
+        val competenciesJson = payload.optJSONArray("competencies") ?: JSONArray()
+        val competencies = (0 until minOf(competenciesJson.length(), 100)).mapNotNull { index ->
+            val row = competenciesJson.optJSONObject(index) ?: return@mapNotNull null
+            val id = row.optInt("id")
+            val skill = row.optString("skill").take(120)
+            if (id <= 0 || skill.isBlank()) null else PassportCompetency(
+                id, skill, row.optString("category").take(32), row.optInt("masteryLevel").coerceIn(0, 4),
+                row.optString("demonstration").take(32), row.optString("description").take(3000),
+                row.optInt("evidenceLinkId").takeIf { it > 0 }, row.optString("verificationStatus").take(32)
+            )
+        }
+        LifelongLearningPassport(
+            LifelongLearningPreferences(
+                preferences.optString("learningContext", "lifelong").take(32),
+                preferences.optString("preferredLanguage").take(24),
+                preferences.optString("learningGoal").take(2000)
+            ), links, competencies
+        )
+    }
+
+    suspend fun saveLifelongLearningPreferences(value: LifelongLearningPreferences) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(value.learningContext in setOf("lifelong", "adult_returning", "career_change", "professional", "school", "personal"))
+        require(value.preferredLanguage.length <= 24 && value.learningGoal.trim().length <= 2000)
+        request("/api/learning-passport/preferences", JSONObject()
+            .put("learningContext", value.learningContext)
+            .put("preferredLanguage", value.preferredLanguage.trim())
+            .put("learningGoal", value.learningGoal.trim()), method = "PUT", auth = true)
+    }
+
+    suspend fun addPassportEvidenceLink(provider: String, url: String, description: String, evidenceType: String) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val cleanProvider = provider.trim()
+            val cleanUrl = url.trim()
+            require(cleanProvider.length in 2..80 && cleanUrl.length in 10..2048 && cleanUrl.startsWith("https://"))
+            require(description.trim().length <= 2000 && evidenceType in setOf("portfolio", "project", "social", "learning", "community", "other"))
+            request("/api/learning-passport/links", JSONObject().put("provider", cleanProvider)
+                .put("url", cleanUrl).put("description", description.trim()).put("evidenceType", evidenceType), auth = true)
+        }
+
+    suspend fun deletePassportEvidenceLink(id: Int) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(id > 0)
+        request("/api/learning-passport/links/$id", method = "DELETE", auth = true)
+    }
+
+    suspend fun addPassportCompetency(skill: String, category: String, masteryLevel: Int,
+                                      demonstration: String, description: String, evidenceLinkId: Int?) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(skill.trim().length in 2..120 && category in setOf("technical", "academic", "creative", "vocational", "transferable", "other"))
+            require(masteryLevel in 0..4 && demonstration in setOf("practical", "project", "assessment", "portfolio", "work_example", "reflection", "other"))
+            require(description.trim().length in 10..3000 && (evidenceLinkId == null || evidenceLinkId > 0))
+            val body = JSONObject().put("skill", skill.trim()).put("category", category)
+                .put("masteryLevel", masteryLevel).put("demonstration", demonstration)
+                .put("description", description.trim())
+            if (evidenceLinkId != null) body.put("evidenceLinkId", evidenceLinkId)
+            request("/api/learning-passport/competencies", body, auth = true)
+        }
+
+    suspend fun deletePassportCompetency(id: Int) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(id > 0)
+        request("/api/learning-passport/competencies/$id", method = "DELETE", auth = true)
+    }
+
     suspend fun saveJourneyIdentity(displayName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         request("/api/learner-journey/me", JSONObject().put("displayName", displayName.trim().take(160)), method = "PUT", auth = true)
     }

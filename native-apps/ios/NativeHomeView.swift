@@ -69,6 +69,7 @@ struct NativeHomeView: View {
             if current != "learner" {
                 showAdmissions = false
                 session.clearAdmissions()
+                session.clearLifelongPassport()
             }
             // Revoke visible private study screens as soon as auth is lost.
             if current == nil {

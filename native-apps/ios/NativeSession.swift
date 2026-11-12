@@ -63,6 +63,35 @@ struct NativeLearnerPassport: Decodable {
     let provenance: String
     let interpretation: String
 }
+struct NativeLifelongLearningPreferences: Codable {
+    var learningContext: String
+    var preferredLanguage: String
+    var learningGoal: String
+    static let empty = NativeLifelongLearningPreferences(learningContext: "lifelong", preferredLanguage: "", learningGoal: "")
+}
+struct NativePassportEvidenceLink: Decodable, Identifiable {
+    let id: Int
+    let provider: String
+    let url: String
+    let description: String
+    let evidenceType: String
+    let verificationStatus: String
+}
+struct NativePassportCompetency: Decodable, Identifiable {
+    let id: Int
+    let skill: String
+    let category: String
+    let masteryLevel: Int
+    let demonstration: String
+    let description: String
+    let evidenceLinkId: Int?
+    let verificationStatus: String
+}
+struct NativeLifelongLearningPassport: Decodable {
+    let preferences: NativeLifelongLearningPreferences
+    let links: [NativePassportEvidenceLink]
+    let competencies: [NativePassportCompetency]
+}
 struct NativeEducationCommandSchool: Decodable, Identifiable {
     let id: Int
     let name: String
@@ -409,6 +438,9 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var learnerPassportJSON: String?
     @Published var learnerPassportNotice = ""
     @Published var learnerPassportBusy = false
+    @Published var lifelongPassport: NativeLifelongLearningPassport?
+    @Published var lifelongPassportNotice = ""
+    @Published var lifelongPassportBusy = false
     @Published var educationCommand: NativeEducationCommand?
     @Published var educationCommandBusy = false
     @Published var educationCommandNotice = ""
@@ -538,6 +570,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; quizzes = []; quizSummaries = []
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
             learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""
+            lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
             admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
@@ -919,6 +952,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             if keychainToken() == nil { clearSupportStorage() }
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
         learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""; learnerPassportBusy = false
+        lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
@@ -1654,6 +1688,95 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
+    func refreshLifelongPassport() async {
+        guard role == "learner", !lifelongPassportBusy else { return }
+        lifelongPassportBusy = true
+        lifelongPassportNotice = ""
+        defer { lifelongPassportBusy = false }
+        do {
+            let data = try await request("api/learning-passport/me")
+            lifelongPassport = try JSONDecoder().decode(NativeLifelongLearningPassport.self, from: data)
+        } catch {
+            lifelongPassport = nil
+            lifelongPassportNotice = "Your private Learning Passport is unavailable. Check your connection and refresh."
+        }
+    }
+
+    func clearLifelongPassport() {
+        lifelongPassport = nil
+        lifelongPassportNotice = ""
+        lifelongPassportBusy = false
+    }
+
+    func saveLifelongPreferences(_ preferences: NativeLifelongLearningPreferences) async {
+        guard role == "learner", !lifelongPassportBusy,
+              ["lifelong", "adult_returning", "career_change", "professional", "school", "personal"].contains(preferences.learningContext),
+              preferences.preferredLanguage.count <= 24, preferences.learningGoal.count <= 2000 else { return }
+        guard let body = try? JSONEncoder().encode(preferences) else { return }
+        await mutateLifelongPassport("api/learning-passport/preferences", method: "PUT", body: body,
+                                     success: "Learning preferences saved.")
+    }
+
+    func addLifelongEvidenceLink(provider: String, url: String, description: String, evidenceType: String) async {
+        let cleanProvider = provider.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard role == "learner", !lifelongPassportBusy,
+              (2...80).contains(cleanProvider.count), cleanURL.count >= 10, cleanURL.count <= 2048,
+              URLComponents(string: cleanURL)?.scheme?.lowercased() == "https",
+              description.count <= 2000,
+              ["portfolio", "project", "social", "learning", "community", "other"].contains(evidenceType) else { return }
+        let object: [String: Any] = ["provider": cleanProvider, "url": cleanURL,
+                                     "description": description.trimmingCharacters(in: .whitespacesAndNewlines),
+                                     "evidenceType": evidenceType]
+        guard let body = try? JSONSerialization.data(withJSONObject: object) else { return }
+        await mutateLifelongPassport("api/learning-passport/links", method: "POST", body: body,
+                                     success: "Private evidence link added.")
+    }
+
+    func deleteLifelongEvidenceLink(id: Int) async {
+        guard id > 0 else { return }
+        await mutateLifelongPassport("api/learning-passport/links/\(id)", method: "DELETE", body: nil,
+                                     success: "Evidence link removed from your private Learning Passport.")
+    }
+
+    func addLifelongCompetency(skill: String, category: String, masteryLevel: Int,
+                               demonstration: String, description: String, evidenceLinkId: Int?) async {
+        let cleanSkill = skill.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard role == "learner", !lifelongPassportBusy, (2...120).contains(cleanSkill.count),
+              ["technical", "academic", "creative", "vocational", "transferable", "other"].contains(category),
+              (0...4).contains(masteryLevel),
+              ["practical", "project", "assessment", "portfolio", "work_example", "reflection", "other"].contains(demonstration),
+              (10...3000).contains(cleanDescription.count), (evidenceLinkId.map { $0 > 0 } ?? true) else { return }
+        var object: [String: Any] = ["skill": cleanSkill, "category": category, "masteryLevel": masteryLevel,
+                                     "demonstration": demonstration, "description": cleanDescription]
+        if let evidenceLinkId { object["evidenceLinkId"] = evidenceLinkId }
+        guard let body = try? JSONSerialization.data(withJSONObject: object) else { return }
+        await mutateLifelongPassport("api/learning-passport/competencies", method: "POST", body: body,
+                                     success: "Practical skill evidence recorded privately.")
+    }
+
+    func deleteLifelongCompetency(id: Int) async {
+        guard id > 0 else { return }
+        await mutateLifelongPassport("api/learning-passport/competencies/\(id)", method: "DELETE", body: nil,
+                                     success: "Skill removed from your private Learning Passport.")
+    }
+
+    private func mutateLifelongPassport(_ path: String, method: String, body: Data?, success: String) async {
+        guard role == "learner", !lifelongPassportBusy else { return }
+        lifelongPassportBusy = true
+        lifelongPassportNotice = ""
+        defer { lifelongPassportBusy = false }
+        do {
+            _ = try await request(path, method: method, body: body)
+            let data = try await request("api/learning-passport/me")
+            lifelongPassport = try JSONDecoder().decode(NativeLifelongLearningPassport.self, from: data)
+            lifelongPassportNotice = success
+        } catch {
+            lifelongPassportNotice = "The change was not saved. Refresh and check your Learning Passport before trying again."
+        }
+    }
+
     func setNotificationPreference(organizationId: Int, kind: String, enabled: Bool, acknowledged: Bool) async {
         guard role == "parent", !busy, organizationId > 0,
               ["guardian_review_requested", "learner_support_updated"].contains(kind) else { return }
@@ -1995,6 +2118,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
+        learnerPassport = nil; learnerPassportJSON = nil; lifelongPassport = nil
+        learnerPassportNotice = ""; lifelongPassportNotice = ""; lifelongPassportBusy = false
         busy = false
     }
 

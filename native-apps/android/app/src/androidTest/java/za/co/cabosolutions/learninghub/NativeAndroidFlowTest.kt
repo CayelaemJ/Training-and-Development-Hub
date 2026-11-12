@@ -57,6 +57,24 @@ class NativeAndroidAdmissionsTest {
 }
 
 @RunWith(AndroidJUnit4::class)
+class NativeAndroidLearningPassportTest {
+    @get:Rule
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun selfReportedEvidenceIsClearlySeparatedFromVerifiedQualifications() {
+        compose.setContent {
+            MaterialTheme {
+                NativeLifelongPassportSection(api = NativeApi(compose.activity))
+            }
+        }
+        compose.onNodeWithText("My Learning Passport").assertIsDisplayed()
+        compose.onNodeWithText("not verified certificates", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Learning preferences").assertIsDisplayed()
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
 class NativeAndroidQuizTest {
     @get:Rule
     val compose = createComposeRule()
