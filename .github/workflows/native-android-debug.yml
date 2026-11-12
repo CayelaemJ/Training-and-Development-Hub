@@ -3,7 +3,10 @@ on:
   pull_request:
     paths:
       - 'native-apps/android/**'
+      - 'native-apps/ios/**'
+      - 'native-apps/SELF_HOSTED_CHECKS.md'
       - '.github/workflows/native-android-debug.yml'
+      - '.github/workflows/native-ios-verify.yml'
   workflow_dispatch:
 jobs:
   android-tests:
