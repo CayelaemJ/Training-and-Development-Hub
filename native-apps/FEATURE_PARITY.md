@@ -76,3 +76,4 @@ A capability moves to complete only when all of these are true on both native pl
 
 
 - Android and iOS now support school-manager year-end progression review from the existing authorized candidate, history and decision endpoints. Every promote/repeat action requires an explicit confirmation; the UI states CABO does not decide progression. Server-side membership, current-enrolment checks, framework rules and transaction safeguards remain authoritative. No high-stakes progression rules were changed.
+- Progression decisions are bound to the academic year and exact candidate record loaded for review. Editing the selected year clears the candidates and pending confirmation; both clients re-fetch and compare the candidate before submitting. A stale or changed record requires refresh and review.
