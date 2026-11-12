@@ -343,6 +343,15 @@ struct NativeJourneyEntry: Codable, Identifiable {
 struct NativeJourneyMilestone: Codable, Identifiable {
     let id: Int; let title: String; let description: String; let kind: String; let year: Int
 }
+struct NativeAdmissionInstitution: Codable, Identifiable {
+    let id: Int; let name: String; let officialUrl: String?; let province: String?; let route: String; let verification: String
+}
+struct NativeAdmissionProgramme: Codable, Identifiable {
+    let id: Int; let name: String; let faculty: String?; let qualification: String?; let requirements: String?
+}
+struct NativeAdmissionApplication: Codable, Identifiable {
+    let id: Int; let programmeId: Int; let status: String; let externalReference: String?; let createdAt: String
+}
 private struct NativeJourneyEnvelope: Codable {
     let identity: NativeJourneyIdentity; let journeys: [NativeJourneyEntry]; let milestones: [NativeJourneyMilestone]
 }
@@ -391,6 +400,11 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var learnerHelp: [NativeStaffSupportTicket] = []
     @Published var learnerReports: [NativeLearnerReport] = []
     @Published var learnerReportNotice = ""
+    @Published var admissionInstitutions: [NativeAdmissionInstitution] = []
+    @Published var admissionProgrammes: [NativeAdmissionProgramme] = []
+    @Published var admissionApplications: [NativeAdmissionApplication] = []
+    @Published var admissionsBusy = false
+    @Published var admissionsNotice = ""
     @Published var learnerPassport: NativeLearnerPassport?
     @Published var learnerPassportJSON: String?
     @Published var learnerPassportNotice = ""
@@ -526,6 +540,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             guardianReports = []; learnerReports = []; guardianGuidance = ""
+            admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
             status = "Session expired. Sign in again."
             throw NSError(domain: "CABO", code: 401)
         }
@@ -905,6 +920,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
         learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""; learnerPassportBusy = false
             guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+            admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
             supportCourses = loadSupportCourses()
@@ -1802,6 +1818,79 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
     }
 
+    func refreshAdmissions(institutionId: Int? = nil) async {
+        guard role == "learner" else { admissionsNotice = "Admissions are available to learner accounts."; return }
+        guard !admissionsBusy else { return }
+        admissionsBusy = true
+        admissionsNotice = ""
+        defer { admissionsBusy = false }
+        do {
+            async let institutionData = request("api/admissions/institutions")
+            async let applicationData = request("api/admissions/applications/me")
+            let (institutionsBytes, applicationsBytes) = try await (institutionData, applicationData)
+            admissionInstitutions = Array(try JSONDecoder().decode([NativeAdmissionInstitution].self, from: institutionsBytes).prefix(200))
+            admissionApplications = Array(try JSONDecoder().decode([NativeAdmissionApplication].self, from: applicationsBytes).prefix(100))
+            if let institutionId, admissionInstitutions.contains(where: { $0.id == institutionId }) {
+                let data = try await request("api/admissions/programmes?institutionId=\(institutionId)")
+                admissionProgrammes = Array(try JSONDecoder().decode([NativeAdmissionProgramme].self, from: data).prefix(200))
+            } else { admissionProgrammes = [] }
+        } catch {
+            admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []
+            admissionsNotice = "Admissions are unavailable right now. Check your connection and refresh."
+        }
+    }
+
+    func clearAdmissions() {
+        admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []
+        admissionsNotice = ""
+    }
+
+    func loadAdmissionProgrammes(institutionId: Int) async {
+        guard role == "learner", institutionId > 0, !admissionsBusy else { return }
+        admissionsBusy = true
+        admissionsNotice = ""
+        defer { admissionsBusy = false }
+        do {
+            let data = try await request("api/admissions/programmes?institutionId=\(institutionId)")
+            admissionProgrammes = Array(try JSONDecoder().decode([NativeAdmissionProgramme].self, from: data).prefix(200))
+        } catch { admissionProgrammes = []; admissionsNotice = "Published programmes could not be loaded. Refresh to try again." }
+    }
+
+    func createAdmissionDraft(programmeId: Int, statement: String, institutionId: Int? = nil) async {
+        guard role == "learner", programmeId > 0, statement.utf8.count <= 4000, !admissionsBusy else { return }
+        admissionsBusy = true
+        admissionsNotice = ""
+        defer { admissionsBusy = false }
+        do {
+            let body = try JSONSerialization.data(withJSONObject: ["programmeId": programmeId, "candidateStatement": statement])
+            _ = try await request("api/admissions/applications", method: "POST", body: body)
+            admissionsNotice = "Private draft created. CABO has not sent an application to the institution."
+            admissionsBusy = false
+            await refreshAdmissions(institutionId: institutionId)
+        } catch { admissionsNotice = "Draft could not be created. It may already exist; refresh and check your applications." }
+    }
+
+    func updateAdmission(applicationId: Int, status: String, externalReference: String? = nil, institutionId: Int? = nil) async {
+        guard role == "learner", applicationId > 0, !admissionsBusy,
+              ["ready_for_handoff", "external_submission_recorded", "withdrawn"].contains(status) else { return }
+        if status == "external_submission_recorded" && (externalReference?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0) < 3 {
+            admissionsNotice = "Enter the confirmation reference from the institution's official system."
+            return
+        }
+        admissionsBusy = true
+        admissionsNotice = ""
+        defer { admissionsBusy = false }
+        do {
+            var fields: [String: Any] = ["status": status]
+            if let externalReference { fields["externalReference"] = externalReference }
+            let body = try JSONSerialization.data(withJSONObject: fields)
+            _ = try await request("api/admissions/applications/\(applicationId)", method: "PATCH", body: body)
+            admissionsNotice = status == "ready_for_handoff" ? "Ready for handoff. Open the institution's official portal to submit; CABO does not submit applications." : "Application tracker updated. Institution decisions are not verified by CABO."
+            admissionsBusy = false
+            await refreshAdmissions(institutionId: institutionId)
+        } catch { admissionsNotice = "Application status was not updated. Refresh and check the current status before retrying." }
+    }
+
     func fetchSchoolProgression(organizationId: Int, year: Int) async throws -> NativeSchoolProgressionSnapshot {
         guard (2020...2200).contains(year), organizationId > 0,
               schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }) else {
@@ -1903,6 +1992,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
         guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+        admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
         busy = false
