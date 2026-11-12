@@ -750,6 +750,7 @@ private struct NativeSchoolOperationsPanel: View {
     @State private var replacementTeacherId = ""
     @State private var substitutionReason = ""
     @State private var selectedIntelligenceWorkspace: NativeSchoolOperationsWorkspace?
+    @State private var selectedProgressionWorkspace: NativeSchoolOperationsWorkspace?
 
     var body: some View {
         if !session.schoolOperations.isEmpty {
@@ -797,6 +798,13 @@ private struct NativeSchoolOperationsPanel: View {
                         }
                         if workspace.canManage {
                             Button {
+                                selectedProgressionWorkspace = workspace
+                            } label: {
+                                Label("Year-end progression", systemImage: "arrow.up.forward.circle")
+                                    .frame(maxWidth: .infinity, minHeight: 48)
+                            }
+                            .buttonStyle(.bordered)
+                            Button {
                                 selectedIntelligenceWorkspace = workspace
                             } label: {
                                 Label("Attendance & academic signals", systemImage: "chart.bar.xaxis")
@@ -842,6 +850,13 @@ private struct NativeSchoolOperationsPanel: View {
             }.padding(.vertical, 8)
                 .sheet(item: $selectedIntelligenceWorkspace) { workspace in
                     NativeSchoolIntelligenceView(
+                        session: session,
+                        organizationId: workspace.organizationId,
+                        organizationName: workspace.organizationName
+                    )
+                }
+                .sheet(item: $selectedProgressionWorkspace) { workspace in
+                    NativeSchoolProgressionView(
                         session: session,
                         organizationId: workspace.organizationId,
                         organizationName: workspace.organizationName

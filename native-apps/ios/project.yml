@@ -16,6 +16,7 @@ targets:
       - path: NativeHomeView.swift
       - path: NativeEducationCommandView.swift
       - path: NativeSchoolIntelligenceView.swift
+      - path: NativeSchoolProgressionView.swift
       - path: NativeSession.swift
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift

@@ -1009,3 +1009,45 @@ class NativeSchoolIntelligencePrivacyTest {
         compose.onNodeWithText("Official district data").assertExists()
     }
 }
+
+
+@RunWith(AndroidJUnit4::class)
+class NativeSchoolProgressionConfirmationTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun progressionRequiresExplicitConfirmationBeforeSubmitting() {
+        var submittedDecision: String? = null
+        val candidate = SchoolProgressionCandidate(
+            enrollmentId = 41, learnerId = "learner-321", stage = "Form 1",
+            academicYear = 2026, nextGrade = "Form 2"
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeSchoolProgressionScreen(
+                    organizationName = "Cabo Valley School",
+                    yearText = "2026",
+                    snapshot = SchoolProgressionSnapshot(2026, listOf(candidate), emptyList()),
+                    busy = false,
+                    savingEnrollmentId = null,
+                    message = null,
+                    error = null,
+                    onYearText = {},
+                    refresh = {},
+                    decide = { _, decision -> submittedDecision = decision },
+                    close = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText(
+            "Promoting or repeating creates a next-year enrolment and completes the previous year. CABO does not decide progression."
+        ).assertExists()
+        compose.onNodeWithText("Promote to Form 2").performClick()
+        compose.onNodeWithText("Confirm promotion for this learner?").assertIsDisplayed()
+        assertEquals(null, submittedDecision)
+        compose.onNodeWithText("Confirm decision").performClick()
+        assertEquals("promote", submittedDecision)
+    }
+}

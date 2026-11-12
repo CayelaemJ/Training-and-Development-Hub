@@ -171,6 +171,26 @@ struct NativeSchoolIntelligenceSnapshot {
     let attendanceBelow: Double
     let officialDistrictData: Bool
 }
+struct NativeSchoolProgressionCandidate: Identifiable, Decodable {
+    let id: Int
+    let learnerId: String
+    let stage: String
+    let academicYear: Int
+    let nextGrade: String?
+}
+struct NativeSchoolProgressionDecision: Identifiable, Decodable {
+    let id: Int
+    let learnerId: String
+    let fromGrade: String
+    let toGrade: String
+    let decision: String
+    let approvedAt: String
+}
+struct NativeSchoolProgressionSnapshot {
+    let year: Int
+    let candidates: [NativeSchoolProgressionCandidate]
+    let history: [NativeSchoolProgressionDecision]
+}
 struct NativeSchoolOperationsWorkspace: Identifiable {
     let organizationId: Int
     let organizationName: String
@@ -1780,6 +1800,38 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             educationCommand = nil
             educationCommandNotice = "Education Command is unavailable for this account right now. Refresh to try again."
         }
+    }
+
+    func fetchSchoolProgression(organizationId: Int, year: Int) async throws -> NativeSchoolProgressionSnapshot {
+        guard (2020...2200).contains(year), organizationId > 0,
+              schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }) else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        async let candidatesData = request("api/organizations/\(organizationId)/progression/candidates?year=\(year)")
+        async let historyData = request("api/organizations/\(organizationId)/progression/history")
+        let (candidateBytes, historyBytes) = try await (candidatesData, historyData)
+        let candidates = try JSONDecoder().decode([NativeSchoolProgressionCandidate].self, from: candidateBytes)
+        let history = try JSONDecoder().decode([NativeSchoolProgressionDecision].self, from: historyBytes)
+        return NativeSchoolProgressionSnapshot(year: year,
+            candidates: Array(candidates.prefix(400)), history: Array(history.prefix(100)))
+    }
+
+    func submitSchoolProgression(organizationId: Int, candidate: NativeSchoolProgressionCandidate,
+                                 targetYear: Int, decision: String) async throws {
+        guard (2020...2200).contains(targetYear), organizationId > 0,
+              ["promote", "repeat"].contains(decision),
+              schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }),
+              decision != "promote" || candidate.nextGrade != nil else {
+            throw NSError(domain: "CABO", code: 403)
+        }
+        let current = try await fetchSchoolProgression(organizationId: organizationId, year: targetYear - 1)
+        guard current.candidates.contains(where: { $0.id == candidate.id }) else {
+            throw NSError(domain: "CABO", code: 409)
+        }
+        _ = try await request("api/organizations/\(organizationId)/progression/\(candidate.id)",
+            method: "POST", body: JSONSerialization.data(withJSONObject: [
+                "targetYear": targetYear, "decision": decision
+            ]))
     }
 
     func fetchSchoolIntelligence(organizationId: Int, year: Int) async throws -> NativeSchoolIntelligenceSnapshot {
