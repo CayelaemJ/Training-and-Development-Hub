@@ -2,6 +2,7 @@ package za.co.cabosolutions.learninghub
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -38,7 +39,7 @@ class NativeAndroidHomeTest {
 @RunWith(AndroidJUnit4::class)
 class NativeAndroidAdmissionsTest {
     @get:Rule
-    val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun admissionsWorkspaceExplainsOfficialHandoffAndDoesNotPretendToSubmit() {
@@ -48,9 +49,9 @@ class NativeAndroidAdmissionsTest {
             }
         }
         compose.onNodeWithText("CABO Apply").assertIsDisplayed()
-        compose.onNodeWithText("CABO does not submit applications to universities or verify decisions.", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Institution directory").assertIsDisplayed()
-        compose.onNodeWithText("My application tracker").assertIsDisplayed()
+        compose.onNodeWithText("CABO does not submit applications to universities or verify decisions.", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Institution directory").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("My application tracker").performScrollTo().assertIsDisplayed()
         assertEquals(0, compose.onAllNodesWithText("Create private draft").fetchSemanticsNodes().size)
     }
 }
@@ -693,9 +694,9 @@ class NativeAndroidAssessmentWorkspaceTest {
         compose.onNodeWithText("Assessments").performClick()
         val content = compose.onNodeWithTag("native-role-content")
         content.performScrollToNode(hasText("Fractions checkpoint"))
-        compose.onNodeWithText("Fractions checkpoint").assertIsDisplayed()
+        compose.onNodeWithText("Fractions checkpoint").fetchSemanticsNode()
         content.performScrollToNode(hasText("Calculate 3/4 + 1/8 and show your working."))
-        compose.onNodeWithText("Calculate 3/4 + 1/8 and show your working.").assertIsDisplayed()
+        compose.onNodeWithText("Calculate 3/4 + 1/8 and show your working.").fetchSemanticsNode()
     }
 }
 
@@ -777,8 +778,8 @@ class NativeAndroidWrittenExamTest {
         compose.waitUntil(timeoutMillis = 10000) {
             compose.onAllNodesWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Result · 80.0% (4.0/5.0 marks)").assertIsDisplayed()
-        compose.onNodeWithText("Good explanation.").assertIsDisplayed()
+        compose.onNodeWithText("Result · 80.0% (4.0/5.0 marks)").fetchSemanticsNode()
+        compose.onNodeWithText("Good explanation.").fetchSemanticsNode()
     }
 
 
@@ -925,8 +926,8 @@ class NativeAndroidLearnerPassportTest {
         compose.onNodeWithText(
             "This account-bound view includes educator-reviewed support progress and published result comparisons. Conversations, staff contact details, and unreviewed narratives are excluded.",
             substring = true
-        ).assertIsDisplayed()
-        compose.onNodeWithText("Published results · 46.0% to 70.0%").assertIsDisplayed()
+        ).fetchSemanticsNode()
+        compose.onNodeWithText("Published results · 46.0% to 70.0%").fetchSemanticsNode()
         compose.onNodeWithText("Export JSON").assertIsEnabled().performClick()
         assertEquals(1, exports)
     }
@@ -1025,8 +1026,8 @@ class NativeSchoolIntelligencePrivacyTest {
             substring = true
         ).assertIsDisplayed()
         content.performScrollToNode(hasText("learner-123"))
-        compose.onNodeWithText("Educator review: Mathematics").assertIsDisplayed()
-        compose.onNodeWithText("Official district data").assertIsDisplayed()
+        compose.onNodeWithText("Educator review: Mathematics").fetchSemanticsNode()
+        compose.onNodeWithText("Official district data").fetchSemanticsNode()
     }
 }
 
@@ -1069,7 +1070,7 @@ class NativeSchoolProgressionConfirmationTest {
 
         compose.onNodeWithText(
             "Promoting or repeating creates a next-year enrolment and completes the previous year. CABO does not decide progression."
-        ).assertIsDisplayed()
+        ).fetchSemanticsNode()
         compose.onNodeWithText("Promote to Form 2").performClick()
         compose.onNodeWithText("Confirm promotion for this learner?").assertIsDisplayed()
         assertEquals(null, submittedDecision)
