@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -32,6 +33,26 @@ class NativeAndroidHomeTest {
         compose.onNodeWithText("CABO").assertIsDisplayed()
         compose.onNodeWithText("Sign in securely").assertIsDisplayed()
         assertEquals(0, compose.onAllNodesWithText("Isolated test account").fetchSemanticsNodes().size)
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidAdmissionsTest {
+    @get:Rule
+    val compose = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun admissionsWorkspaceExplainsOfficialHandoffAndDoesNotPretendToSubmit() {
+        compose.setContent {
+            MaterialTheme {
+                NativeAdmissionsScreen(api = NativeApi(compose.activity), close = {})
+            }
+        }
+        compose.onNodeWithText("CABO Apply").assertIsDisplayed()
+        compose.onNodeWithText("CABO does not submit applications to universities or verify decisions.", substring = true).assertExists()
+        compose.onNodeWithText("Institution directory").assertExists()
+        compose.onNodeWithText("My application tracker").assertExists()
+        assertEquals(0, compose.onAllNodesWithText("Create private draft").fetchSemanticsNodes().size)
     }
 }
 
