@@ -2,21 +2,27 @@ name: CABO native iOS build verification
 on:
   pull_request:
     paths:
+      - 'native-apps/android/**'
       - 'native-apps/ios/**'
+      - 'native-apps/SELF_HOSTED_CHECKS.md'
+      - '.github/workflows/native-android-debug.yml'
       - '.github/workflows/native-ios-verify.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   ios-simulator-build:
-    runs-on: macos-15
+    runs-on: ${{ fromJSON(vars.CABO_IOS_RUNNER_LABELS || '["macos-15"]') }}
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Select installed Xcode
         run: xcodebuild -version
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          fi
       - name: Generate Xcode project from source
         working-directory: native-apps/ios
         run: xcodegen generate

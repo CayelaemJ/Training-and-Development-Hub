@@ -15,6 +15,7 @@ struct NativeHomeView: View {
     @State private var showLearnerPassport = false
     @State private var showExamManagement = false
     @State private var showEducationCommand = false
+    @State private var showAdmissions = false
     @State private var uploadSelection: NativeMaterialUploadSelection?
     @State private var showMaterialImporter = false
     @State private var materialImportError: String?
@@ -65,6 +66,10 @@ struct NativeHomeView: View {
         .tint(clay)
         .task { await session.restore() }
         .onChange(of: session.role) { current in
+            if current != "learner" {
+                showAdmissions = false
+                session.clearAdmissions()
+            }
             // Revoke visible private study screens as soon as auth is lost.
             if current == nil {
                 selectedQuiz = nil
@@ -73,6 +78,7 @@ struct NativeHomeView: View {
                 showExamManagement = false
                 showLearnerPassport = false
                 showEducationCommand = false
+                showAdmissions = false
                 session.clearEducationCommand()
                 testPassword = ""
                 reviewedGuardianEvidence = []
@@ -104,6 +110,9 @@ struct NativeHomeView: View {
         }
         .sheet(isPresented: $showEducationCommand) {
             NativeEducationCommandView(session: session)
+        }
+        .sheet(isPresented: $showAdmissions) {
+            NativeAdmissionsView(session: session)
         }
         .fileImporter(isPresented: $showMaterialImporter, allowedContentTypes: materialUploadTypes) { result in
             switch result {
@@ -476,6 +485,12 @@ struct NativeHomeView: View {
         }
         .buttonStyle(.bordered)
         .disabled(session.busy)
+        Button { showAdmissions = true; Task { await session.refreshAdmissions() } } label: {
+            Label("University applications", systemImage: "graduationcap")
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.bordered)
+        .disabled(session.busy || session.role != "learner")
         ForEach(session.summary + session.journey, id: \.self) { item in
             infoTile(item, "Current CABO learning progress", system: "chart.bar")
         }

@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private var selectedQuiz by mutableStateOf<QuizSummary?>(null)
     private var selectedWrittenExams by mutableStateOf(false)
     private var selectedLearnerPassport by mutableStateOf(false)
+    private var selectedAdmissions by mutableStateOf(false)
     private var learnerPassport by mutableStateOf<LearnerPassport?>(null)
     private var learnerPassportBusy by mutableStateOf(false)
     private var learnerPassportMessage by mutableStateOf<String?>(null)
@@ -137,12 +138,13 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedEducationCommand || selectedSchoolIntelligenceOrganization != null || selectedSchoolProgressionOrganization != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedAdmissions || selectedEducationCommand || selectedSchoolIntelligenceOrganization != null || selectedSchoolProgressionOrganization != null) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
                         selectedSchoolProgressionOrganization != null -> closeSchoolProgression()
                         selectedSchoolIntelligenceOrganization != null -> closeSchoolIntelligence()
                         selectedEducationCommand -> closeEducationCommand()
+                        selectedAdmissions -> selectedAdmissions = false
                         selectedLearnerPassport -> closeLearnerPassport()
                         creatingSupportRequest -> creatingSupportRequest = false
                         selectedSupportTicket != null -> closeSupportTicket()
@@ -307,6 +309,7 @@ class MainActivity : ComponentActivity() {
                         },
                         close = { closeLearnerPassport() }
                     )
+                    selectedAdmissions -> NativeAdmissionsScreen(api = api, close = { selectedAdmissions = false })
                     selectedQuiz != null -> NativeQuizScreen(
                         summary = selectedQuiz!!, quiz = activeQuiz, answers = answers,
                         attempt = attempt, busy = studyBusy, submitted = studySubmitted,
@@ -385,6 +388,7 @@ class MainActivity : ComponentActivity() {
                             } else selectedWrittenExams = true
                         },
                         openPassport = { openLearnerPassport() },
+                        openAdmissions = { if (!demoActive && screen?.portal?.role == "learner") selectedAdmissions = true },
                         openEducationCommand = { openEducationCommand() },
                         openSchoolIntelligence = { org, name -> openSchoolIntelligence(org, name) },
                         openSchoolProgression = { org, name -> openSchoolProgression(org, name) },
@@ -754,6 +758,7 @@ class MainActivity : ComponentActivity() {
                 supportDrafts = try { api.loadSupportDrafts() } catch (_: Exception) { supportDrafts }
                 supportCourseOptions = try { api.loadCachedSupportCourses() } catch (_: Exception) { supportCourseOptions }
                 screen = api.dashboard()
+                if (screen?.portal?.role != "learner") selectedAdmissions = false
                 supportDrafts = if (screen?.portal?.role == "learner") api.loadSupportDrafts() else emptyList()
                 supportCourseOptions = if (screen?.portal?.role == "learner") screen?.supportCourses.orEmpty() else emptyList()
                 status = "Connected securely as ${screen?.portal?.role ?: "CABO user"}"
@@ -1157,6 +1162,7 @@ class MainActivity : ComponentActivity() {
             demoActive = false
             selectedSupportTicket = null
             creatingSupportRequest = false
+            selectedAdmissions = false
             supportTicket = null
             supportGuidance = null
             screen = null
@@ -1471,6 +1477,7 @@ internal fun NativeHome(
     offlineSupportCourses: List<SupportCourseOption> = emptyList(),
     learnerJourneyAction: (LearnerJourneyAction) -> Unit = {},
     openPassport: () -> Unit = {},
+    openAdmissions: () -> Unit = {},
     openEducationCommand: () -> Unit = {},
     openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> },
     openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
@@ -1659,6 +1666,7 @@ internal fun NativeHome(
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
                                 learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
+                                openAdmissions = openAdmissions,
                                 openEducationCommand = { openEducationCommand() },
                                 openSchoolIntelligence = openSchoolIntelligence,
                                 openSchoolProgression = openSchoolProgression
@@ -1681,6 +1689,7 @@ internal fun NativeHome(
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
                             learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
+                            openAdmissions = openAdmissions,
                             openEducationCommand = { openEducationCommand() },
                             openSchoolIntelligence = openSchoolIntelligence,
                             openSchoolProgression = openSchoolProgression
@@ -2093,6 +2102,7 @@ private fun RoleContent(
     deleteSupportDraft: (NativeSupportDraft) -> Unit,
     learnerJourneyAction: (LearnerJourneyAction) -> Unit,
     openPassport: () -> Unit,
+    openAdmissions: () -> Unit,
     openEducationCommand: () -> Unit = {},
     openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> },
     openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
@@ -2272,6 +2282,12 @@ private fun RoleContent(
                         OutlinedButton(onClick = openPassport, enabled = !busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                             Text("Open my learner passport")
+                        }
+                    }
+                    item {
+                        OutlinedButton(onClick = openAdmissions, enabled = !busy && !demoActive,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("University applications")
                         }
                     }
                     if (data.learnerReportNotice.isNotBlank()) item { Text(data.learnerReportNotice) }
