@@ -32,6 +32,7 @@ struct NativeSchoolProgressionView: View {
                     TextField("Current academic year", text: $yearText)
                         .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
                         .accessibilityLabel("Current academic year")
+                        .disabled(busy || savingId != nil)
                     Button(snapshot == nil ? "Load active enrolments" : "Refresh enrolments") {
                         Task { await refresh() }
                     }
@@ -43,7 +44,8 @@ struct NativeSchoolProgressionView: View {
                     if !notice.isEmpty { Text(notice).font(.footnote).foregroundColor(.green) }
                     if !error.isEmpty { Text(error).font(.footnote).foregroundColor(.red) }
 
-                    if let snapshot {
+                    if let snapshot, snapshot.year == Int(yearText),
+                       snapshot.candidates.allSatisfy({ $0.academicYear == snapshot.year }) {
                         Text("Active enrolments · \(snapshot.year)")
                             .font(.title3.bold()).accessibilityAddTraits(.isHeader)
                         if snapshot.candidates.isEmpty {
@@ -88,6 +90,9 @@ struct NativeSchoolProgressionView: View {
                             .frame(maxWidth: .infinity, alignment: .leading).padding(13)
                             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                         }
+                    } else if snapshot != nil {
+                        Text("The reviewed year does not match the current selection. Refresh enrolments before making a decision.")
+                            .font(.footnote).foregroundColor(.red)
                     }
                 }
                 .padding(16)
@@ -104,6 +109,12 @@ struct NativeSchoolProgressionView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .task { await refresh() }
+        .onChange(of: yearText) { _ in
+            pendingCandidate = nil
+            snapshot = nil
+            notice = ""
+            error = ""
+        }
         .alert(isPresented: Binding(
             get: { pendingCandidate != nil },
             set: { if !$0 { pendingCandidate = nil } }
@@ -112,7 +123,7 @@ struct NativeSchoolProgressionView: View {
                 return Alert(title: Text("Confirm progression"))
             }
             let nextGrade = pendingDecision == "repeat" ? candidate.stage : (candidate.nextGrade ?? candidate.stage)
-            let nextYear = (Int(yearText) ?? candidate.academicYear) + 1
+            let nextYear = candidate.academicYear + 1
             return Alert(
                 title: Text("Confirm \(pendingDecision)"),
                 message: Text("\(candidate.learnerId): Grade \(candidate.stage) → \(nextGrade) in \(nextYear). This creates a new enrolment and completes the current year. CABO does not decide progression."),
@@ -130,7 +141,17 @@ struct NativeSchoolProgressionView: View {
     }
 
     private func requestConfirmation(_ candidate: NativeSchoolProgressionCandidate, decision: String) {
-        guard savingId == nil, decision != "promote" || candidate.nextGrade != nil else { return }
+        guard let reviewed = snapshot,
+              NativeSchoolProgressionReview.targetYear(
+                selection: yearText, snapshotYear: reviewed.year, candidateYear: candidate.academicYear
+              ) != nil,
+              reviewed.candidates.contains(candidate),
+              savingId == nil,
+              decision == "repeat" || (decision == "promote" && candidate.nextGrade != nil) else {
+            pendingCandidate = nil
+            error = "The reviewed academic year changed. Reload enrolments and review the current records."
+            return
+        }
         pendingCandidate = candidate
         pendingDecision = decision
     }
@@ -141,32 +162,54 @@ struct NativeSchoolProgressionView: View {
             return
         }
         busy = true
+        pendingCandidate = nil
         notice = ""
         error = ""
         defer { busy = false }
         do {
-            snapshot = try await session.fetchSchoolProgression(organizationId: organizationId, year: year)
+            let result = try await session.fetchSchoolProgression(organizationId: organizationId, year: year)
+            if Int(yearText) == year { snapshot = result }
         } catch {
-            snapshot = nil
-            self.error = "Progression records are unavailable for this account right now. Check your connection and try again."
+            if Int(yearText) == year {
+                snapshot = nil
+                self.error = "Progression records are unavailable for this account right now. Check your connection and try again."
+            }
         }
     }
 
     private func submit(_ candidate: NativeSchoolProgressionCandidate, decision: String) async {
-        guard let year = Int(yearText), (2020...2199).contains(year), savingId == nil else { return }
-        savingId = candidate.id
+        guard let reviewed = snapshot,
+              let targetYear = NativeSchoolProgressionReview.targetYear(
+                selection: yearText, snapshotYear: reviewed.year, candidateYear: candidate.academicYear
+              ),
+              let current = reviewed.candidates.first(where: { $0.id == candidate.id && $0.academicYear == reviewed.year }),
+              current == candidate,
+              (2020...2199).contains(reviewed.year),
+              savingId == nil,
+              decision == "repeat" || (decision == "promote" && current.nextGrade != nil) else {
+            pendingCandidate = nil
+            error = "The reviewed academic year changed. Reload enrolments and review the current records."
+            return
+        }
+        let reviewedYear = reviewed.year
+        savingId = current.id
         notice = ""
         error = ""
         defer { savingId = nil }
         do {
             try await session.submitSchoolProgression(
-                organizationId: organizationId, candidate: candidate, targetYear: year + 1, decision: decision
+                organizationId: organizationId, candidate: current, targetYear: targetYear, decision: decision
             )
-            notice = "Learner \(candidate.learnerId) recorded for \(year + 1)."
-            snapshot = try await session.fetchSchoolProgression(organizationId: organizationId, year: year)
+            notice = "Learner \(current.learnerId) recorded for \(targetYear)."
+            snapshot = try await session.fetchSchoolProgression(organizationId: organizationId, year: reviewedYear)
         } catch {
-            self.error = "That progression could not be saved. The enrolment may have changed; refresh and review it again."
-            snapshot = try? await session.fetchSchoolProgression(organizationId: organizationId, year: year)
+            let failure = error as NSError
+            if failure.code == 409 || failure.localizedDescription.localizedCaseInsensitiveContains("candidate changed") {
+                self.error = "The learner's enrolment changed. Current records were reloaded; review them before trying again."
+            } else {
+                self.error = "That progression could not be saved. Check your connection and reload before trying again."
+            }
+            snapshot = try? await session.fetchSchoolProgression(organizationId: organizationId, year: reviewedYear)
         }
     }
 }

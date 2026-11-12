@@ -714,11 +714,19 @@ internal class NativeApi(private val context: Context) {
             SchoolProgressionSnapshot(year, candidates, history)
         }
 
-    suspend fun submitSchoolProgression(organizationId: Int, enrollmentId: Int, targetYear: Int, decision: String) =
+    suspend fun submitSchoolProgression(
+        organizationId: Int,
+        candidate: SchoolProgressionCandidate,
+        targetYear: Int,
+        decision: String
+    ) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            require(organizationId > 0 && enrollmentId > 0 && targetYear in 2020..2200 &&
-                decision in setOf("promote", "repeat"))
-            request("/api/organizations/$organizationId/progression/$enrollmentId",
+            require(organizationId > 0 && candidate.enrollmentId > 0 && targetYear in 2020..2200 &&
+                candidate.academicYear == targetYear - 1 && decision in setOf("promote", "repeat"))
+            val latest = fetchSchoolProgression(organizationId, candidate.academicYear)
+            val current = latest.candidates.firstOrNull { it.enrollmentId == candidate.enrollmentId }
+            check(current == candidate) { "Progression candidate changed; refresh and review the current record." }
+            request("/api/organizations/$organizationId/progression/${candidate.enrollmentId}",
                 JSONObject().put("targetYear", targetYear).put("decision", decision), method = "POST", auth = true)
         }
 

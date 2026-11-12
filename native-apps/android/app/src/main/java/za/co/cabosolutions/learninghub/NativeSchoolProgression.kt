@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -45,6 +46,12 @@ internal fun NativeSchoolProgressionScreen(
     var pending by remember { mutableStateOf<Pair<SchoolProgressionCandidate, String>?>(null) }
     val year = yearText.toIntOrNull()
     val yearValid = year != null && year in 2020..2200
+    val reviewedSnapshot = snapshot?.takeIf { it.year == year }
+    LaunchedEffect(year, snapshot) {
+        if (pending?.let { year != it.first.academicYear || snapshot?.year != it.first.academicYear } == true) {
+            pending = null
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Surface(color = MaterialTheme.colorScheme.primaryContainer) {
             Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -69,8 +76,15 @@ internal fun NativeSchoolProgressionScreen(
                 }
             }
             OutlinedTextField(
-                value = yearText, onValueChange = { onYearText(it.filter(Char::isDigit).take(4)) },
-                label = { Text("Current academic year") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                value = yearText,
+                onValueChange = {
+                    val next = it.filter(Char::isDigit).take(4)
+                    if (next != yearText) pending = null
+                    onYearText(next)
+                },
+                label = { Text("Current academic year") }, singleLine = true,
+                enabled = !busy && savingEnrollmentId == null,
+                modifier = Modifier.fillMaxWidth()
             )
             Button(onClick = refresh, enabled = !busy && savingEnrollmentId == null && yearValid,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
@@ -79,11 +93,18 @@ internal fun NativeSchoolProgressionScreen(
             message?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium) }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             snapshot?.let { result ->
+                if (reviewedSnapshot == null || result.candidates.any { it.academicYear != result.year }) {
+                    Text(
+                        "The reviewed year does not match the current selection. Refresh enrolments before making a decision.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
                 Text("Active enrolments · ${result.year}", style = MaterialTheme.typography.titleLarge)
                 if (result.candidates.isEmpty()) {
                     ElevatedCard(Modifier.fillMaxWidth()) { Text("No eligible active school enrolments found for this year.", Modifier.padding(16.dp)) }
                 }
-                result.candidates.forEach { candidate ->
+                reviewedSnapshot.candidates.forEach { candidate ->
                     ElevatedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(candidate.learnerId, style = MaterialTheme.typography.titleSmall)
@@ -119,28 +140,44 @@ internal fun NativeSchoolProgressionScreen(
                         }
                     }
                 }
+                }
             }
         }
     }
     pending?.let { (candidate, decision) ->
-        val targetYear = (year ?: candidate.academicYear) + 1
+        val currentCandidate = reviewedSnapshot?.candidates?.firstOrNull {
+            it == candidate
+        }
+        val canConfirm = currentCandidate != null && year == candidate.academicYear
+        val targetYear = candidate.academicYear + 1
         val targetGrade = if (decision == "repeat") candidate.stage else candidate.nextGrade.orEmpty()
         AlertDialog(
             onDismissRequest = { if (savingEnrollmentId == null) pending = null },
             title = { Text(if (decision == "promote") "Confirm promotion for this learner?" else "Confirm repeating this grade?") },
             text = {
-                Text(
-                    "${candidate.learnerId}: Grade ${candidate.stage} → $targetGrade in $targetYear. " +
-                        "This creates a new enrolment and completes the current year. CABO does not decide progression."
-                )
+                if (canConfirm) {
+                    Text(
+                        "${candidate.learnerId}: Grade ${candidate.stage} → $targetGrade in $targetYear. " +
+                            "This creates a new enrolment and completes the current year. CABO does not decide progression."
+                    )
+                } else {
+                    Text(
+                        "This learner record or academic year changed after review. Cancel and reload the enrolments before deciding.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        pending = null
-                        decide(candidate, decision)
+                        if (canConfirm) {
+                            pending = null
+                            decide(currentCandidate!!, decision)
+                        } else {
+                            pending = null
+                        }
                     },
-                    enabled = savingEnrollmentId == null
+                    enabled = savingEnrollmentId == null && canConfirm
                 ) { Text("Confirm decision") }
             },
             dismissButton = {

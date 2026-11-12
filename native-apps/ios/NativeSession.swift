@@ -171,7 +171,7 @@ struct NativeSchoolIntelligenceSnapshot {
     let attendanceBelow: Double
     let officialDistrictData: Bool
 }
-struct NativeSchoolProgressionCandidate: Identifiable, Decodable {
+struct NativeSchoolProgressionCandidate: Identifiable, Decodable, Equatable {
     let id: Int
     let learnerId: String
     let stage: String
@@ -1819,14 +1819,17 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     func submitSchoolProgression(organizationId: Int, candidate: NativeSchoolProgressionCandidate,
                                  targetYear: Int, decision: String) async throws {
         guard (2020...2200).contains(targetYear), organizationId > 0,
+              candidate.academicYear == targetYear - 1,
               ["promote", "repeat"].contains(decision),
               schoolOperations.contains(where: { $0.organizationId == organizationId && $0.canManage }),
               decision != "promote" || candidate.nextGrade != nil else {
             throw NSError(domain: "CABO", code: 403)
         }
-        let current = try await fetchSchoolProgression(organizationId: organizationId, year: targetYear - 1)
-        guard current.candidates.contains(where: { $0.id == candidate.id }) else {
-            throw NSError(domain: "CABO", code: 409)
+        let latest = try await fetchSchoolProgression(organizationId: organizationId, year: candidate.academicYear)
+        guard latest.year == candidate.academicYear,
+              latest.candidates.contains(candidate) else {
+            throw NSError(domain: "CABO", code: 409,
+                          userInfo: [NSLocalizedDescriptionKey: "Progression candidate changed; refresh and review the current record."])
         }
         _ = try await request("api/organizations/\(organizationId)/progression/\(candidate.id)",
             method: "POST", body: JSONSerialization.data(withJSONObject: [

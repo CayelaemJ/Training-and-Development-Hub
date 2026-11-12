@@ -1,6 +1,6 @@
 # iOS internal test build
 
-The GitHub Actions workflow `.github/workflows/native-ios-verify.yml` compiles the SwiftUI app for the iOS Simulator when iOS source or the workflow changes.
+The GitHub Actions workflow `.github/workflows/native-ios-verify.yml` compiles the SwiftUI app for the iOS Simulator and runs native progression review unit tests when iOS source or the workflow changes.
 
 ## Download
 
@@ -14,6 +14,6 @@ The iOS API origin is supplied by the `CABO_API_ORIGIN` Xcode build setting, wit
 
 ## Test limits
 
-This is an unsigned simulator app bundle, not an IPA. It cannot be installed on a physical iPhone or iPad, distributed with TestFlight or submitted to the App Store. It does not verify physical-device authentication, Keychain behavior, permissions, notifications or platform review requirements.
+This is an unsigned simulator app bundle, not an IPA. It cannot be installed on a physical iPhone or iPad, distributed with TestFlight or submitted to the App Store. Simulator tests do not verify physical-device authentication, Keychain behavior, permissions, notifications or platform review requirements.
 
 Use simulator test accounts and synthetic learner records. Device testing and CABO-owned signing credentials are required before claiming an iOS release.

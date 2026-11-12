@@ -160,7 +160,14 @@ class MainActivity : ComponentActivity() {
                         savingEnrollmentId = schoolProgressionSavingId,
                         message = schoolProgressionMessage,
                         error = schoolProgressionError,
-                        onYearText = { schoolProgressionYearText = it },
+                        onYearText = { nextYear ->
+                            if (nextYear != schoolProgressionYearText) {
+                                schoolProgressionYearText = nextYear
+                                schoolProgression = null
+                                schoolProgressionMessage = null
+                                schoolProgressionError = null
+                            }
+                        },
                         refresh = { loadSchoolProgression() },
                         decide = { candidate, decision -> decideSchoolProgression(candidate, decision) },
                         close = { closeSchoolProgression() }
@@ -572,10 +579,13 @@ class MainActivity : ComponentActivity() {
         schoolProgressionMessage = null
         lifecycleScope.launch {
             try {
-                schoolProgression = api.fetchSchoolProgression(organizationId, year)
+                val result = api.fetchSchoolProgression(organizationId, year)
+                if (schoolProgressionYearText.toIntOrNull() == year) schoolProgression = result
             } catch (_: Exception) {
-                schoolProgression = null
-                schoolProgressionError = "Progression records are unavailable for this account right now. Check your connection and try again."
+                if (schoolProgressionYearText.toIntOrNull() == year) {
+                    schoolProgression = null
+                    schoolProgressionError = "Progression records are unavailable for this account right now. Check your connection and try again."
+                }
             } finally {
                 schoolProgressionBusy = false
             }
@@ -584,22 +594,39 @@ class MainActivity : ComponentActivity() {
 
     private fun decideSchoolProgression(candidate: SchoolProgressionCandidate, decision: String) {
         val organizationId = selectedSchoolProgressionOrganization ?: return
-        val year = schoolProgressionYearText.toIntOrNull()?.takeIf { it in 2020..2200 } ?: return
+        val reviewed = schoolProgression ?: run {
+            schoolProgressionError = "Reload the selected academic year before making a progression decision."
+            return
+        }
+        val year = reviewed.year
+        val reviewedCandidate = reviewed.candidates.firstOrNull {
+            it.enrollmentId == candidate.enrollmentId && it == candidate && it.academicYear == reviewed.year
+        }
+        if (schoolProgressionYearText.toIntOrNull() != reviewed.year || reviewedCandidate == null) {
+            schoolProgression = null
+            schoolProgressionError = "The reviewed academic year changed. Reload enrolments and review the current records."
+            return
+        }
         if (demoActive || schoolProgressionSavingId != null ||
-            schoolProgression?.candidates?.none { it.enrollmentId == candidate.enrollmentId } != false ||
             decision !in setOf("promote", "repeat") ||
             screen?.schoolOperations?.none { it.organizationId == organizationId && it.canManage } != false) return
-        if (decision == "promote" && candidate.nextGrade == null) return
-        schoolProgressionSavingId = candidate.enrollmentId
+        if (decision == "promote" && reviewedCandidate.nextGrade == null) return
+        schoolProgressionSavingId = reviewedCandidate.enrollmentId
         schoolProgressionMessage = null
         schoolProgressionError = null
         lifecycleScope.launch {
             try {
-                api.submitSchoolProgression(organizationId, candidate.enrollmentId, year + 1, decision)
-                schoolProgressionMessage = "Learner ${candidate.learnerId} recorded for ${year + 1}."
+                api.submitSchoolProgression(organizationId, reviewedCandidate, year + 1, decision)
+                schoolProgressionMessage = "Learner ${reviewedCandidate.learnerId} recorded for ${year + 1}."
                 schoolProgression = api.fetchSchoolProgression(organizationId, year)
-            } catch (_: Exception) {
-                schoolProgressionError = "That progression could not be saved. The enrolment may have changed; refresh and review it again."
+            } catch (failure: Exception) {
+                val conflict = failure.message?.contains("candidate changed", ignoreCase = true) == true ||
+                    failure.message?.contains("HTTP 409", ignoreCase = true) == true
+                schoolProgressionError = if (conflict) {
+                    "The learner's enrolment changed. Current records were reloaded; review them before trying again."
+                } else {
+                    "That progression could not be saved. Check your connection and reload before trying again."
+                }
                 try { schoolProgression = api.fetchSchoolProgression(organizationId, year) } catch (_: Exception) {}
             } finally {
                 schoolProgressionSavingId = null

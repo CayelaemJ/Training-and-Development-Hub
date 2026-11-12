@@ -1019,6 +1019,8 @@ class NativeSchoolProgressionConfirmationTest {
     @Test
     fun progressionRequiresExplicitConfirmationBeforeSubmitting() {
         var submittedDecision: String? = null
+        var submissions = 0
+        val savingEnrollmentId = mutableStateOf<Int?>(null)
         val candidate = SchoolProgressionCandidate(
             enrollmentId = 41, learnerId = "learner-321", stage = "Form 1",
             academicYear = 2026, nextGrade = "Form 2"
@@ -1030,12 +1032,16 @@ class NativeSchoolProgressionConfirmationTest {
                     yearText = "2026",
                     snapshot = SchoolProgressionSnapshot(2026, listOf(candidate), emptyList()),
                     busy = false,
-                    savingEnrollmentId = null,
+                    savingEnrollmentId = savingEnrollmentId.value,
                     message = null,
                     error = null,
                     onYearText = {},
                     refresh = {},
-                    decide = { _, decision -> submittedDecision = decision },
+                    decide = { candidate, decision ->
+                        submittedDecision = decision
+                        submissions += 1
+                        savingEnrollmentId.value = candidate.enrollmentId
+                    },
                     close = {}
                 )
             }
@@ -1049,5 +1055,80 @@ class NativeSchoolProgressionConfirmationTest {
         assertEquals(null, submittedDecision)
         compose.onNodeWithText("Confirm decision").performClick()
         assertEquals("promote", submittedDecision)
+        assertEquals(1, submissions)
+        compose.onNodeWithText("Promote to Form 2").assertIsNotEnabled()
+    }
+
+    @Test
+    fun changingTheYearClearsTheReviewedCandidatesAndPendingDecision() {
+        val candidate = SchoolProgressionCandidate(
+            enrollmentId = 41, learnerId = "learner-321", stage = "Form 1",
+            academicYear = 2026, nextGrade = "Form 2"
+        )
+        val year = mutableStateOf("2026")
+        val snapshot = mutableStateOf<SchoolProgressionSnapshot?>(
+            SchoolProgressionSnapshot(2026, listOf(candidate), emptyList())
+        )
+        var submittedDecision: String? = null
+        compose.setContent {
+            MaterialTheme {
+                NativeSchoolProgressionScreen(
+                    organizationName = "Cabo Valley School",
+                    yearText = year.value,
+                    snapshot = snapshot.value,
+                    busy = false,
+                    savingEnrollmentId = null,
+                    message = null,
+                    error = null,
+                    onYearText = { next ->
+                        year.value = next
+                        if (next.toIntOrNull() != snapshot.value?.year) snapshot.value = null
+                    },
+                    refresh = {},
+                    decide = { _, decision -> submittedDecision = decision },
+                    close = {}
+                )
+            }
+        }
+
+        compose.onNodeWithText("Promote to Form 2").assertIsDisplayed()
+        compose.onNodeWithText("Promote to Form 2").performClick()
+        compose.onNodeWithText("Confirm promotion for this learner?").assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+
+        compose.onNodeWithText("Current academic year").performTextClearance()
+        compose.onNodeWithText("Current academic year").performTextInput("2027")
+        assertEquals(0, compose.onAllNodesWithText("Promote to Form 2").fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodesWithText("Confirm promotion for this learner?").fetchSemanticsNodes().size)
+        assertEquals(null, submittedDecision)
+    }
+
+    @Test
+    fun staleSnapshotCannotOpenAProgressionDecision() {
+        val candidate = SchoolProgressionCandidate(
+            enrollmentId = 41, learnerId = "learner-321", stage = "Form 1",
+            academicYear = 2026, nextGrade = "Form 2"
+        )
+        compose.setContent {
+            MaterialTheme {
+                NativeSchoolProgressionScreen(
+                    organizationName = "Cabo Valley School",
+                    yearText = "2027",
+                    snapshot = SchoolProgressionSnapshot(2026, listOf(candidate), emptyList()),
+                    busy = false,
+                    savingEnrollmentId = null,
+                    message = null,
+                    error = null,
+                    onYearText = {},
+                    refresh = {},
+                    decide = { _, _ -> error("A stale candidate must not be submitted") },
+                    close = {}
+                )
+            }
+        }
+
+        assertEquals(0, compose.onAllNodesWithText("Promote to Form 2").fetchSemanticsNodes().size)
+        compose.onNodeWithText("The reviewed year does not match the current selection. Refresh enrolments before making a decision.")
+            .assertIsDisplayed()
     }
 }

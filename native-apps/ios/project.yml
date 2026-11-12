@@ -17,6 +17,7 @@ targets:
       - path: NativeEducationCommandView.swift
       - path: NativeSchoolIntelligenceView.swift
       - path: NativeSchoolProgressionView.swift
+      - path: NativeSchoolProgressionReview.swift
       - path: NativeSession.swift
       - path: NativeQuizView.swift
       - path: NativeMaterialView.swift
@@ -34,3 +35,15 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
         CABO_API_ORIGIN: https://cabo-learning-hub-pilot.onrender.com
+  CABOLearningHubTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: CABOLearningHub
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub.tests
