@@ -6,7 +6,8 @@
 import { pool } from "@workspace/db";
 import { newStagingKey, r2Configured, validateStagingKey } from "./r2Staging";
 
-type Client = Awaited<ReturnType<typeof pool.connect>>;
+async function acquireClient() { return await pool.connect(); }
+type Client = Awaited<ReturnType<typeof acquireClient>>;
 const CAPACITY = 2 * 1024 * 1024 * 1024;
 const USER_CAP = 48 * 1024 * 1024;
 const MAX_FILE = 8 * 1024 * 1024;
@@ -29,7 +30,7 @@ function identity(userId: string, tenantId: string) {
   }
 }
 async function tx<T>(fn: (client: Client) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+  const client = await acquireClient();
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL lock_timeout = '3s'");
