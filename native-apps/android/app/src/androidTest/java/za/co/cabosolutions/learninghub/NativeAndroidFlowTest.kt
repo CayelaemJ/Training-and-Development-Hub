@@ -3,7 +3,6 @@ package za.co.cabosolutions.learninghub
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -1099,8 +1098,8 @@ class NativeSchoolProgressionConfirmationTest {
 
         compose.onNodeWithText("Current academic year").performTextClearance()
         compose.onNodeWithText("Current academic year").performTextInput("2027")
-        compose.onNodeWithText("Promote to Form 2").assertDoesNotExist()
-        compose.onNodeWithText("Confirm promotion for this learner?").assertDoesNotExist()
+        assertEquals(0, compose.onAllNodesWithText("Promote to Form 2").fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodesWithText("Confirm promotion for this learner?").fetchSemanticsNodes().size)
         assertEquals(null, submittedDecision)
     }
 
@@ -1128,7 +1127,7 @@ class NativeSchoolProgressionConfirmationTest {
             }
         }
 
-        compose.onNodeWithText("Promote to Form 2").assertDoesNotExist()
+        assertEquals(0, compose.onAllNodesWithText("Promote to Form 2").fetchSemanticsNodes().size)
         compose.onNodeWithText("The reviewed year does not match the current selection. Refresh enrolments before making a decision.")
             .assertIsDisplayed()
     }
