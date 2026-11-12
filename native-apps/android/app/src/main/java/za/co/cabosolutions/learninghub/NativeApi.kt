@@ -27,6 +27,9 @@ private val materialContentTypes = mapOf(
 )
 
 internal data class MaterialSummary(val id: Int, val title: String)
+internal data class AdmissionInstitution(val id: Int, val name: String, val officialUrl: String?, val province: String?, val route: String, val verification: String)
+internal data class AdmissionProgramme(val id: Int, val name: String, val faculty: String?, val qualification: String?, val requirements: String?)
+internal data class AdmissionApplication(val id: Int, val programmeId: Int, val status: String, val externalReference: String?, val createdAt: String)
 internal data class LearnerJourneyIdentity(val displayName: String = "")
 internal data class LearnerJourneyEntry(val id: Int, val institutionName: String, val stage: String, val academicYear: Int, val note: String)
 internal data class LearnerJourneyMilestone(val id: Int, val title: String, val description: String, val kind: String, val year: Int)
@@ -1172,6 +1175,55 @@ internal class NativeApi(private val context: Context) {
             learnerReports = learnerReports, learnerReportNotice = learnerReportNotice, issuedReports = issuedReports,
             schoolOperations = loadSchoolOperations(),
             canManageExamAssignments = hasManagerOrganizationMembership())
+    }
+
+    suspend fun fetchAdmissionInstitutions(): List<AdmissionInstitution> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val rows = getArray("/api/admissions/institutions")
+        (0 until minOf(rows.length(), 200)).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
+            val id = row.optInt("id"); val name = row.optString("name")
+            if (id <= 0 || name.isBlank()) null else AdmissionInstitution(id, name.take(180),
+                row.optString("officialUrl").takeUnless { it == "null" || it.isBlank() },
+                row.optString("province").takeUnless { it == "null" || it.isBlank() },
+                row.optString("route", "handoff").take(40), row.optString("verification", "directory_only").take(40))
+        } }
+    }
+
+    suspend fun fetchAdmissionProgrammes(institutionId: Int): List<AdmissionProgramme> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(institutionId > 0)
+        val rows = getArray("/api/admissions/programmes?institutionId=$institutionId")
+        (0 until minOf(rows.length(), 200)).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
+            val id = row.optInt("id"); val name = row.optString("name")
+            if (id <= 0 || name.isBlank()) null else AdmissionProgramme(id, name.take(200),
+                row.optString("faculty").takeUnless { it == "null" || it.isBlank() },
+                row.optString("qualification").takeUnless { it == "null" || it.isBlank() },
+                row.optString("requirements").takeUnless { it == "null" || it.isBlank() }?.take(4000))
+        } }
+    }
+
+    suspend fun fetchAdmissionApplications(): List<AdmissionApplication> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val rows = getArray("/api/admissions/applications/me")
+        (0 until minOf(rows.length(), 100)).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
+            val id = row.optInt("id"); val programmeId = row.optInt("programmeId")
+            if (id <= 0 || programmeId <= 0) null else AdmissionApplication(id, programmeId,
+                row.optString("status", "draft").take(40),
+                row.optString("externalReference").takeUnless { it == "null" || it.isBlank() }?.take(150),
+                row.optString("createdAt").take(40))
+        } }
+    }
+
+    suspend fun createAdmissionDraft(programmeId: Int, statement: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(programmeId > 0 && statement.toByteArray(Charsets.UTF_8).size <= 4000)
+        request("/api/admissions/applications", JSONObject().put("programmeId", programmeId).put("candidateStatement", statement), auth = true)
+    }
+
+    suspend fun updateAdmission(applicationId: Int, status: String, externalReference: String? = null) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        require(applicationId > 0 && status in setOf("ready_for_handoff", "external_submission_recorded", "withdrawn"))
+        val payload = JSONObject().put("status", status)
+        if (externalReference != null) {
+            require(externalReference.trim().length in 3..150)
+            payload.put("externalReference", externalReference.trim())
+        }
+        request("/api/admissions/applications/$applicationId", payload, method = "PATCH", auth = true)
     }
 
     suspend fun fetchLearnerPassport(): LearnerPassport = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
