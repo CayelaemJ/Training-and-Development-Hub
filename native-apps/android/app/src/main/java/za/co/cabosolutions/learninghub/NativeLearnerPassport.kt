@@ -29,6 +29,25 @@ internal data class LearnerPassportDna(
     val concept: String,
     val courseId: Int?
 )
+internal data class LifelongLearningPreferences(
+    val learningContext: String,
+    val preferredLanguage: String,
+    val learningGoal: String
+)
+internal data class PassportEvidenceLink(
+    val id: Int, val provider: String, val url: String, val description: String,
+    val evidenceType: String, val verificationStatus: String
+)
+internal data class PassportCompetency(
+    val id: Int, val skill: String, val category: String, val masteryLevel: Int,
+    val demonstration: String, val description: String, val evidenceLinkId: Int?,
+    val verificationStatus: String
+)
+internal data class LifelongLearningPassport(
+    val preferences: LifelongLearningPreferences,
+    val links: List<PassportEvidenceLink>,
+    val competencies: List<PassportCompetency>
+)
 internal data class LearnerPassport(
     val asOf: String,
     val items: List<LearnerPassportItem>,
@@ -44,6 +63,7 @@ internal fun NativeLearnerPassportScreen(
     passport: LearnerPassport?,
     busy: Boolean,
     message: String?,
+    api: NativeApi? = null,
     refresh: () -> Unit,
     share: () -> Unit,
     close: () -> Unit
@@ -73,6 +93,10 @@ internal fun NativeLearnerPassportScreen(
             }
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             message?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+            api?.let {
+                NativeLifelongPassportSection(api = it)
+                HorizontalDivider()
+            }
             passport?.let { passportData ->
                 Text("Updated ${passportData.asOf.take(10)}", style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
