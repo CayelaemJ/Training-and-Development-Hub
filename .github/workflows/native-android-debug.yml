@@ -10,13 +10,14 @@ on:
   workflow_dispatch:
 jobs:
   android-tests:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ fromJSON(vars.CABO_ANDROID_RUNNER_LABELS || '["ubuntu-latest"]') }}
     permissions:
       contents: read
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify Android emulator host virtualization
+        if: contains(fromJSON(vars.CABO_ANDROID_RUNNER_LABELS || '["ubuntu-latest"]'), 'self-hosted')
         shell: bash
         run: |
           set -euo pipefail
@@ -48,7 +49,7 @@ jobs:
           working-directory: native-apps/android
           script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
   android-build:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ fromJSON(vars.CABO_ANDROID_RUNNER_LABELS || '["ubuntu-latest"]') }}
     permissions:
       contents: read
     timeout-minutes: 30
