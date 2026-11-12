@@ -619,8 +619,14 @@ class MainActivity : ComponentActivity() {
                 api.submitSchoolProgression(organizationId, reviewedCandidate, year + 1, decision)
                 schoolProgressionMessage = "Learner ${reviewedCandidate.learnerId} recorded for ${year + 1}."
                 schoolProgression = api.fetchSchoolProgression(organizationId, year)
-            } catch (_: Exception) {
-                schoolProgressionError = "That progression could not be saved. The enrolment may have changed; refresh and review it again."
+            } catch (failure: Exception) {
+                val conflict = failure.message?.contains("candidate changed", ignoreCase = true) == true ||
+                    failure.message?.contains("HTTP 409", ignoreCase = true) == true
+                schoolProgressionError = if (conflict) {
+                    "The learner's enrolment changed. Current records were reloaded; review them before trying again."
+                } else {
+                    "That progression could not be saved. Check your connection and reload before trying again."
+                }
                 try { schoolProgression = api.fetchSchoolProgression(organizationId, year) } catch (_: Exception) {}
             } finally {
                 schoolProgressionSavingId = null

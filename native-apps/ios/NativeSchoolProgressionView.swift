@@ -203,7 +203,12 @@ struct NativeSchoolProgressionView: View {
             notice = "Learner \(current.learnerId) recorded for \(targetYear)."
             snapshot = try await session.fetchSchoolProgression(organizationId: organizationId, year: reviewedYear)
         } catch {
-            self.error = "That progression could not be saved. The enrolment may have changed; refresh and review it again."
+            let failure = error as NSError
+            if failure.code == 409 || failure.localizedDescription.localizedCaseInsensitiveContains("candidate changed") {
+                self.error = "The learner's enrolment changed. Current records were reloaded; review them before trying again."
+            } else {
+                self.error = "That progression could not be saved. Check your connection and reload before trying again."
+            }
             snapshot = try? await session.fetchSchoolProgression(organizationId: organizationId, year: reviewedYear)
         }
     }
