@@ -1,5 +1,6 @@
 import {Router,type IRouter} from "express";
-import OpenAI from "openai";
+import { completeAIJson, hasAiProvider } from "../lib/aiCompletion";
+import { ProviderQuotaError } from "../lib/providerQuota";
 import {and,desc,eq,gte} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,aiInferenceMetricsTable,organizationMembersTable,mlModelVersionsTable,mlEvaluationRunsTable,mlOperationalEventsTable} from "@workspace/db";
@@ -94,7 +95,7 @@ router.get("/ai/capabilities",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  const config=aiConfiguration();
  res.setHeader("Cache-Control","no-store");
- res.json({configured:config.configured,provider:config.preferredProvider,planningEnabled:config.configured,medicalAndHighStakesDecisionsEnabled:false});
+ res.json({configured:config.configured,provider:config.preferredProvider,providers:config.providers,planningEnabled:config.configured,medicalAndHighStakesDecisionsEnabled:false});
 });
 router.get("/platform/mlops",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
@@ -110,22 +111,27 @@ router.get("/platform/mlops",async(req,res)=>{
 router.post("/platform/mlops/smoke-test",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  if(!isPlatformSuperadmin(req.user.id)){res.sendStatus(403);return}
+ const input=z.object({provider:z.enum(["groq","huggingface","openai"]).optional()}).strict().safeParse(req.body??{});
+ if(!input.success){res.status(400).json({error:"Select a supported provider"});return}
  const configuration=aiConfiguration();
- if(!configuration.configured){res.status(503).json({error:"No model credentials configured"});return}
- const start=Date.now();
- const groq=configuration.preferredProvider==="groq";
- try {
-  const client=new OpenAI({apiKey:groq?process.env.GROQ_API_KEY:process.env.OPENAI_API_KEY,baseURL:groq?"https://api.groq.com/openai/v1":undefined,timeout:12000,maxRetries:0});
-  const answer=await client.chat.completions.create({model:configuration.developmentModel,max_completion_tokens:512,...(groq && configuration.developmentModel.startsWith("openai/gpt-oss-") ? {reasoning_effort:"low" as const} : {}),messages:[{role:"system",content:"Return the exact word READY, and no other text."},{role:"user",content:"Synthetic CABO infrastructure availability test. Respond READY."}]});
-  if(!answer.choices[0]?.message?.content?.includes("READY"))throw Error("Unexpected output");
-  await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"success",start);
-  res.json({ok:true,provider:configuration.preferredProvider,model:configuration.developmentModel,latencyMs:Date.now()-start});
+ const provider=input.data.provider??configuration.preferredProvider;
+ if(provider==="none"||!hasAiProvider(provider)){res.status(503).json({error:"Selected AI provider is not configured",provider});return}
+ const started=Date.now();
+ try{
+  const result=await completeAIJson({provider,task:"generic",maxCompletionTokens:128,system:"Return one JSON object with status set to the exact string READY.",payload:{purpose:"Synthetic CABO provider connectivity check. Do not include learner or personal data."},validate(value){return z.object({status:z.literal("READY")}).parse(value)}});
+  await recordAiMetric("smoke_test",result.provider,result.modelId,"success",started);
+  res.json({ok:true,provider:result.provider,model:result.modelId,latencyMs:Date.now()-started});
  }catch(e){
-  await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"failure",start);
-  const status = typeof (e as {status?:unknown})?.status === "number" ? (e as {status:number}).status : null;
-  console.warn("AI connection check failed", {provider: configuration.preferredProvider, status});
-  const error = status === 401 ? "The AI provider rejected this API key. Check the key in Render settings." : status === 403 ? "The AI provider refused access. Check this project's permissions and provider restrictions." : status === 429 ? "The AI provider has reached its usage limit. Check the account quota and try again later." : status === 404 ? "This AI model is unavailable. Choose an available model in Render settings." : "The AI service could not complete the connection check. Please try again shortly.";
-  res.status(502).json({ok:false,error,providerStatus:status});
+  await recordAiMetric("smoke_test",provider,"unavailable","failure",started);
+  const status=typeof(e as {status?:unknown})?.status==="number"?(e as {status:number}).status:null;
+  console.warn("AI provider connectivity check failed",{provider,status});
+  const error=status===402?"The provider account has no inference credits for this request. Check billing or provider access.":
+   status===401?"The provider rejected this API key. Check the server secret.":
+   status===403?"The provider refused access. Check token permissions and model access.":
+   status===429?"The provider rate or usage limit was reached. Check quota and retry guidance.":
+   status===404?"The configured model is unavailable to this provider.":
+   "The selected AI provider did not complete the synthetic connection check.";
+  res.status(e instanceof ProviderQuotaError?429:status===402?402:status===429?429:502).json({ok:false,error,provider,status});
  }
 });
 export default router;
