@@ -17,7 +17,6 @@ test("a real Groq SDK 429 fails over to mocked Hugging Face without extra calls"
   process.env.GROQ_API_KEY = "synthetic-groq-test-key";
   process.env.HF_TOKEN = "synthetic-hf-test-key";
   process.env.CABO_AI_HF_ENABLED = "true";
-    process.env.CABO_AI_HF_ENABLED = "true";
   delete process.env.HUGGINGFACE_API_KEY;
   delete process.env.OPENAI_API_KEY;
 
