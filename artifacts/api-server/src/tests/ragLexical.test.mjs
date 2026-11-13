@@ -23,7 +23,7 @@ test("lexical index persists searchable chunks and enforces revocation and owner
       INSERT INTO study_materials VALUES (1, 'owner', 'quarantine/test', true);
       INSERT INTO cabo_r2_objects VALUES ('quarantine/test','owner','approved',true,NULL);
     `);
-    await database.exec(await readFile(new URL("../../../../../lib/db/migrations/20261113_rag_lexical_foundation.sql", import.meta.url), "utf8"));
+    await database.exec(await readFile(new URL("../../../../lib/db/migrations/20261113_rag_lexical_foundation.sql", import.meta.url), "utf8"));
     const query = async (sql, values) => {
       const result = await database.query(sql, values);
       return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length };
