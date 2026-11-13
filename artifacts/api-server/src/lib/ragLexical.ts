@@ -7,6 +7,7 @@ const MAX_CHUNK = 3000;
 const OVERLAP = 260;
 const MAX_QUERY = 500;
 const MAX_RESULTS = 8;
+const MAX_SOURCE = 2_000_000;
 
 export type MaterialChunk = {
   chunkIndex: number;
@@ -64,17 +65,20 @@ function boundary(text: string, start: number, preferredEnd: number): number {
 /** Deterministic paragraph-aware chunks. Offsets always refer to normalized text. */
 export function chunkMaterialText(text: string): { source: string; sourceVersion: string; chunks: MaterialChunk[] } {
   const source = normalizedSource(text);
+  if (source.length > MAX_SOURCE) throw new Error("Material is too large to index.");
   if (source.length < 30) throw new Error("Material has insufficient readable text.");
   const chunks: MaterialChunk[] = [];
   let start = 0;
   while (start < source.length) {
     const end = boundary(source, start, start + TARGET_CHUNK);
-    const content = source.slice(start, end).trim();
+    const raw = source.slice(start, end);
+    const content = raw.trim();
+    const leading = raw.length - raw.trimStart().length;
     if (content.length >= 30) {
       chunks.push({
         chunkIndex: chunks.length,
-        startChar: start,
-        endChar: end,
+        startChar: start + leading,
+        endChar: start + leading + content.length,
         content,
         contentSha256: sha256(content),
       });
@@ -138,7 +142,11 @@ export async function replaceApprovedMaterialChunks(input: {
            content text, content_sha256 text
          )`,
       [input.materialId, input.ownerUserId, input.objectKey, prepared.sourceVersion,
-       JSON.stringify(prepared.chunks)],
+       JSON.stringify(prepared.chunks.map(chunk => ({
+         chunk_index: chunk.chunkIndex, start_char: chunk.startChar,
+         end_char: chunk.endChar, content: chunk.content,
+         content_sha256: chunk.contentSha256,
+       })))],
     );
     await client.query("COMMIT");
     return { sourceVersion: prepared.sourceVersion, chunkCount: prepared.chunks.length };
@@ -159,7 +167,10 @@ export async function searchApprovedOwnerMaterial(input: {
 }): Promise<LexicalMaterialMatch[]> {
   if (!lexicalRagEnabled()) throw new RagRetrievalUnavailableError();
   const query = input.query.replace(/\s+/g, " ").trim();
-  const limit = Math.max(1, Math.min(MAX_RESULTS, Math.trunc(input.limit ?? 6)));
+  if (input.limit !== undefined && (!Number.isSafeInteger(input.limit) || input.limit < 1)) {
+    throw new Error("Invalid search result limit.");
+  }
+  const limit = Math.min(MAX_RESULTS, input.limit ?? 6);
   if (!Number.isSafeInteger(input.materialId) || input.materialId < 1 ||
       !input.ownerUserId || input.ownerUserId.length > 128 ||
       query.length < 2 || query.length > MAX_QUERY) {
@@ -178,6 +189,7 @@ export async function searchApprovedOwnerMaterial(input: {
        JOIN cabo_r2_objects o ON o.object_key = c.object_key
        CROSS JOIN q
       WHERE c.owner_user_id = $1 AND c.material_id = $2
+        AND m.object_path = c.object_key
         AND m.allow_ai_reading = true
         AND o.owner_user_id = $1 AND o.state = 'approved'
         AND o.ai_read_consent = true AND o.deleted_at IS NULL
