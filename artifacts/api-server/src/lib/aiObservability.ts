@@ -6,7 +6,9 @@ export async function recordAiMetric(operation:AiOperation,provider:string,model
  catch{console.error("AI telemetry write failed")}
 }
 export function aiConfiguration(){
- const groq=!!process.env.GROQ_API_KEY?.trim(),huggingface=!!(process.env.HF_TOKEN?.trim()||process.env.HUGGINGFACE_API_KEY?.trim()),openai=!!process.env.OPENAI_API_KEY?.trim();
+ const groq=!!process.env.GROQ_API_KEY?.trim();
+ const huggingface=process.env.CABO_AI_HF_ENABLED==="true"&&!!(process.env.HF_TOKEN?.trim()||process.env.HUGGINGFACE_API_KEY?.trim());
+ const openai=process.env.CABO_AI_OPENAI_FALLBACK_ENABLED==="true"&&!!process.env.OPENAI_API_KEY?.trim();
  const providers:AiProviderName[]=[...(groq?["groq" as const]:[]),...(huggingface?["huggingface" as const]:[]),...(openai?["openai" as const]:[])];
  const preferredProvider:AiProviderName|"none"=groq?"groq":huggingface?"huggingface":openai?"openai":"none";
  return {configured:providers.length>0,providers,preferredProvider,developmentModel:groq?(process.env.GROQ_EXAM_MODEL||"openai/gpt-oss-20b"):huggingface?(process.env.HF_CHAT_MODEL||"openai/gpt-oss-20b:cheapest"):(process.env.OPENAI_EXAM_MODEL||"gpt-4.1-mini")};
