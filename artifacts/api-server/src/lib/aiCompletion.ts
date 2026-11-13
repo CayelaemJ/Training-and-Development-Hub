@@ -23,11 +23,15 @@ export class AiUnavailableError extends Error {
 }
 
 export function hasAiProvider(provider?: AiProviderName): boolean {
-  if (provider === "groq") return Boolean(process.env.GROQ_API_KEY?.trim());
-  if (provider === "huggingface") return Boolean(process.env.HF_TOKEN?.trim() || process.env.HUGGINGFACE_API_KEY?.trim());
-  if (provider === "openai") return Boolean(process.env.OPENAI_API_KEY?.trim());
-  return Boolean(process.env.GROQ_API_KEY?.trim() || process.env.HF_TOKEN?.trim() ||
-    process.env.HUGGINGFACE_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
+  const groq = Boolean(process.env.GROQ_API_KEY?.trim());
+  const huggingface = process.env.CABO_AI_HF_ENABLED === "true" &&
+    Boolean(process.env.HF_TOKEN?.trim() || process.env.HUGGINGFACE_API_KEY?.trim());
+  const openai = process.env.CABO_AI_OPENAI_FALLBACK_ENABLED === "true" &&
+    Boolean(process.env.OPENAI_API_KEY?.trim());
+  if (provider === "groq") return groq;
+  if (provider === "huggingface") return huggingface;
+  if (provider === "openai") return openai;
+  return groq || huggingface || openai;
 }
 
 const groqModelCache: { expires: number; models: string[] | null } = { expires: 0, models: null };
@@ -77,7 +81,7 @@ async function configuredProviders(): Promise<Provider[]> {
     if (candidates.length) providers.push({ name: "groq", client, models: candidates.slice(0, 5) });
   }
   const hfToken = process.env.HF_TOKEN?.trim() || process.env.HUGGINGFACE_API_KEY?.trim();
-  if (hfToken) {
+  if (process.env.CABO_AI_HF_ENABLED === "true" && hfToken) {
     const client = new OpenAI({ apiKey: hfToken, baseURL: HF_BASE_URL, timeout: 25_000, maxRetries: 0 });
     // Inference Providers supports the OpenAI-compatible chat endpoint. The model
     // can be changed without a code deployment when access or pricing changes.
@@ -87,7 +91,7 @@ async function configuredProviders(): Promise<Provider[]> {
       models: cleanModels([process.env.HF_CHAT_MODEL || "openai/gpt-oss-20b:cheapest"]).slice(0, 2),
     });
   }
-  if (process.env.OPENAI_API_KEY?.trim()) {
+  if (process.env.CABO_AI_OPENAI_FALLBACK_ENABLED === "true" && process.env.OPENAI_API_KEY?.trim()) {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim(), timeout: 25_000, maxRetries: 0 });
     providers.push({ name: "openai", client, models: cleanModels([process.env.OPENAI_EXAM_MODEL, "gpt-4.1-mini", "gpt-4o-mini"]).slice(0, 3) });
   }
@@ -109,8 +113,9 @@ function postponeProvider(name: AiProviderName, ms: number): void {
 
 /**
  * Validate the output before committing any caller-side state. Production
- * traffic is split between Groq and HF, with failover and optional OpenAI
- * legacy fallback. A provider override is only for admin smoke tests.
+ * uses Groq by default. Hugging Face and OpenAI are disabled unless an
+ * administrator explicitly enables their feature flags. A provider override
+ * is only for admin smoke tests and cannot bypass those flags.
  */
 export async function completeAIJson<T>(args: {
   system: string;
