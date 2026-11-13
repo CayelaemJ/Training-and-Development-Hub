@@ -221,7 +221,29 @@ Before implementing a feature:
 
 The full security workflow and hard boundaries are maintained in [AGENTS.md](../AGENTS.md).
 
-## 10. Documentation map
+## 10. Bringing collaborators on board
+
+Use the documentation as a shared orientation, then let each person go deeper in the areas relevant to their role. A short walkthrough can follow this order:
+
+1. **Start with the learner problem:** explain the fragmentation CABO is trying to address and the north-star question in this guide.
+2. **Show the platform map:** walk through the six pillars and the data-flow diagrams above. Explain which parts are live, prototype, pilot or planned for the environment being discussed.
+3. **Follow one real workflow:** for example, study material to practice exam to advisory feedback. Show where a human remains responsible and where learner data is protected.
+4. **Set expectations clearly:** use the delivery register to identify current capabilities, open gates and decisions still needed. Keep future vision separate from commitments.
+5. **Agree on the next contribution:** assign one bounded task, name its owner and reviewer, and agree how success and evidence will be recorded.
+6. **Close the loop:** update the relevant module documentation and status when work changes what collaborators can rely on.
+
+### Suggested reading paths
+
+| Audience | Read first | Then use |
+|---|---|---|
+| Public, families and prospective partners | This guide: sections 1–5 and the external description | [Platform identity](./PLATFORM_IDENTITY.md), [public messaging](./GO_TO_MARKET_MESSAGING.md), and delivery register |
+| Educators and institution teams | This guide: audiences, pillars, boundaries and trust principles | [Role-based portals](./ROLE_BASED_PORTALS.md), [governance hierarchy](./GOVERNANCE_HIERARCHY.md), [institution and guardian workflows](./INSTITUTION_TRANSFERS_AND_GUARDIANS.md) |
+| Developers and reviewers | This guide: architecture, diagrams, data principles and contributor workflow | [AGENTS.md](../AGENTS.md), [architecture](./ARCHITECTURE.md), relevant module docs, [deployment](./DEPLOYMENT.md), and delivery register |
+| Project leads and delivery partners | This guide: product scope, maturity boundaries and onboarding steps | [Product vision](./PRODUCT_VISION.md), [connected sprints](./CONNECTED_HUB_SPRINTS.md), and delivery register |
+
+A good onboarding session should end with shared agreement on the product's present state, the user's needs, the work being proposed, and the evidence required before calling that work complete. Avoid treating the full document set as a one-time reading assignment; use the index to bring the right reference into each discussion.
+
+## 11. Documentation map
 
 - [Documentation index](./README.md)
 - [Canonical platform identity and positioning](./PLATFORM_IDENTITY.md)
@@ -238,7 +260,7 @@ The full security workflow and hard boundaries are maintained in [AGENTS.md](../
 - [Role-based portals](./ROLE_BASED_PORTALS.md)
 - [Connected Hub sprints](./CONNECTED_HUB_SPRINTS.md)
 
-## 11. External description
+## 12. External description
 
 **Short description:**  
 CABO Learning Hub is a connected education and lifelong development platform designed to bring learning, assessment, learner development and institution workflows into a more continuous journey. It is being developed by CABO Solutions with a focus on learner agency, responsible use of data and human-led support.
