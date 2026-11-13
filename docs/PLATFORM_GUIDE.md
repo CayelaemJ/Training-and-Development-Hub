@@ -101,7 +101,75 @@ The repository is a pnpm TypeScript monorepo. The documented high-level componen
 
 At a high level, a user interacts with the web or native client, which calls the API. The API checks the authenticated identity and authorization, reads or writes PostgreSQL, uses private object storage for materials, and calls configured AI services for selected functions. Client state is not an authorization boundary: ownership, organization scope and consent must be enforced by the server.
 
-This is a high-level orientation, not a complete component diagram. Review each module's route, schema and architecture notes before changing its data flow.
+### Platform data flow
+
+This logical view shows the normal trust boundaries. The API is the policy enforcement point; clients must not connect directly to the database, object store or model provider. Exact providers and deployment topology depend on the environment.
+
+~~~mermaid
+flowchart TD
+  Learner["Learner, educator or institution user"] --> Client["Web or native client"]
+  Client --> API["Express API"]
+  API --> Auth["Authentication and server-side authorization"]
+  Auth --> DB[("PostgreSQL via Drizzle")]
+  Auth --> Files["Private object storage"]
+  Auth --> AI["Configured AI service"]
+  AI --> API
+  Files --> API
+  DB --> API
+  API --> Client
+  Client --> User["User sees permitted result"]
+~~~
+
+### AI-assisted written assessment flow
+
+The assessment lifecycle separates private source material and answer keys from learner-visible questions. The model's score is advisory; any high-stakes outcome needs an appropriate human review step.
+
+~~~mermaid
+sequenceDiagram
+  actor Learner
+  participant Web as Web client
+  participant API as Express API
+  participant DB as PostgreSQL
+  participant Model as AI service
+  Learner->>Web: Choose material and exam settings
+  Web->>API: Request exam generation
+  API->>DB: Verify ownership and read source material
+  API->>Model: Generate questions, marks and rubric
+  Model-->>API: Draft assessment content
+  API->>DB: Store exam and private answer key
+  API-->>Web: Return learner-safe questions
+  Learner->>Web: Submit written answers
+  Web->>API: Submit attempt
+  API->>DB: Verify ownership and load rubric
+  API->>Model: Request rubric-based draft marking
+  Model-->>API: Marks, feedback and review flags
+  API->>DB: Store attempt and AI assessment
+  API-->>Web: Return feedback and advisory result
+~~~
+
+### Consent-gated opportunity disclosure
+
+The opportunity profile path has its own permission boundary. A request alone grants no access; the user's decision, active grant, scope and expiry are checked when the organization reads permitted evidence.
+
+~~~mermaid
+sequenceDiagram
+  actor Org as Organization administrator
+  participant API as Express API
+  participant User as Individual user
+  participant DB as PostgreSQL
+  Org->>API: Request specific profile scope and purpose
+  API->>DB: Check organization role and feature flag
+  API->>DB: Record pending request
+  API-->>User: Notify user of requested scope
+  User->>API: Approve, deny or ignore
+  API->>DB: Record decision and grant expiry
+  Org->>API: Read profile after approval
+  API->>DB: Recheck scope, status and expiry
+  API->>DB: Record access audit event
+  API-->>Org: Return only permitted evidence
+~~~
+
+These diagrams show logical flows, not every endpoint, queue, provider, deployment component or database transaction. Review the relevant route, schema, tests and module documentation before changing a data path.
 
 ## 7. Data, trust and AI principles
 
