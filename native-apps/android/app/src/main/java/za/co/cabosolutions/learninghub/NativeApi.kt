@@ -328,7 +328,8 @@ internal class NativeApi(private val context: Context) {
 
     suspend fun submitQuiz(id: Int, answers: List<Int>, requestKey: String): QuizAttempt =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            require(id > 0 && answers.isNotEmpty() && answers.all { it >= 0 })
+            require(NativeAssessmentPolicy.isValidQuizId(id) && answers.isNotEmpty() && answers.all { it >= 0 } &&
+                NativeAssessmentPolicy.isValidRequestKey(requestKey))
             val json = request("/api/quizzes/$id/attempts",
                 JSONObject().put("answers", JSONArray(answers)), auth = true, requestKey = requestKey)
             val rows = json.getJSONArray("feedback")
@@ -344,7 +345,7 @@ internal class NativeApi(private val context: Context) {
 
     suspend fun lookupQuiz(id: Int, requestKey: String): QuizAttempt =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            require(id > 0 && requestKey.matches(Regex("[A-Za-z0-9_-]{16,64}")))
+            require(NativeAssessmentPolicy.isValidQuizId(id) && NativeAssessmentPolicy.isValidRequestKey(requestKey))
             val json = request("/api/quizzes/$id/attempts/by-key/$requestKey", auth = true)
             val rows = json.getJSONArray("feedback")
             val feedback = (0 until rows.length()).map { i ->
