@@ -1,35 +1,65 @@
-name: CABO native iOS build verification
+name: CABO iOS native verification (GitHub-hosted macOS)
 on:
   pull_request:
+    paths:
+      - 'native-apps/ios/**'
+      - '.github/workflows/native-ios-verify.yml'
+  push:
+    branches: [main, feat/real-native-cabo-apps]
     paths:
       - 'native-apps/ios/**'
       - '.github/workflows/native-ios-verify.yml'
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: cabo-ios-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  ios-simulator-build:
+  ios-verify:
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Select installed Xcode
-        run: xcodebuild -version
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Generate Xcode project from source
-        working-directory: native-apps/ios
-        run: xcodegen generate
-      - name: Compile iPhone simulator app without signing
-        working-directory: native-apps/ios
+      - name: Verify macOS Xcode runner
+        shell: bash
         run: |
-          xcodebuild \
-            -project CABOLearningHub.xcodeproj \
-            -scheme CABOLearningHub \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-      - name: Explain validation scope
-        run: echo 'Simulator compilation only. Physical iPhone sign-in, Keychain, notifications and store signing require a separate device test.'
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-path
+      - name: Generate Xcode project
+        working-directory: native-apps/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          test -d CABOLearningHub.xcodeproj
+      - name: Build iOS Simulator app
+        working-directory: native-apps/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project CABOLearningHub.xcodeproj -scheme CABOLearningHub -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/cabo-ios-derived" CODE_SIGNING_ALLOWED=NO build
+      - name: Xcode static analysis
+        working-directory: native-apps/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project CABOLearningHub.xcodeproj -scheme CABOLearningHub -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/cabo-ios-derived" CODE_SIGNING_ALLOWED=NO analyze
+      - name: Assert simulator app exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$RUNNER_TEMP/cabo-ios-derived/Build/Products/Debug-iphonesimulator/CABOLearningHub.app"
+          test -s "$RUNNER_TEMP/cabo-ios-derived/Build/Products/Debug-iphonesimulator/CABOLearningHub.app/CABOLearningHub"
+      - name: Upload simulator build evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cabo-ios-simulator-app-test-only
+          path: ${{ runner.temp }}/cabo-ios-derived/Build/Products/Debug-iphonesimulator/CABOLearningHub.app/
+          if-no-files-found: error
+          retention-days: 3

@@ -1,46 +1,81 @@
-name: CABO native Android debug APK (manual)
+name: CABO Android native verification (self-hosted)
 on:
   pull_request:
     paths:
       - 'native-apps/android/**'
       - '.github/workflows/native-android-debug.yml'
+  push:
+    branches: [main, feat/real-native-cabo-apps]
+    paths:
+      - 'native-apps/android/**'
+      - '.github/workflows/native-android-debug.yml'
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cabo-android-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  android-debug:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    timeout-minutes: 35
+  android-verify:
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      # GitHub's Ubuntu runner already contains Android command-line tools.
-      # setup-android@v3 currently tries to install removed SDK package "tools".
-      - name: Install Android SDK platform and build tools
+      - name: Verify Android runner toolchain
         shell: bash
         run: |
           set -euo pipefail
-          sdkroot="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          manager=$(find "$sdkroot/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)
-          test -x "$manager"
-          yes | "$manager" --licenses > /dev/null || true
-          "$manager" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
-          cache-read-only: true
-      - name: Compile native Android Kotlin app
+          java -version
+          test -n "${JAVA_HOME:-}" || { echo 'JAVA_HOME must point to JDK 17'; exit 1; }
+          java -version 2>&1 | grep -q '"17\.' || { echo 'JDK 17 required'; exit 1; }
+          sdkroot="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdkroot" && test -d "$sdkroot" || { echo 'ANDROID_HOME or ANDROID_SDK_ROOT must point to an installed SDK'; exit 1; }
+          test -f "$sdkroot/platforms/android-35/android.jar" || { echo 'Install Android SDK platform 35'; exit 1; }
+          test -d "$sdkroot/build-tools/35.0.0" || { echo 'Install Android build-tools 35.0.0'; exit 1; }
+          if test -f native-apps/android/gradlew; then
+            chmod +x native-apps/android/gradlew
+            echo "GRADLE_CMD=./gradlew" >> "$GITHUB_ENV"
+          else
+            command -v gradle || { echo 'Install Gradle 8.11.1 or commit a Gradle wrapper'; exit 1; }
+            echo "GRADLE_CMD=gradle" >> "$GITHUB_ENV"
+          fi
+      - name: Lint, unit tests, and compile debug APK
         working-directory: native-apps/android
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - name: Upload TEST-ONLY unsigned-for-release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          $GRADLE_CMD --version
+          $GRADLE_CMD :app:lintDebug :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
+      - name: Require at least one discovered Android unit test
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="native-apps/android/app/build/test-results/testDebugUnitTest"
+          test -d "$reports" || { echo "Android unit test reports are missing"; exit 1; }
+          grep -R -E '<testsuite[^>]*tests="[1-9][0-9]*"' "$reports" >/dev/null || {
+            echo "No Android unit tests were discovered"
+            exit 1
+          }
+      - name: Assert actual APK was produced
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s native-apps/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload Android lint and unit test evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CABO-native-Android-DEBUG-test-only
+          name: cabo-android-check-reports
+          path: |
+            native-apps/android/app/build/reports/
+            native-apps/android/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload debug APK (testing only)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cabo-android-debug-test-only
           path: native-apps/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 3
           if-no-files-found: error
-# Debug APK is signed with Android's generated DEBUG key, not CABO's Play Store
-# release signing identity. Never redistribute it as a production school app.
+          retention-days: 3
