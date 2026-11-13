@@ -1,4 +1,4 @@
-name: CABO iOS native verification (self-hosted macOS)
+name: CABO iOS native verification (GitHub-hosted macOS)
 on:
   pull_request:
     paths:
@@ -17,10 +17,12 @@ concurrency:
   cancel-in-progress: true
 jobs:
   ios-verify:
-    runs-on: [self-hosted, macOS]
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
       - name: Verify macOS Xcode runner
         shell: bash
         run: |
@@ -28,7 +30,6 @@ jobs:
           test "$(uname -s)" = Darwin
           xcodebuild -version
           xcrun --sdk iphonesimulator --show-sdk-path
-          command -v xcodegen >/dev/null || { echo 'Install XcodeGen on this macOS runner'; exit 1; }
       - name: Generate Xcode project
         working-directory: native-apps/ios
         shell: bash
