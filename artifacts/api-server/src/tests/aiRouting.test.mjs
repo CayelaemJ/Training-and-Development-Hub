@@ -2,6 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { aiRoutingWeights, createAiProviderOrderer } from "../lib/aiRouting.ts";
 
+test("Groq is the only provider enabled by default", () => {
+  assert.deepEqual(aiRoutingWeights({}), { groq: 1, huggingface: 0 });
+  const choose = createAiProviderOrderer(aiRoutingWeights({}));
+  assert.deepEqual(choose(["groq", "huggingface", "openai"], "exam_generation"), ["groq", "huggingface", "openai"]);
+});
+
+test("Hugging Face routing requires an explicit feature flag", () => {
+  assert.deepEqual(aiRoutingWeights({ CABO_AI_HF_WEIGHT: "1" }), { groq: 1, huggingface: 0 });
+  assert.deepEqual(aiRoutingWeights({ CABO_AI_HF_ENABLED: "true", CABO_AI_HF_WEIGHT: "1" }), { groq: 1, huggingface: 1 });
+});
+
 test("task-specific routing shares traffic without requiring both providers", () => {
   const choose = createAiProviderOrderer({groq:1,huggingface:1});
   const available = ["groq","huggingface"];
