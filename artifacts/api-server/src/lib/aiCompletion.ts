@@ -14,9 +14,11 @@ const orderProviders = createAiProviderOrderer(aiRoutingWeights(process.env));
 const blockedUntil: Record<AiProviderName, number> = { groq: 0, huggingface: 0, openai: 0 };
 
 export class AiUnavailableError extends Error {
-  constructor() {
+  status?: number;
+  constructor(status?: number) {
     super("AI generation is temporarily unavailable. Please try again shortly; no work has been submitted.");
     this.name = "AiUnavailableError";
+    this.status = status;
   }
 }
 
@@ -120,6 +122,7 @@ export async function completeAIJson<T>(args: {
 }): Promise<{ value: T; modelId: string; provider: AiProviderName }> {
   const deadline = Date.now() + 180_000;
   let quotaError: ProviderQuotaError | undefined;
+  let lastStatus: number | undefined;
   const configured = await configuredProviders();
   const order = args.provider ? [args.provider] : orderProviders(configured.map(item => item.name), args.task);
   const providers = order.flatMap(name => configured.filter(candidate => candidate.name === name));
@@ -153,10 +156,12 @@ export async function completeAIJson<T>(args: {
         } catch (error) {
           if (error instanceof ProviderQuotaError) {
             quotaError = error;
+            lastStatus = 429;
             postponeProvider(provider.name, error.retryAfterSeconds * 1000);
             continue providers;
           }
           const err = error as { status?: number; code?: string; name?: string };
+          if (typeof err.status === "number") lastStatus = err.status;
           logger.warn({ provider: provider.name, model, jsonMode, status: err.status ?? null, code: err.code ?? null, type: err.name ?? "Error" }, "CABO AI candidate did not return valid output");
           const action = aiFailureAction(err, jsonMode);
           if (action === "next-provider") {
@@ -169,5 +174,5 @@ export async function completeAIJson<T>(args: {
       }
     }
   }
-  throw quotaError ?? new AiUnavailableError();
+  throw quotaError ?? new AiUnavailableError(lastStatus);
 }
