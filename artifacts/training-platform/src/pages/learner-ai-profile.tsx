@@ -136,7 +136,7 @@ export default function LearnerAiProfilePage() {
 
       <aside className="flex gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
         <ShieldCheck className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-        <p><strong>Your profile stays private to your account.</strong> These settings are learner-entered and are not used to infer your personality, emotions, ability or health. The learner chat is not live yet, so these preferences do not currently change AI responses.</p>
+        <p><strong>Your profile is learner-entered and private to your CABO account.</strong> If you opt in and request a development plan, the preferences you chose may be sent to CABO’s configured AI provider for that response. They are not used to infer your personality, emotions, ability or health. Learner chat is not live yet.</p>
       </aside>
 
       {loading ? (
@@ -150,7 +150,7 @@ export default function LearnerAiProfilePage() {
               checked={profile.personalizationEnabled}
               onChange={(event) => { setProfile({ ...profile, personalizationEnabled: event.target.checked }); setSaved(false); }}
             />
-            <span><strong>Use my profile to personalise future CABO AI help</strong><span className="mt-1 block text-sm text-muted-foreground">Optional. This setting will take effect when the private learner chat is released.</span></span>
+            <span><strong>Use my profile to personalise development plans</strong><span className="mt-1 block text-sm text-muted-foreground">Optional. When enabled, your selected profile fields are included with your development-plan request and sent to CABO’s configured AI provider for that response.</span></span>
           </label>
 
           <div className="grid gap-5 sm:grid-cols-2">
