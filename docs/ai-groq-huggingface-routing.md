@@ -21,7 +21,7 @@ Set these only as server-side runtime environment variables, never in source con
 
 - \`GROQ_API_KEY\`: Groq inference credential.
 - \`HF_TOKEN\`: Hugging Face token permitted to call Inference Providers (preferred). \`HUGGINGFACE_API_KEY\` is supported as an alternative.
-- \`HF_CHAT_MODEL\`: Inference Providers chat model; default \`openai/gpt-oss-120b:cheapest\`. Verify model access, context and costs before deployment. Model suffixes are a Hugging Face feature.
+- \`HF_CHAT_MODEL\`: Inference Providers chat model; default \`openai/gpt-oss-20b:cheapest\`. The 20B model is the lower-size default to limit usage. `:cheapest` chooses the lowest-priced available inference provider; it does not make inference free. Verify model access, context and costs before deployment.
 - \`GROQ_EXAM_MODEL\`: optional Groq chat model override.
 - \`CABO_AI_GROQ_WEIGHT\`: optional global multiplier 0–100, default 1.
 - \`CABO_AI_HF_WEIGHT\`: optional global multiplier 0–100, default 1.
