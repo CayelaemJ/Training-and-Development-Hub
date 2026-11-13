@@ -1,4 +1,4 @@
-> 📐 **[Explore the project architecture, diagrams and technical deep dive](docs/PORTFOLIO_SHOWCASE.md)** · [Engineering profile](https://github.com/CayelaemJ)
+> 🧭 **[Start here: CABO stakeholder and developer onboarding pack](docs/PLATFORM_GUIDE.md)** · [Project architecture and technical deep dive](docs/PORTFOLIO_SHOWCASE.md) · [Engineering profile](https://github.com/CayelaemJ)
 
 ---
 
