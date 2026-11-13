@@ -29,6 +29,26 @@ jobs:
             npx --yes wrangler@4.151.3 deploy --dry-run --outdir /tmp/cabo-django-worker-bundle
 
 
+  django_worker_local_smoke:
+    # The staging deploy pipeline must exercise real HTTP via local workerd.
+    # This job does not run on ordinary pushes or deploy anything.
+    docker:
+      - image: cimg/python:3.12-node
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Run synthetic Django Worker HTTP contract in local workerd
+          command: |
+            python -m pip install --disable-pip-version-check "uv==0.13.6"
+            cd services/cloudflare-django-worker
+            uvx --from workers-py==1.17.9 pywrangler sync
+            # Install a pinned CLI in an isolated folder, not the repo lockfile.
+            npm install --prefix /tmp/cabo-django-smoke-cli --no-save --no-audit --no-fund wrangler@4.151.3
+            cd ../..
+            CABO_DJANGO_LOCAL_WRANGLER_CLI=/tmp/cabo-django-smoke-cli/node_modules/wrangler/wrangler-dist/cli.js node scripts/test-django-worker-local.mjs
+          no_output_timeout: 8m
+
   deploy_django_staging:
     docker:
       - image: cimg/python:3.12-node
@@ -44,6 +64,9 @@ jobs:
             fi
             if [ "${CABO_DJANGO_WORKER_URL:-}" != "https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev" ]; then
               echo "Refusing unexpected staging destination"; exit 2
+            fi
+            if [ "${CABO_ENVIRONMENT:-}" != "staging" ] || [ "${CABO_DJANGO_STAGING_PRIVACY_APPROVED:-}" != "true" ]; then
+              echo "Refusing deploy without staging environment and privacy approval"; exit 2
             fi
             : "${CLOUDFLARE_API_TOKEN:?A scoped Cloudflare Workers deployment token is required}"
             : "${DJANGO_SECRET_KEY:?Django signing secret is required}"
@@ -154,11 +177,13 @@ workflows:
     when: << pipeline.parameters.deploy_django_staging >>
     jobs:
       - django_worker
+      - django_worker_local_smoke
       - verify
       - security_suite
       - deploy_django_staging:
           requires:
             - django_worker
+            - django_worker_local_smoke
             - verify
             - security_suite
           context: cabo-cloudflare-staging

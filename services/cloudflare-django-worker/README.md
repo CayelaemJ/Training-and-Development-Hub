@@ -29,10 +29,12 @@ Confirm the deployed Worker URL and authorized health+POST smoke tests first; do
 
 ## Existing CABO API configuration
 - `ENABLE_CABO_DJANGO_INSIGHTS=true` (defaults **off**)
-- `CABO_DJANGO_WORKER_URL=https://<verified-worker-host>` (server-side only)
+- `CABO_ENVIRONMENT=staging` (or `testing`; **never** `production`)
+- `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` only after synthetic-data and cross-border review
+- `CABO_DJANGO_WORKER_URL=https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev` (server-side only)
 - `CABO_DJANGO_WORKER_TOKEN=<same secret as Cloudflare>` (server-side only)
 
-`POST /api/organizations/:orgId/learning/insights/draft` requires an authenticated CABO session and verified **owner/admin (or platform superadmin)** authorisation for that institution. Unscoped users and users belonging to other institutions are denied. It accepts `{"concepts":[{"code":"fractions","masteryPercent":45,"evidenceCount":5}]}` and returns advisory labels only. Metrics are supplied by the caller and are **not institution-verified**. This endpoint must not be used for real learner decisions until scoped source evidence and consent checks are implemented.
+`POST /api/organizations/:orgId/learning/insights/draft` requires an authenticated CABO session and verified **owner/admin (or platform superadmin)** authorisation for that institution. Unscoped users and users belonging to other institutions are denied. It accepts `{"concepts":[{"code":"fractions","masteryPercent":45,"evidenceCount":5}]}` and returns advisory labels only. Metrics are supplied by the caller and are **not institution-verified**. This endpoint must not be used for real learner decisions until scoped source evidence and consent checks are implemented. An additional server-side staging-only guard prevents calls outside `CABO_ENVIRONMENT=staging` or `testing`, even when `ENABLE_CABO_DJANGO_INSIGHTS=true` is set in production. `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` must also be explicitly granted by the responsible pilot administrator; this flag is an authorisation gate, not proof that supplied data is synthetic.
 
 ### Release gates
 - Django unit tests, main CABO typecheck/build and security regressions.
@@ -47,6 +49,11 @@ The connected Cloudflare account now has two **EU-jurisdiction** queues:
 - `cabo-learning-insights-staging-dlq` (queue ID `b9019c0485ad4e3da11f026314f23f9e`)
 
 **These queues are presently unbound, empty and inactive.** Do not publish messages until an authenticated producer, durable job-status store, idempotent consumer, failure classification, DLQ monitoring, consent/revocation checks and cross-border review are implemented. Cloudflare's Workers Free plan includes 10,000 queue operations/day with 24-hour retention, so it is unsuitable as the only durable job store.
+
+### Cloudflare Python local-runtime verification
+The pinned Wrangler `4.151.3` local `workerd` build supports compatibility date `2026-10-26` (not `2026-10-28`). The Worker configuration uses the supported date. A manual synthetic HTTP run under Cloudflare's local Pyodide/WSGI runtime confirmed: health 200, no/invalid bearer 401, authorised synthetic advisory 200, disallowed identifying fields 400 and forged Host 400. The local runtime took approximately 30 seconds to process its first request; subsequent requests completed in less than 0.1 seconds. This **does not predict hosted Cloudflare cold-start performance**, which requires separate verification.
+
+After `uvx --from workers-py==1.17.9 pywrangler sync`, the repeatable local smoke script is `node scripts/test-django-worker-local.mjs` from the repository root. It uses only synthetic secrets and data and will refuse to replace an existing local `.dev.vars` file. It must pass in an isolated runtime before any hosted staging deployment is approved.
 
 ### Expected staging verification
 1. Django test suite: `DJANGO_SECRET_KEY=local-only-test-secret DJANGO_WORKER_TOKEN=long-test-only-token-for-ci-tests-1234 python -m django test --settings=cabo_worker.settings`.
@@ -63,5 +70,20 @@ The repository includes a pipeline parameter `deploy_django_staging` (default `f
 - `DJANGO_SECRET_KEY`: strong randomly generated Django signing key, at least 32 characters.
 - `DJANGO_WORKER_TOKEN`: strong random shared bearer secret, at least 32 characters, also configured in the **staging CABO API only**.
 - `CABO_DJANGO_WORKER_URL=https://cabo-learning-django-insights-staging.cabo-solutions-za.workers.dev`.
+- `CABO_ENVIRONMENT=staging` and `CABO_DJANGO_STAGING_PRIVACY_APPROVED=true` (both required by the CI deploy preflight; do not add these approval flags to production).
 
 Restrict context access to approved maintainers and staging jobs; do not use live student records. The job writes secrets to a temporary mode-0600 file, deploys via Pywrangler, deletes that file, then runs `node scripts/test-django-worker-staging.mjs` to check HTTP health, authentication, advisory output, and privacy rejection. A failed test is a failed release even if the Worker upload succeeded: revert staging before proceeding. **There is currently no authorised Cloudflare deployment credential configured in this connected environment, so this remains a prepared, untriggered workflow.**
+
+## Local cold-start diagnostics
+
+Before an approved staging deployment, the gated `django_worker_local_smoke` job exercises **real local workerd HTTP** with synthetic-only metrics. It never uses Cloudflare or database credentials, and the test runner forwards only a small allowlist of operating-system variables to workerd.
+
+The local test reports two distinct phases:
+- `listener=false`: Wrangler/workerd did not open the local TCP port; investigate CLI startup, runtime availability and resource starvation.
+- `listener=true`, `lastHttpStatus=none`: the TCP listener opened but no HTTP response arrived; investigate initial Python/Pyodide isolation, imported dependencies, or resource pressure.
+- `lastHttpStatus=400`: check `DJANGO_ALLOWED_HOST` and the exact `Host` request header. The test deliberately sends a forged host and expects its rejection.
+- A `PASS` requires the complete warmed HTTP contract: health, unauthorised and invalid-bearer rejection, authorised advisory output, extra-field rejection and forged-host rejection. A listening socket is **not** a passing result.
+
+In an isolated low-resource test environment on 29 October 2026, a minimal JavaScript Worker also took minutes to become responsive, while the Django/Python Worker packaged approximately 41 MiB across 7,112 modules and did not complete its initial local HTTP response within six minutes. This is **not** proof that a deployed Worker is broken: Cloudflare's production Python Workers use deploy-time memory snapshots, whereas the local `workerd` path performs additional initialization. See [Cloudflare's Python Worker lifecycle](https://developers.cloudflare.com/workers/languages/python/how-python-workers-work/).
+
+**Do not remove or waive the local smoke gate to force a release.** Investigate runtime cold start with resource-aware CI, retain bounded timeouts, and subsequently verify the real staging Worker with `node scripts/test-django-worker-staging.mjs`. The pilot remains disabled unless all protected staging and privacy controls pass.
