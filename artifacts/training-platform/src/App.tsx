@@ -1,5 +1,6 @@
 import InstallPage from '@/pages/install';
 import LearnerSuccessPage from "@/pages/learner-success";
+import LearnerAiProfilePage from "@/pages/learner-ai-profile";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -66,9 +67,10 @@ const allowedNav:Record<PortalKind,string[]>={
  teacher:['/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
  assessor:['/','/learner-success','/organizations','/written-exams'],
  parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
- learner:['/','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ learner:['/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
+  { href: '/my-ai', label: 'My CABO AI profile', icon: BrainCircuit },
   { href: '/learner-success', label: 'Learner Success Loop', icon: Target },
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
@@ -129,6 +131,7 @@ function AuthGate() {
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={RoleHomePage} />
+    <Route path="/my-ai" component={LearnerAiProfilePage} />
     <Route path="/learner-success" component={LearnerSuccessPage} />
     <Route path="/hub-modules" component={HubModulesPage} />
     <Route path="/cabo-apply" component={CaboApplyPage} />
@@ -189,7 +192,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
