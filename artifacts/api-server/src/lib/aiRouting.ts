@@ -21,10 +21,13 @@ export function aiWeight(value: string | undefined, fallback = 1): number {
 export function aiRoutingWeights(env: {
   CABO_AI_GROQ_WEIGHT?: string;
   CABO_AI_HF_WEIGHT?: string;
+  CABO_AI_HF_ENABLED?: string;
 }): Record<PrimaryProviderName, number> {
   const groq = aiWeight(env.CABO_AI_GROQ_WEIGHT);
-  const huggingface = aiWeight(env.CABO_AI_HF_WEIGHT);
-  return groq + huggingface === 0 ? { groq: 1, huggingface: 1 } : { groq, huggingface };
+  // Hugging Face is opt-in only. Merely configuring a token never enables learner traffic.
+  const huggingface = env.CABO_AI_HF_ENABLED === "true" ? aiWeight(env.CABO_AI_HF_WEIGHT) : 0;
+  if (groq + huggingface === 0) return { groq: 1, huggingface: 0 };
+  return { groq, huggingface };
 }
 
 /** Per-task weighted round robin, with the unselected provider next in line.
