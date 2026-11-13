@@ -46,15 +46,17 @@ For a pure two-provider installation, do not set \`OPENAI_API_KEY\`. One missing
 
 **Architecture limitations:** Cooldowns and routing counters are in memory per Render instance. Multiple horizontally scaled replicas should eventually use shared provider-health state, distributed rate limits, concurrency budgets, cost ceilings and a central circuit breaker. This PR does not assert those protections are distributed.
 
-## Isolated Render pre-demo readiness gate (deployed)
+## Isolated Hugging Face/Groq live probe
 
-The separately hosted **[CABO Groq/Hugging Face test service](https://dashboard.render.com/web/srv-dbg6r5sipgvc73emrvkg)** runs the exact `completeAIJson` implementation from this PR with one fixed, non-identifying science question per provider. Its repo branch is `feat/groq-hf-balanced-ai-routing`, and its build command is `bash scripts/render-build.sh`.
+The separate **[CABO AI provider probe](https://dashboard.render.com/web/srv-dbg6r5sipgvc73emrvkg)** is a free Render service with synthetic prompts only and no learner database. It starts `artifacts/api-server/scripts/isolated-ai-live-probe.mjs`; the public `/healthz` endpoint reports ready only after both direct provider calls return validated JSON.
 
-- This service is a **separate free Render deployment**, not the CABO pilot, and does **not** connect to a learner database.
-- `CABO_ENVIRONMENT=testing`, `CABO_AI_LIVE_PROBE=true`, `NODE_ENV=production` are configured.
-- Its start command is `node artifacts/api-server/scripts/isolated-ai-live-probe.mjs`.
-- Its **public readiness endpoint** `https://cabo-ai-groq-hf-isolated-probe.onrender.com/healthz` returns HTTP 200 with `{"status":"ready"}` **only when both** configured providers returned grounded, validated JSON on startup. Otherwise it returns HTTP 503 and `{"status":"not_ready"}`. It exposes no prompts, keys, or learner data.
-- **Initial actual deployment on 27 October 2026: code launched successfully, both provider credentials were UNCONFIGURED in this new isolated service, so readiness was correctly FALSE.** This does not mean the providers are broken or their credentials are configured on any other CABO service.
-- A trusted administrator must create new least-privilege provider credentials in the issuers' consoles (revoke any previously chat-disclosed tokens), then add `GROQ_API_KEY` and `HF_TOKEN` using **Render Dashboard → cabo-ai-groq-hf-isolated-probe → Environment**. Saving configuration triggers a deploy/restart; the probe runs again with a single safe synthetic request per provider. Do not put key contents in chat, source control or CI logs.
-- Inspect Render application logs for `cabo_ai_live_probe_summary`; successful providers log provider name, model and latency only. Inspect the readiness endpoint only after the deploy is LIVE. A healthy probe verifies connectivity and structured response parsing, **not** educational answer quality, permissions, uploaded-file workflows, cost ceilings or production system security.
-- Production pilot and CABO main are unchanged by this isolated test. Do not merge or promote until successful real credentials, user-flow E2E and privacy gates are documented.
+Latest isolated run (13 November 2026), with Hugging Face model `openai/gpt-oss-20b:cheapest`:
+
+- Groq direct inference passed.
+- Hugging Face direct inference returned HTTP 402. The probe therefore reports not ready; this response does not distinguish exhausted free credit from account billing or provider access configuration.
+- Groq fallback passed, and the synthetic classroom exam-generation/grading workflow passed using Groq.
+- The earlier Hugging Face `openai/gpt-oss-120b:nscale` route returned HTTP 410 (`model_no_longer_supported`). The current 20B `:cheapest` default is smaller, but `:cheapest` does not mean free.
+
+The Hugging Face credential shared in chat was configured only on this isolated service. It was not committed and was not added to the learner-facing pilot. Treat it as exposed and rotate it in Hugging Face; use a new least-privilege token with Inference Providers permission. Check available inference credit/provider access before further live calls. Do not run additional HF calls or purchase credits until the account has available credit and the owner approves any spend.
+
+Keep the PR in draft and do not merge or promote it to the public pilot until a direct Hugging Face call succeeds with an authorized token, followed by review of combined provider behavior, learner-flow E2E and privacy gates. A successful synthetic probe would confirm connectivity and response parsing only, not educational quality or production readiness.
