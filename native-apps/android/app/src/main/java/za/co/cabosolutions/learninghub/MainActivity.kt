@@ -176,8 +176,9 @@ class MainActivity : ComponentActivity() {
 
     private fun submitQuiz() {
         val quiz = activeQuiz ?: return
-        if (studyBusy || studySubmitted || answers.size != quiz.questions.size ||
-            answers.any { it == null }) return
+        if (!NativeAssessmentPolicy.canSubmit(
+                quiz.questions.map { it.options.size }, answers, studyBusy, studySubmitted
+            )) return
         studySubmitted = true // Do not reset after a network timeout: it might have committed.
         studyBusy = true
         lifecycleScope.launch {
