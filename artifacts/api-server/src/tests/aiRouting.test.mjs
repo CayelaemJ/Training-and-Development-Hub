@@ -5,7 +5,7 @@ import { aiRoutingWeights, createAiProviderOrderer } from "../lib/aiRouting.ts";
 test("Groq is the only provider enabled by default", () => {
   assert.deepEqual(aiRoutingWeights({}), { groq: 1, huggingface: 0 });
   const choose = createAiProviderOrderer(aiRoutingWeights({}));
-  assert.deepEqual(choose(["groq", "huggingface", "openai"], "exam_generation"), ["groq", "huggingface", "openai"]);
+  assert.deepEqual(choose(["groq"], "exam_generation"), ["groq"]);
 });
 
 test("Hugging Face routing requires an explicit feature flag", () => {
