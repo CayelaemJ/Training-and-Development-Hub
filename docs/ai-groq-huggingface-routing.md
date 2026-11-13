@@ -1,62 +1,58 @@
-# CABO multi-provider AI routing (Groq + Hugging Face)
+# CABO Groq-first AI routing
 
-CABO's server-side JSON AI completion pipeline can now distribute work across Groq and Hugging Face Inference Providers. The application still validates each AI response before it can affect a learner record or an assessment. No credential, learner identifier or prompt is sent to the browser's configuration endpoint.
+CABO's server-side structured AI completion pipeline uses **Groq only by default** for development plans, exams, quizzes and grading. Every response is schema-validated before it can affect learner records. Provider credentials remain server-side.
 
-## Intended division of work
+Hugging Face and OpenAI are disabled unless an administrator explicitly enables their feature flags. This keeps the active learner path on Groq while preserving a controlled option to evaluate another provider later. Weighting settings have no effect on Hugging Face traffic while its flag is off.
 
-| Task | Default first-choice share when both services are healthy | If first attempt fails |
+## Current provider behavior
+
+| Setting | Default | Effect |
 | --- | --- | --- |
-| Development-plan drafts | Hugging Face 75%, Groq 25% | Try the other provider |
-| Written exam generation | Hugging Face 75%, Groq 25% | Try the other provider |
-| Written-answer grading/feedback | Groq 75%, Hugging Face 25% | Try the other provider |
-| Generic structured JSON / admin smoke tests | Groq 50%, Hugging Face 50% | Try the other provider |
+| Groq | Enabled when `GROQ_API_KEY` is configured | Handles all AI tasks |
+| Hugging Face | Disabled | Enable only with `CABO_AI_HF_ENABLED=true`, a server-side token, available credit and an approved evaluation |
+| OpenAI fallback | Disabled | Enable only with `CABO_AI_OPENAI_FALLBACK_ENABLED=true` and explicit approval |
 
-These are **routing preferences**, not assertions that one model is objectively better at an educational task. They require validation against your own anonymized evaluation set. They are weighted selections **per server process** and can vary with failures, cooldowns and unequal task volume; they are not global quotas or guaranteed request percentages. If a third legacy OpenAI provider is configured, it remains **last-resort fallback**.
+If Groq is unavailable or over quota while the other providers remain disabled, the request fails safely with the existing retryable response or deterministic development-plan fallback. No other provider is called.
 
-The routing layer currently handles structured chat completions used by written exams, marking and development plans. Image generation, embeddings, live streaming tutor chat or offline native inference require separate integrations and are **not** implied by this PR.
+The integration covers structured chat completions for development plans, written exams, quizzes and marking. It does not implement learner chat memory, document embeddings, RAG retrieval, image generation, live streaming or offline native inference.
 
 ## Render environment variables
 
-Set these only as server-side runtime environment variables, never in source control, frontend build variables, browser storage, screenshots, PR descriptions or public logs.
+Set values only as server-side runtime environment variables. Never place credentials in source control, frontend build variables, browser storage, screenshots, PR descriptions or public logs.
 
-- \`GROQ_API_KEY\`: Groq inference credential.
-- \`HF_TOKEN\`: Hugging Face token permitted to call Inference Providers (preferred). \`HUGGINGFACE_API_KEY\` is supported as an alternative.
-- \`HF_CHAT_MODEL\`: Inference Providers chat model; default \`openai/gpt-oss-20b:cheapest\`. The 20B model is the lower-size default to limit usage. `:cheapest` chooses the lowest-priced available inference provider; it does not make inference free. Verify model access, context and costs before deployment.
-- \`GROQ_EXAM_MODEL\`: optional Groq chat model override.
-- \`CABO_AI_GROQ_WEIGHT\`: optional global multiplier 0–100, default 1.
-- \`CABO_AI_HF_WEIGHT\`: optional global multiplier 0–100, default 1.
+- `GROQ_API_KEY`: Groq inference credential.
+- `GROQ_EXAM_MODEL`: optional Groq model override, after checking current model support.
+- `CABO_AI_GROQ_WEIGHT`: optional Groq routing weight; defaults to 1.
+- `CABO_AI_HF_ENABLED`: leave unset or false to keep Hugging Face disabled. Only set true after a rotated least-privilege token is configured and credit/access and evaluation are confirmed.
+- `HF_TOKEN` or `HUGGINGFACE_API_KEY`: Hugging Face Inference Providers credential, used only when the HF feature flag is true.
+- `HF_CHAT_MODEL`: optional model override when Hugging Face is explicitly enabled; defaults to `openai/gpt-oss-20b:cheapest`.
+- `CABO_AI_HF_WEIGHT`: optional HF routing weight, used only when the HF feature flag is true.
+- `CABO_AI_OPENAI_FALLBACK_ENABLED`: leave unset or false to keep OpenAI disabled; set true only after explicit approval.
+- `OPENAI_API_KEY`: optional legacy fallback credential, used only when the OpenAI fallback flag is true.
 
-For a pure two-provider installation, do not set \`OPENAI_API_KEY\`. One missing provider is acceptable; its workloads route to the available one. If **all** inference providers fail, the API produces a retriable error or preserves the existing deterministic fallback for development-plan drafts.
-
-**Security:** Create a *new* fine-grained Hugging Face token with the minimum required Inference Providers permission. A read/write Hub token is unnecessarily privileged for chat inference. Any credential disclosed in a chat should be replaced and revoked through its issuer before production. Review Groq token exposure too; a new token is not automatically active on Render.
+Do not configure Hugging Face or OpenAI credentials in the learner-facing pilot while Groq-only mode is active. The credential shared in chat was cleared from the isolated Render service and should be revoked/rotated with Hugging Face.
 
 ## Validation and rollout
 
-1. Run local and CircleCI unit tests: \`node --test artifacts/api-server/src/tests/*.test.mjs\`. Also run \`pnpm run build\` with the pinned workspace tooling.
-2. Review the generated pull request diff and verify no secret values appear.
-3. Configure **rotated** credentials in Render in a test/staging deployment. Start with synthetic test data only. Do not run load tests against production or children's records.
-4. As an authenticated CABO platform superadmin, POST \`/platform/mlops/smoke-test\` with \`{"provider":"groq"}\`, then \`{"provider":"huggingface"}\`. The endpoint uses one synthetic JSON completion per call and returns a provider/model/latency without exposing tokens. Requests lacking platform superadmin access must be rejected.
-5. Validate representative exam generation, grading and development plans using non-identifying source material. Review factual grounding, assessment fairness, JSON schemas, timeouts, latency, 429 handling, failure recovery and provider-specific spending.
-6. Review \`/platform/mlops\` for provider usage distribution, failures and latency. Existing metrics are capped to a 7-day recent window and are not a provider invoice or complete token-level cost record.
-7. Deploy in stages; roll back by reverting the PR or disabling one provider via secret configuration. Do not disable all inference keys unless deterministic draft plans and temporary 503s are acceptable.
-
-**Data protection:** Minimize learner data before calling either provider, document data flows and transfer implications under applicable South African/Botswana privacy obligations, and obtain appropriate safeguards for children's information. Never assume that AI-generated grades are verified official records without human review.
-
-**Quota behavior:** A 429 from one provider triggers a cooldown and immediate alternative-provider attempt without repeated immediate calls to the limited provider. A global increase in throughput is **not** guaranteed, and this routing is not intended to evade any supplier's usage restrictions.
-
-**Architecture limitations:** Cooldowns and routing counters are in memory per Render instance. Multiple horizontally scaled replicas should eventually use shared provider-health state, distributed rate limits, concurrency budgets, cost ceilings and a central circuit breaker. This PR does not assert those protections are distributed.
+1. Run the API regression tests, workspace type checks and build in CI.
+2. Review the branch diff and confirm no secret values are present.
+3. Keep the current pilot on Groq only; use synthetic, non-identifying inputs for any provider smoke test.
+4. The superadmin smoke endpoint defaults to the configured Groq provider. HF/OpenAI provider-specific checks must remain unavailable while their feature flags are off.
+5. Review representative exam generation, grading and development plans for grounding, schema validity, latency, quota handling and recovery.
+6. Monitor provider/model usage and latency; these metrics are not a provider invoice or complete token-level cost record.
+7. Keep this change in draft until code checks pass and the Groq-only rollout is reviewed.
 
 ## Isolated Hugging Face/Groq live probe
 
-The separate **[CABO AI provider probe](https://dashboard.render.com/web/srv-dbg6r5sipgvc73emrvkg)** is a free Render service with synthetic prompts only and no learner database. It starts `artifacts/api-server/scripts/isolated-ai-live-probe.mjs`; the public `/healthz` endpoint reports ready only after both direct provider calls return validated JSON.
+The separate **[CABO AI provider probe](https://dashboard.render.com/web/srv-dbg6r5sipgvc73emrvkg)** is a free Render service with synthetic prompts only and no learner database. It still tests dual-provider readiness and is separate from the learner-facing Groq-only configuration.
 
-Latest isolated run (13 November 2026), with Hugging Face model `openai/gpt-oss-20b:cheapest`:
+Latest isolated run after clearing the Hugging Face credential (13 November 2026):
 
 - Groq direct inference passed.
-- Hugging Face direct inference returned HTTP 402. The probe therefore reports not ready; this response does not distinguish exhausted free credit from account billing or provider access configuration.
-- Groq fallback passed, and the synthetic classroom exam-generation/grading workflow passed using Groq.
-- The earlier Hugging Face `openai/gpt-oss-120b:nscale` route returned HTTP 410 (`model_no_longer_supported`). The current 20B `:cheapest` default is smaller, but `:cheapest` does not mean free.
+- Hugging Face is unconfigured, so the dual-provider probe correctly reports not ready.
+- In the preceding run, the Hugging Face 20B route returned HTTP 402. This did not distinguish depleted credit from billing or provider-access configuration.
+- Groq fallback and the synthetic classroom exam-generation/grading workflow passed before the HF value was cleared.
 
-The Hugging Face credential shared in chat was configured only on this isolated service; its Render value has now been cleared, and Render is applying the environment update. It was not committed and was not added to the learner-facing pilot. Treat it as exposed and revoke/rotate it in Hugging Face; use a new least-privilege token with Inference Providers permission. Check available inference credit/provider access before further live calls. Do not run additional HF calls or purchase credits until the account has available credit and the owner approves any spend.
+The Hugging Face credential shared in chat was configured only on this isolated service, was not committed, and was not added to the learner-facing pilot. Its Render value is now cleared. Revoke/rotate it with Hugging Face; do not paste a replacement token into chat. Do not run more HF calls or purchase credit until access is confirmed and any spend is approved.
 
-Keep the PR in draft and do not merge or promote it to the public pilot until a direct Hugging Face call succeeds with an authorized token, followed by review of combined provider behavior, learner-flow E2E and privacy gates. A successful synthetic probe would confirm connectivity and response parsing only, not educational quality or production readiness.
+Keep the PR in draft until the CI checks are green. A synthetic provider probe confirms connectivity and response parsing only; it does not establish educational quality or production readiness.
