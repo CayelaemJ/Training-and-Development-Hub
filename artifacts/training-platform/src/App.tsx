@@ -1,7 +1,7 @@
 import InstallPage from '@/pages/install';
 import LearnerSuccessPage from "@/pages/learner-success";
 import LearnerAiProfilePage from "@/pages/learner-ai-profile";
-import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type ChangeEvent, type FormEvent } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import CaboAccessLanding from '@/components/cabo-access-landing';
@@ -428,6 +428,10 @@ function MaterialConfigurePage() {
   const [difficulty, setDifficulty] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [options, setOptions] = useState<4 | 6>(4);
   const [error, setError] = useState('');
+  const [askQuestion, setAskQuestion] = useState('');
+  const [askError, setAskError] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [groundedAnswer, setGroundedAnswer] = useState<{answer:string;citations:{excerpt:string}[];reviewRequired:boolean}|null>(null);
   const [, setLocation] = useLocation();
   const create = () => {
     setError('');
@@ -435,6 +439,20 @@ function MaterialConfigurePage() {
       onSuccess: async (quiz) => { await queryClient.invalidateQueries({ queryKey: getListQuizzesQueryKey() }); await queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setLocation(`/quiz/${quiz.id}`); },
        onError: (error) => setError(error instanceof Error ? error.message.replace(/^HTTP \d{3} [^:]+:\s*/, '') : 'We couldn’t create that test. Check your material and try again.'),
     });
+  };
+  const ask = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAskError(''); setGroundedAnswer(null); setAsking(true);
+    try {
+      const response = await fetch(`/api/materials/${materialId}/ask`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: askQuestion }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'I couldn’t answer from this material. Please try again.');
+      setGroundedAnswer(body);
+    } catch (err) { setAskError(err instanceof Error ? err.message : 'I couldn’t answer from this material. Please try again.'); }
+    finally { setAsking(false); }
   };
   if (materials.isLoading) return <div className="page-enter"><SkeletonRows count={2} /></div>;
   if (materials.isError) return <QueryNotice retry={() => materials.refetch()} />;
@@ -459,6 +477,17 @@ function MaterialConfigurePage() {
          <p className="generate-foot"><Sparkles size={13} /> Creating a test sends selected source text to our AI provider. Long documents are covered in sections. Your original file stays in your private library.</p>
       </section>
     </div>
+    <section className="rounded-xl border bg-card p-5 sm:p-6 space-y-4" aria-labelledby="ask-material-title">
+      <div className="flex items-start gap-3"><CircleHelp size={20} aria-hidden="true" /><div><h2 id="ask-material-title" className="text-xl font-semibold">Ask this material</h2><p className="text-sm text-muted-foreground">Get an answer grounded in the most relevant passages from “{material.title}”.</p></div></div>
+      <form className="space-y-3" onSubmit={ask}>
+        <label className="field-label" htmlFor="material-question">Your question</label>
+        <textarea id="material-question" className="text-input min-h-24 w-full resize-y" value={askQuestion} onChange={(event)=>setAskQuestion(event.target.value)} minLength={5} maxLength={2000} required placeholder="What is the difference between mitosis and meiosis?" />
+        <p className="text-xs text-muted-foreground">Relevant passages from this material are sent to the configured AI provider to answer. Answers include source quotations and should be checked against your notes.</p>
+        {askError && <p role="alert" className="form-error">{askError}</p>}
+        <button type="submit" className="button button-primary" disabled={asking || askQuestion.trim().length<5}>{asking?<><LoaderCircle className="spin" size={17}/>Finding an answer…</>:<>Ask from this material <ArrowRight size={16}/></>}</button>
+      </form>
+      {groundedAnswer && <div className="rounded-lg border bg-background p-4 space-y-3" aria-live="polite"><h3 className="font-semibold">Answer</h3><p className="whitespace-pre-wrap text-sm leading-6">{groundedAnswer.answer}</p><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source quotations</p><ul className="mt-2 space-y-2">{groundedAnswer.citations.map((citation,index)=><li key={`${index}-${citation.excerpt}`} className="border-l-2 pl-3 text-sm italic">“{citation.excerpt}”</li>)}</ul></div><p className="text-xs text-muted-foreground">AI draft · Check the quoted passages and confirm important details with your educator.</p></div>}
+    </section>
   </div>;
 }
 

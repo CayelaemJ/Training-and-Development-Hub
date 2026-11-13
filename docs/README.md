@@ -14,6 +14,7 @@ CABO Learning Hub is a **Connected Education and Lifelong Development Platform**
 - [API reference](./API_POTENTIAL.md)
 - [Deployment, schema and verification](./DEPLOYMENT.md)
 - [Feature roadmap and acceptance criteria](./ROADMAP.md)
+- [Study-material retrieval and generation context](./RAG_PIPELINE.md)
 
 ## Engineering principles
 

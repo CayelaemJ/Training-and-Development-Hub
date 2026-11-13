@@ -13,6 +13,15 @@ test('a long source window includes both ends, and batch failures cannot publish
  const text='OPENING'+'.'.repeat(100000)+'ENDING';const selected=sourceWindow(text);assert.ok(selected.includes('OPENING'));assert.ok(selected.includes('ENDING'));
  await assert.rejects(questionBatches(text,10,async(_text,_count,i)=>{if(i===1)throw Error('provider unavailable');return ['partial'];}),/unavailable/);
 });
+test('retrieval context samples separate sections within its budget and rejects runaway generation counts',async()=>{
+ const text=Array.from({length:12},(_,i)=>`SECTION_${i} ${'learning material '.repeat(15)}`).join('\n\n')+'\n\nFINAL_SENTINEL';
+ const selected=sourceWindow(text,3000);
+ assert.ok(selected.length<=3000);
+ assert.ok(selected.includes('SECTION_0'));
+ assert.ok(selected.includes('FINAL_SENTINEL'));
+ assert.ok(selected.includes('[Next section]'));
+ await assert.rejects(questionBatches(text,31,async()=>[]),/between 1 and 30/);
+});
 test('user-facing errors do not expose HTTP prefixes or upstream HTML',()=>{
  const err=new ApiError(new Response('',{status:503}),{error:'Your material is saved. Try again shortly.'},{method:'POST',url:'/api/materials'});assert.equal(err.message,'Your material is saved. Try again shortly.');
  const html=new ApiError(new Response('',{status:502}),'<html>upstream stack trace</html>',{method:'POST',url:'/api/materials'});assert.doesNotMatch(html.message,/HTTP|html|stack trace/);

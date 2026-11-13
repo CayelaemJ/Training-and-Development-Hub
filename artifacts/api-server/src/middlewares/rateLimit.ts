@@ -38,7 +38,7 @@ function rulesFor(req: Request): RateLimitRule[] {
   if (/\/(?:storage|upload|material)(?:s|\/|-|$)/.test(url)) {
     limits.push(["uploads", 24, 10 * 60_000]);
   }
-  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\/|-|$)/.test(url)) {
+  if (/\/(?:generate|ai|quiz|written-exam|assessment-paper)(?:s|\/|-|$)/.test(url) || /\/materials\/[1-9]\d*\/ask$/.test(url)) {
     limits.push(["generation", 30, 10 * 60_000]);
   }
   if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {

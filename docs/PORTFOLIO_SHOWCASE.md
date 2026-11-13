@@ -113,7 +113,7 @@ flowchart TB
   REVIEW --> ACTION["Authorised educator / institution action"]
 ```
 
-**Implementation evidence:** The repository documents AI-assisted assessment and marking, development-plan workflows and limited model-health/MLOps support. Provider routing, Groq/Hugging Face fallbacks, cross-module orchestration and national-scale intelligence must be validated in the relevant code and deployment before they are presented as live.
+**Implementation evidence:** The repository documents AI-assisted assessment and marking, development-plan workflows and limited model-health/MLOps support. Current application AI uses Groq only; Hugging Face fallback, cross-module orchestration and national-scale intelligence are not implemented as live provider-routing features.
 
 ### AI responsibility model
 
