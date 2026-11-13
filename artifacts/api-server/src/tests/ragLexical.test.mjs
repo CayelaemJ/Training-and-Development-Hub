@@ -26,7 +26,7 @@ test("lexical index persists searchable chunks and enforces revocation and owner
     await database.exec(await readFile(new URL("../../../../lib/db/migrations/20261113_rag_lexical_foundation.sql", import.meta.url), "utf8"));
     const query = async (sql, values) => {
       const result = await database.query(sql, values);
-      return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length };
+      return { rows: result.rows, rowCount: result.rows.length || result.affectedRows || 0 };
     };
     globalThis.__caboRagTestPool = { query, connect: async () => ({ query, release() {} }) };
     const outfile = path.join(directory, "rag.mjs");
