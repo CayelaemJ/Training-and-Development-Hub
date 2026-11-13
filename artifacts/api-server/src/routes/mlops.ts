@@ -1,5 +1,6 @@
 import {Router,type IRouter} from "express";
 import { completeAIJson, hasAiProvider } from "../lib/aiCompletion";
+import { ProviderQuotaError } from "../lib/providerQuota";
 import {and,desc,eq,gte} from "drizzle-orm";
 import {z} from "zod/v4";
 import {db,aiInferenceMetricsTable,organizationMembersTable,mlModelVersionsTable,mlEvaluationRunsTable,mlOperationalEventsTable} from "@workspace/db";
@@ -130,7 +131,7 @@ router.post("/platform/mlops/smoke-test",async(req,res)=>{
    status===429?"The provider rate or usage limit was reached. Check quota and retry guidance.":
    status===404?"The configured model is unavailable to this provider.":
    "The selected AI provider did not complete the synthetic connection check.";
-  res.status(status===429?429:502).json({ok:false,error,provider,status});
+  res.status(e instanceof ProviderQuotaError?429:status===402?402:status===429?429:502).json({ok:false,error,provider,status});
  }
 });
 export default router;
