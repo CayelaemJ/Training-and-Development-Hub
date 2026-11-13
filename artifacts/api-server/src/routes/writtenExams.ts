@@ -181,6 +181,7 @@ router.post("/written-exams/:id/attempts", async (req, res) => {
     res.status(201).json(attempt);
   } catch (error) {
     await recordAiMetric("grading","unavailable","none","failure",gradingStartedAt);
+    if(error instanceof ProviderQuotaError){res.setHeader("Retry-After",error.retryAfterSeconds);res.status(429).json({error:error.message,retryAfterSeconds:error.retryAfterSeconds});return;}
     if (assignment) await recordMLOpsEvent({organizationId:assignment.organizationId,modelKey:"written-exam-grading",version:"unavailable",eventType:"grading",durationMs:Date.now()-gradingStartedAt,status:"failure"});
     req.log.error({ err: error }, "Written exam marking failed");
     res.status(error instanceof AiUnavailableError ? 503 : 502).json({ error: "AI marking is temporarily unavailable. Your answers have not been graded; please retry." });
