@@ -84,7 +84,7 @@ async function configuredProviders(): Promise<Provider[]> {
     providers.push({
       name: "huggingface",
       client,
-      models: cleanModels([process.env.HF_CHAT_MODEL || "openai/gpt-oss-120b:cheapest"]).slice(0, 2),
+      models: cleanModels([process.env.HF_CHAT_MODEL || "openai/gpt-oss-20b:cheapest"]).slice(0, 2),
     });
   }
   if (process.env.OPENAI_API_KEY?.trim()) {
