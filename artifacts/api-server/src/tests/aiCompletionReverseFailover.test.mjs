@@ -9,7 +9,7 @@ test("failed Hugging Face generation routes to Groq without a second HF call", a
   const originalFetch = globalThis.fetch;
   const oldNodeEnv = process.env.NODE_ENV;
   const saved = Object.fromEntries(
-    ["GROQ_API_KEY", "HF_TOKEN", "HUGGINGFACE_API_KEY", "OPENAI_API_KEY"]
+    ["GROQ_API_KEY", "HF_TOKEN", "HUGGINGFACE_API_KEY", "OPENAI_API_KEY", "CABO_AI_HF_ENABLED", "CABO_AI_OPENAI_FALLBACK_ENABLED"]
       .map(k => [k, process.env[k]]),
   );
   const directory = await mkdtemp(path.join(fileURLToPath(new URL(".", import.meta.url)), ".reverse-ai-test-"));
@@ -23,7 +23,6 @@ test("failed Hugging Face generation routes to Groq without a second HF call", a
     process.env.NODE_ENV = "production";
     process.env.GROQ_API_KEY = "synthetic-groq-test-key";
     process.env.HF_TOKEN = "synthetic-hf-test-key";
-  process.env.CABO_AI_HF_ENABLED = "true";
     process.env.CABO_AI_HF_ENABLED = "true";
     delete process.env.HUGGINGFACE_API_KEY;
     delete process.env.OPENAI_API_KEY;
