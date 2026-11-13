@@ -12,10 +12,12 @@ test("a real Groq SDK 429 fails over to mocked Hugging Face without extra calls"
   await build({entryPoints:[fileURLToPath(new URL("../lib/aiCompletion.ts",import.meta.url))],bundle:true,platform:"node",format:"esm",packages:"external",outfile,logLevel:"silent"});
   const savedNodeEnv=process.env.NODE_ENV;
   process.env.NODE_ENV="production";
-  const saved = Object.fromEntries(["GROQ_API_KEY","HF_TOKEN","HUGGINGFACE_API_KEY","OPENAI_API_KEY"].map(k => [k,process.env[k]]));
+  const saved = Object.fromEntries(["GROQ_API_KEY","HF_TOKEN","HUGGINGFACE_API_KEY","OPENAI_API_KEY","CABO_AI_HF_ENABLED","CABO_AI_OPENAI_FALLBACK_ENABLED"].map(k => [k,process.env[k]]));
   let groqCalls = 0, hfCalls = 0, groqModelCalls = 0;
   process.env.GROQ_API_KEY = "synthetic-groq-test-key";
   process.env.HF_TOKEN = "synthetic-hf-test-key";
+  process.env.CABO_AI_HF_ENABLED = "true";
+    process.env.CABO_AI_HF_ENABLED = "true";
   delete process.env.HUGGINGFACE_API_KEY;
   delete process.env.OPENAI_API_KEY;
 
