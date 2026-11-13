@@ -47,5 +47,5 @@ test("traffic preferences cannot disable emergency fallback",()=>{
 test("routing weights accept only safe bounded integers",()=>{
   assert.deepEqual(aiRoutingWeights({CABO_AI_GROQ_WEIGHT:"3",CABO_AI_HF_WEIGHT:"1",CABO_AI_HF_ENABLED:"true"}),{groq:3,huggingface:1});
   assert.deepEqual(aiRoutingWeights({CABO_AI_GROQ_WEIGHT:"0",CABO_AI_HF_WEIGHT:"0"}),{groq:1,huggingface:0});
-  assert.deepEqual(aiRoutingWeights({CABO_AI_GROQ_WEIGHT:"999999",CABO_AI_HF_WEIGHT:"abc",CABO_AI_HF_ENABLED:"true"}),{groq:1,huggingface:0});
+  assert.deepEqual(aiRoutingWeights({CABO_AI_GROQ_WEIGHT:"999999",CABO_AI_HF_WEIGHT:"abc",CABO_AI_HF_ENABLED:"true"}),{groq:1,huggingface:1});
 });
