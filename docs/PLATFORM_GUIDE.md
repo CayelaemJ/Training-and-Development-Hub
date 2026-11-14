@@ -1,4 +1,4 @@
-# CABO Learning Hub — Stakeholder and Developer Onboarding Pack
+# CABO Learning Hub - Team Handover and Onboarding Pack
 
 **Audience:** learners, families, educators, institutions, partners, the public and software contributors  
 **Product owner:** CABO Solutions  
@@ -7,7 +7,7 @@
 
 > CABO Learning Hub connects learning, development, educational operations, support and future opportunity around a learner's evolving journey. Learning management is one part of the platform, not the whole product.
 
-This pack is designed to give readers a full shared understanding of the product and its codebase, with role-specific reading paths and a self-contained explanation of its workflows. It describes the intended platform, explains capabilities evidenced in this repository, and distinguishes implementation from pilots and future plans. It is not a legal compliance certificate, accreditation claim, deployment runbook or promise that every module is enabled in a live environment. Check the [delivery register](./PHASES_1_TO_4_DELIVERY_REGISTER.md) and deployment configuration before making release claims.
+This pack captures the product, codebase, team responsibilities and scale work needed to move CABO from founder-led development into shared delivery. It is written for business analysts, business management, legal reviewers, teachers, designers, engineers, QA and operations colleagues. It describes the intended platform, explains capabilities evidenced in this repository, and distinguishes implementation from pilots and future plans. It is not a legal compliance certificate, accreditation claim, deployment runbook or promise that every module is enabled in a live environment. Check the [delivery register](./PHASES_1_TO_4_DELIVERY_REGISTER.md) and deployment configuration before making release claims.
 
 ## 1. In plain language
 
@@ -564,6 +564,182 @@ By the end of the first month, a new team member should have:
 - Agreed with their manager on a clear next area of responsibility.
 
 The manager and teammate should review these outcomes together; they are onboarding goals, not an assumption about an individual's seniority or performance.
+
+## 21. Cross-functional team handover
+
+CABO is a product and operating model as well as a codebase. Business, legal, education and technical colleagues need to work from the same user journeys and the same truthful account of what is ready. The founder has built the product largely independently using their own code and accumulated product knowledge. This handover begins to make that knowledge usable by the whole team; it does not assume that every decision, workflow or operational detail has already been recorded.
+
+### What each discipline contributes
+
+| Team member | What they help CABO decide | First useful contribution | Important boundary |
+|---|---|---|---|
+| **Business analyst** | User problems, current and desired processes, requirements, exception paths, acceptance criteria and data definitions | Map one learner or institution workflow end to end; identify actors, inputs, decisions, outputs, failure paths and unresolved questions | Do not convert an assumption into a requirement without confirming it with the relevant user or decision owner |
+| **Business management** | Operating model, partner strategy, service ownership, rollout sequence, support model, resource needs, cost and sustainability | Turn the product vision into a realistic pilot scope, stakeholder map, cost assumptions, operating responsibilities and measurable outcomes | Do not promise pricing, savings, national rollout or adoption without validated evidence and an accountable decision |
+| **Legal counsel / privacy reviewers** | Applicable law and contracts, controller/operator responsibilities, lawful purpose, notices, children's data, consent, guardian authority, transfers, retention, deletion, processor agreements and cross-border data handling | Produce a jurisdiction-specific issue list and review gates for one defined workflow, including the exact data and providers involved | This pack is not legal advice or compliance certification. A policy helper or consent button in code is not legal approval |
+| **Teachers and education specialists** | Learning design, curriculum context, assessment quality, feedback, moderation, support practices and classroom fit | Review one study or assessment journey; create realistic scenarios and rubrics; identify where teacher judgement must remain in control | CABO does not establish curriculum approval, examination accreditation or a teacher's professional decision |
+| **Product/design** | Learner and staff experience, accessibility, language, usability and prioritisation | Observe a journey using synthetic data and write an agreed problem statement and acceptance conditions | Do not hide unfinished maturity or make a prototype look like a service guarantee |
+| **Software/data engineers** | Secure implementation, APIs, data model, performance, availability and maintainability | Trace a route and data path, then make a scoped, reviewable change with evidence | Do not deploy migrations, change access policy or use live learner records as a first-task shortcut |
+| **QA/security** | Test strategy, threat coverage, release evidence and operational risk | Build a role/tenant test matrix and verify both permitted and denied paths | A build passing does not prove privacy, end-to-end, legal or production readiness |
+| **Delivery / operations** | Environments, ownership, release gates, support, incident response, backups and rollback | Create an environment and release inventory; identify an accountable owner and tested recovery procedure | A staging URL or deployed service is not automatically a production service |
+
+### Shared workflow for turning a need into a release
+
+Every feature should pass through the same cross-functional conversation:
+
+1. **Need:** Which person is experiencing what problem, in which setting?
+2. **Evidence:** What did users, educators or institutional partners tell us? What is confirmed and what is still a hypothesis?
+3. **Process:** What happens today, what should happen, and what are the exceptions?
+4. **Data:** What information is needed, who supplies it, how reliable is it, how sensitive is it, and when should it be deleted?
+5. **Authority:** Who can view, create, change, approve, correct or challenge the record?
+6. **Design:** What does the user see, including loading, offline, denial, error and appeal states?
+7. **Implementation:** Which client, route, policy, schema, storage, provider and deployment components change?
+8. **Validation:** What will a learner, teacher, institution, legal reviewer and engineer each need to see before accepting it?
+9. **Operation:** Who supports it, monitors it, handles a suspected incident and rolls it back?
+10. **Communication:** What can be said publicly about the feature and what must remain clearly labelled as pilot or planned?
+
+### Cross-functional first-week outputs
+
+The group can build the following shared artefacts without waiting for a full production release:
+
+- A **stakeholder and decision map** listing roles, decision owners, reviewers and unresolved authority questions.
+- A **process map** for one learner assessment and one institution workflow, including exception and appeal paths.
+- A **requirements record** with user story, acceptance criteria, data definitions and exclusions.
+- A **data inventory** that distinguishes personal, child-related, academic, operational and aggregate data and records source, access purpose, retention owner and external processors.
+- A **legal and safeguarding question register** by jurisdiction and workflow, owned by qualified counsel.
+- An **educator review record** covering learning goals, curriculum context, rubric, moderation and acceptable AI use.
+- A **technical baseline** listing repository branch, deployed environments, database ownership, storage, Redis role, background jobs, model providers, observability and backup evidence.
+- A **delivery board** separating available, in validation, gated and planned work, with a named owner for each item.
+
+These are living team records. The point is to surface disagreement early and retain decisions, not to manufacture paperwork for its own sake.
+
+## 22. Engineering handover and scale plan
+
+### Current implementation verified in this repository
+
+| Component | What exists in code or repository documentation | What must not be assumed |
+|---|---|---|
+| Web client | React, Vite and TypeScript under artifacts/training-platform, with a PWA install/offline shell | Full offline synchronization, mobile-store readiness or native parity across every feature |
+| Native clients | Separate Android Kotlin/Jetpack Compose, iOS SwiftUI and Windows C#/WinUI projects | Signed public releases, physical-device acceptance or every workflow implemented on every platform |
+| API | TypeScript Express service under artifacts/api-server; middleware handles browser origins, API throttling, authentication, privileged MFA checks, optional country-pilot gating, routes and safe error responses | That each module has the same maturity or has passed its complete integration/security suite |
+| Operational database | PostgreSQL accessed through Drizzle and the node-postgres pool in lib/db | Sharding, read replicas, a warehouse, CDC or a proven production-scale capacity envelope |
+| Connection pool | DB_POOL_MAX defaults to 10 and is capped in code at 50 per process; connection timeout is 5 seconds; statement timeout is 15 seconds; query timeout is 20 seconds; shutdown closes the server and pool | That setting each API instance to 50 is safe. Total possible connections scale with instance count and must fit the database limit and pooler configuration |
+| Files | Private object-storage helpers and material upload/read paths exist | That all file formats, retention periods, quotas and production restore procedures are fully validated |
+| Redis | Optional Upstash Redis REST integration provides atomic, cross-instance fixed-window rate limiting and a bounded readiness probe. It is disabled unless configured | Redis is not currently the platform's general-purpose cache, database, session store or active job queue |
+| Background processing | A signed QStash material-preview callback route exists; a PostgreSQL notification outbox has encrypted recipient data, leases and consent rechecks | One unified, production-proven job platform or guaranteed delivery for every background workflow |
+| Django | A separate Cloudflare Python/Django worker supports a narrow, stateless, coded aggregate-insights draft endpoint in isolated staging/testing; its feature is gated and rejects identifying fields | Django is not the main CABO API, does not own learner data or persistence, and must not receive live learner records under the current staging design |
+| Cloudflare Queues | Staging and dead-letter queues are provisioned according to their README | They are currently unbound, empty and inactive. No producer/consumer workflow, job-status store or operational DLQ process should be claimed |
+| AI provider routing | The Express AI completion helper supports Groq and OpenAI-compatible provider configuration, validates structured responses, applies timeouts and has provider/model retry logic | A confirmed Groq-only production configuration. The product owner's current preference is Groq only; align environment configuration and docs to that decision before claiming the fallback is removed |
+| Environments | Repository documentation describes a dedicated Render native-test preview using a separate Neon project with synthetic records, plus a prepared Cloudflare Django staging workflow | The isolated preview is not a school production database. A staging deployment workflow is not evidence that a credentialed deployment has occurred |
+
+The server is a modular monolith today. That is a useful starting point: it keeps authentication, authorization and core transactions close together while the team learns actual workload patterns. Splitting services or adopting a larger database tier should follow measurements, data-residency needs and operating capacity.
+
+### System of record and scale-out target
+
+PostgreSQL should remain the authoritative store for transactional learner, organization, academic and consent records unless the team makes a reviewed architecture decision to change it. Uploaded binary files belong in private object storage; they should not be copied into a second database merely to support reporting. Redis is a shared coordination/cache service for selected workloads, not the durable source of truth. Python/Django is a bounded analytics service where it offers clear value, not a second owner of core learner workflows.
+
+~~~mermaid
+flowchart TD
+  Client["Web and native clients"] --> API["Express API - authentication, tenant scope and transactions"]
+  API --> PG[("PostgreSQL - transactional system of record")]
+  API --> Blob["Private object storage - uploaded files"]
+  API --> Redis["Redis / Upstash - distributed throttles today; carefully scoped cache later"]
+  API --> Outbox["Transactional outbox and signed job handoff"]
+  Outbox --> Worker["Approved asynchronous workers - idempotent, observable and retryable"]
+  Worker --> Django["Django insights worker - isolated staging today"]
+  PG --> Analytics["Future analytics read model or warehouse - after governance approval"]
+~~~
+
+The diagram combines current components and a proposed evolution. PostgreSQL, object storage, optional Upstash throttling, a QStash callback path, notification outbox code and the isolated Django worker exist in some form. A unified durable worker fleet, production cache strategy and analytics warehouse/read model are future work requiring design, privacy review and deployment evidence.
+
+### Database growth and performance: sequence the work
+
+“Bigger database” can mean more storage, faster queries, more concurrent connections, higher write throughput, longer history or stronger availability. These require different remedies. Do not choose a database product or copy records to another database before establishing which limit is real.
+
+**Step 1 - Establish a safe baseline.** Capture database size and growth, row counts for high-volume tables, active/idle connection counts, pool wait time, query p50/p95/p99, slow-query fingerprints, lock waits, CPU/I/O, table/index bloat, read/write ratio, upload sizes, API latency and error rate. Use aggregates and redacted query metadata; do not put learner data or SQL parameters containing personal information in logs. Set a time window and compare against normal and peak use.
+
+**Step 2 - Fix query shape first.** Trace expensive API endpoints. Remove N+1 reads by loading related records in bounded queries or joins while preserving authorization filters. Add composite or partial indexes for observed filters, tenant keys, joins and sort order. Use EXPLAIN (ANALYZE, BUFFERS) on representative synthetic or approved staging data. Confirm the index is used and writes remain acceptable; an index on every column is not a plan.
+
+**Step 3 - Bound connections.** Model total connections as API instances × pool size plus workers, migrations and operational access. Compare that against the managed database's connection cap and reserve capacity. Tune DB_POOL_MAX per environment and instance count; introduce the provider's supported pooler when concurrency requires it. Do not raise the pool cap simply because requests are timing out.
+
+**Step 4 - Scale the primary when evidence supports it.** Increase managed PostgreSQL compute/storage or IOPS to meet the measured workload. Confirm backups, point-in-time recovery, restore tests, maintenance windows, connection pooling, migration duration and rollback. Keep a single transactional source of truth unless a reviewed design proves the need for additional write stores.
+
+**Step 5 - Separate read-heavy analytics safely.** First optimize aggregate queries and precompute read models in the primary database where appropriate. If operational workloads still contend with dashboards, evaluate a read replica or a warehouse fed through a governed, one-way analytics pipeline. Define freshness, deletion propagation, child-data minimization, region, lineage, reconciliation and access policy before loading identifiable records. Do not make the application dual-write the same authoritative learner fact into multiple databases.
+
+**Step 6 - Partition or archive only when needed.** Consider time partitioning for append-heavy event/audit/telemetry tables when retention, pruning or maintenance is a measured issue. Define partition keys, uniqueness constraints, archival, deletion and backfill before implementation. Sharding is a major operational change and is not justified merely by a large aspirational user count.
+
+### Redis: current role and safe expansion
+
+**Today:** optional Upstash REST; distributed fixed-window rate limiting uses an atomic Lua script across API instances, hashed client fingerprints and bounded network timeouts. Readiness checks are disabled when Redis is not configured and are cached to avoid unnecessary free-tier requests.
+
+**Possible next uses:** short-lived cache entries for stable, non-sensitive reference data or precomputed aggregates; bounded coordination for specific idempotency/lock use cases only after their correctness is proven.
+
+**Design requirements before cache rollout:**
+
+- Define the exact read, key shape, TTL, maximum size, tenant dimension and stale-data tolerance.
+- Include organization/tenant and permission scope in keys; never let a shared cache bypass the API's authorization.
+- Choose invalidation or versioning on writes. Test role changes, consent revocation, learner transfers and deletion so cached information cannot outlive access rights.
+- Avoid putting raw child data, essays, tokens or direct identifiers in cache keys or values.
+- Add hit/miss, eviction, latency, error and cost metrics; define whether each cache is fail-open or fail-closed.
+- Keep rate limiting operational when cache entries are flushed; do not store durable workflow state only in Redis.
+- Run cache-stampede, provider outage and cross-tenant tests before enabling it broadly.
+
+### Django and Python services: bounded scope
+
+The Cloudflare Django worker is currently a narrow statistical/advisory service. Express remains responsible for user authentication, institution authorization, feature gating and upstream input validation. The Django worker accepts only allowlisted coded aggregate metrics, is protected by server-to-server bearer authentication, returns advisory labels and holds no persistent learner database.
+
+The intended staging call path is:
+
+1. An authenticated user calls the CABO Express endpoint.
+2. Express verifies organization membership and owner/admin authority, checks environment and explicit privacy flags, and validates the payload.
+3. Express calls the exact allowlisted HTTPS worker origin using a server-side secret.
+4. Django validates the host, bearer credential and schema, computes a deterministic draft, and returns an advisory response.
+5. Express returns the response; logs must not contain input metrics, credentials or learner identifiers.
+
+Do not enable this with real learner data until the team has a defined lawful purpose, source evidence and consent path, country/cross-border review, tested authorization and leakage controls, operational timeouts, and human review. If Django expands beyond this bounded role, decide explicitly whether it remains stateless, what service owns each table, how contracts/versioning work, and how deployment, monitoring and incident response are staffed. Avoid two services writing the same authoritative tables.
+
+### Background jobs and durable work
+
+The codebase contains more than one job-related pattern. Before adding another, inventory current producers and consumers, who runs them, what environment enables them, and how failed work is recovered.
+
+A scalable job should be created through a durable transaction/outbox pattern, carry a unique idempotency key and minimal data reference, re-check current authorization/consent at execution time, expose a safe status, apply bounded retries/backoff, classify permanent failures, route poison work to a monitored dead-letter queue, and support replay or cancellation with audit. Queue messages should not contain raw essays, child records, secrets or full documents.
+
+Cloudflare queues are inactive today. Choose and operate one queue stack only after the team assigns an owner and verifies concurrency, delivery guarantees, retention, region, cost and recovery. A queue being provisioned is not proof that jobs are running.
+
+### Performance backlog for the incoming team
+
+| Workstream | How to approach it | Acceptance evidence |
+|---|---|---|
+| N+1 queries | Profile route-level query counts and traces; batch or join bounded reads while preserving tenant predicates | Representative request has bounded query count; results match; authorization tests pass |
+| Indexes | Use real filters, joins and ORDER BY clauses; inspect plans on representative data | Query plan demonstrates intended index and acceptable write overhead |
+| Cache stable reads | Add only where latency or database load measurements justify it | Tenant-safe keys, invalidation/expiry tests, hit/miss/latency metrics and bounded cost |
+| Lazy-load images | Apply loading hints and responsive image sizes below the fold; preserve accessible alternatives | Mobile/network test shows deferred off-screen image fetch without layout shift |
+| Optimistic UI | Use for reversible low-risk actions with clear rollback and pending state | Failure/rejection restores server truth; retries do not duplicate writes |
+
+Do not use optimistic updates for grades, role grants, consent, safety decisions or audited state transitions unless the server transaction and review model explicitly support the behavior.
+
+### Architecture decisions for the team
+
+Before committing to larger infrastructure, record decisions for:
+
+- Expected active learners, institutions, API requests, upload/storage volume and peak concurrency at each pilot and growth stage.
+- Availability, recovery time, recovery point, latency and data freshness targets.
+- Country/region requirements, child-data controls and provider/processor boundaries.
+- Managed PostgreSQL provider, sizing, pooler, backups, restore owner and migration/reversal strategy.
+- Redis service, budget, data classes permitted, fail-open/fail-closed behavior and operational owner.
+- Whether QStash, Cloudflare Queues or another managed worker platform will handle each class of job, avoiding overlapping brokers.
+- Django's bounded service contract, supported output, deployment owner and no-PII policy.
+- AI provider choice and model evaluation. The product owner's stated current preference is Groq only; reconcile this with code that can still configure OpenAI fallback.
+- Observability, incident escalation, on-call expectations, dependency upgrades and change approval.
+
+### First engineering milestones for a team transition
+
+1. **Knowledge transfer:** founder walks the team through product intent, current environments, data model, permission model, AI flow, storage and deployment. Record unknowns; share secrets only through approved individual access.
+2. **Repository baseline:** agree the branch and current commit, map workflows, capture current CI status and document which test environment is safe for which action.
+3. **Production inventory:** list each service, database, object bucket, Redis account, queue, domain, environment flag and owner. Mark unknown, inactive and unverified resources honestly.
+4. **Performance baseline:** collect anonymized database and endpoint measurements before optimization; do not optimize against guesses.
+5. **Bounded first change:** select one evidenced N+1 or missing index, one below-fold image improvement, or one low-risk optimistic UI interaction. Keep schema, permission and product behavior changes separate.
+6. **Scale design review:** business, educators, legal/privacy and engineering review capacity assumptions, data boundaries, pilot size and operating cost before provisioning larger services.
+7. **Release gate:** use isolated synthetic staging, reviewed migrations, multi-tenant negative tests, privacy/security checks, backup/rollback rehearsal and a named approver before production changes.
 
 ---
 
