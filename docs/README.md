@@ -8,7 +8,7 @@ CABO Learning Hub is a **Connected Education and Lifelong Development Platform**
 
 ## Document index
 
-- [Stakeholder and developer onboarding pack — start here](./PLATFORM_GUIDE.md)
+- [Team handover and onboarding pack — start here](./PLATFORM_GUIDE.md)
 - [Product vision and delivery scope](./PRODUCT_VISION.md)
 - [System architecture and data flows](./ARCHITECTURE.md)
 - [Security, POPIA and consent](./PRIVACY_AND_CONSENT.md)
