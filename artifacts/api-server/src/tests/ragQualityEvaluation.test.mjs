@@ -50,7 +50,7 @@ test("reproducible RAG lexical quality: gold queries retrieve their grounded pas
       plugins: [{
         name: "isolated-rag-evaluation-database",
         setup(builder) {
-          builder.onResolve({ filter: /^@workspace\\/db$/ }, () => ({ path: "test-db", namespace: "rag-test" }));
+          builder.onResolve({ filter: /^@workspace\/db$/ }, () => ({ path: "test-db", namespace: "rag-test" }));
           builder.onLoad({ filter: /.*/, namespace: "rag-test" }, () => ({
             contents: "export const pool = globalThis.__caboRagTestPool;", loader: "js",
           }));
