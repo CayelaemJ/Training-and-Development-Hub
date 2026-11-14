@@ -38,8 +38,8 @@ export async function questionBatches<T>(
   count: number,
   generate: (text: string, count: number, index: number) => Promise<T[]>,
 ): Promise<T[]> {
-  if (!Number.isSafeInteger(count) || count < 1 || count > 30)
-    throw new RangeError("Question count must be between 1 and 30");
+  if (!Number.isSafeInteger(count) || count < 1 || count > 50)
+    throw new RangeError("Question count must be between 1 and 50");
   const total = Math.ceil(count / 5),
     results: T[][] = [];
   // Sequential requests avoid competing for the provider's token allowance.
