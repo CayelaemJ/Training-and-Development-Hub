@@ -454,6 +454,117 @@ CABO Learning Hub is a connected education and lifelong development platform des
 **Expanded description:**  
 CABO Learning Hub brings together digital study and assessment with academic progress, development evidence, institutional coordination and future pathways. The platform is evolving through prototypes and pilots. Its purpose is to help learners and authorized educators work with clearer context over time, while protecting privacy and keeping human beings accountable for consequential decisions. Feature availability, institutional validation and production readiness vary by module and deployment.
 
+## 20. First-day handover for a new CABO team member
+
+This section is written for someone joining after a hiring process and beginning their first day. It is a practical orientation, not an employment contract or a claim about the person's title. The manager should adapt the role-specific track, permissions, schedule and first task to the hire.
+
+### What the new teammate should understand before starting work
+
+CABO Learning Hub is an evolving product, not a finished national platform. It is being developed by CABO Solutions to connect learning, assessment, learner development, institution workflows, support and future pathways around the learner. The repository contains working features, prototypes, pilots, gated functionality and roadmap foundations side by side. The first responsibility is to learn which is which.
+
+The product's most important operating rule is: **protect the learner while making the next useful action clearer to the people authorized to support them.** The team must not overstate the product, expose records outside their purpose, or use model-generated output as an unreviewed high-stakes decision.
+
+The new teammate should be able to answer, in their own words:
+
+- Who CABO serves and the problem it is designed to solve.
+- Why it is broader than an LMS and why it is not a government registry or accredited qualification authority.
+- Which feature they are working on, who benefits from it, and what remains incomplete.
+- Where the relevant UI, API, schema, tests and documents live.
+- Who owns the next decision, who reviews their change and how they should raise a blocker.
+
+### First day: a practical schedule
+
+| Session | Purpose | Leave with |
+|---|---|---|
+| Welcome and context | Meet the manager and immediate collaborators; review the role, team responsibilities and decision paths | A named point of contact for product questions, technical review, privacy/security concerns and access issues |
+| Product walkthrough | Use a demo or isolated environment to follow one learner study flow and one institution workflow | A clear picture of what the user sees, where the API acts and where human review is required |
+| Shared language and product state | Review platform identity, module inventory, delivery register and public claim rules | Agreement on what is implemented, piloted, gated and planned |
+| Repository tour | Locate the web app, API server, database schema, API contract, native apps, CI and documentation | A map of the files connected to the assigned work |
+| Trust and privacy briefing | Review authentication, tenant isolation, child-data boundaries, AI limits, secrets and incident escalation | Understanding of what data must not be copied, logged, exposed or used in demos |
+| Environment and access | Set up only the approved development environment and verify assigned repository permissions | Working local setup or a written list of access blockers; no shared production credentials |
+| First task planning | Agree one bounded, low-risk task with an acceptance checklist and reviewer | A ticket, definition of done, and check-in time |
+
+A day-one walkthrough can follow this sequence: learner problem → user journey → interface → API authorization → database or private storage → AI service (when used) → human review → release evidence. Use synthetic data in demos unless a specific lawful, approved test workflow says otherwise.
+
+### First week: learn, contribute, and verify
+
+**Day 1:** Complete the handover above. Avoid production changes, migration execution and broad feature rewrites.
+
+**Days 2–3:** Trace one feature end to end. Read its UI, route, schema, tests and module documentation. Run the relevant local checks. Write down any mismatch between docs and code and confirm it with the feature owner before changing behavior.
+
+**Days 4–5:** Complete one small, reviewable contribution. It might be a documentation correction, a missing negative test or a tightly scoped UI/API fix. Include the test evidence, authorization cases, migration impact and any remaining limitations in the pull request.
+
+**End-of-week review:** The new teammate should present the flow they traced, describe what changed, show the verification they ran, and list unresolved questions or release gates. The reviewer confirms the next area of ownership.
+
+### Role-specific first-week tracks
+
+| Track | Start with | First safe learning exercise |
+|---|---|---|
+| Frontend or mobile engineering | Client structure, navigation, API client, loading/error states, accessibility and relevant mobile CI | Trace an existing screen to its API and confirm the interface handles loading, empty, denied and error states |
+| Backend or platform engineering | Express route registration, authentication middleware, policy helpers, database schema and API contract | Trace a read and a mutation; identify the exact ownership, role, tenant and input checks |
+| Data or analytics engineering | Data entities, provenance, score/status meaning, aggregate reporting and retention constraints | Explain how a metric is derived and who may see it; use synthetic data and test small-group disclosure safeguards |
+| AI or assessment engineering | Prompt/model call path, source material controls, structured output validation, retry/limits and human review | Trace one generated assessment; identify how answer keys stay private and how incorrect output is flagged |
+| Product, design or education partner | Platform identity, stakeholder messaging, module inventory, delivery register and one user journey | Walk through a proposed workflow with a learner or educator lens and write acceptance criteria with a clear maturity label |
+| QA or security engineering | AGENTS.md, CI workflows, role matrix, feature flags, abuse controls and negative tests | Build a test matrix for two users in separate organizations and prove unauthorized access is denied |
+| Delivery or operations | Environment map, deployment guide, migrations, backups, observability and rollback steps | Review a release checklist in an isolated environment; do not change production settings without explicit authorization |
+
+These tracks are starting points. The manager assigns actual ownership and confirms the permissions needed for the role.
+
+### The repository map to use during onboarding
+
+- **artifacts/training-platform:** React/Vite web client; trace pages, API calls and role-aware navigation here.
+- **artifacts/api-server:** Express application, routes, middleware, policy helpers and server-side workflows.
+- **lib/db/src/schema:** Drizzle schema definitions and relationships; changes may require reviewed migrations.
+- **lib/api-spec:** API contract and generated client; keep contracts aligned when routes change.
+- **native-apps:** Android and iOS work; use the dedicated verification workflows before claiming parity or distribution readiness.
+- **.github/workflows and .circleci:** build, typecheck, security and platform checks; confirm which workflow applies to the changed files.
+- **docs:** product, module, privacy, deployment and delivery records. Update the owning document when behavior or status changes.
+- **AGENTS.md:** mandatory secure engineering boundaries and change workflow; read it before editing code.
+
+### How to take ownership of a task
+
+Before coding, write a short task note that answers:
+
+1. Which user problem is being addressed, and which users are in scope?
+2. Which module and files currently own the behavior?
+3. What should happen for an authorized user, and what must happen for an unauthorized or malformed request?
+4. What personal, academic, child-related or organization data is touched?
+5. Which schema, API contract, feature flag, provider or environment could be affected?
+6. What evidence will prove the work is correct? Include negative tests and the relevant CI checks.
+7. What is explicitly out of scope, and who reviews the change?
+
+A useful task is small enough to review. Avoid combining product redesign, data migration, permission changes and deployment in one first contribution.
+
+### Working agreements
+
+- **Ask early with evidence:** raise a blocker with the file/route, observed behavior, expected behavior and what you already checked.
+- **Do not guess at authority:** if a role, consent state or tenant relationship is ambiguous, stop the affected data path and ask the owner.
+- **Separate facts from plans:** label a repository fact, an inference, a proposal and an open decision distinctly in tickets and meetings.
+- **Record decisions:** put product and technical decisions in the owning issue or documentation, including date, owner and rationale.
+- **Review as a team:** a successful local build is not the same as security review, integration testing or production approval.
+- **Respect access boundaries:** never copy personal learner data, secrets or production records into a laptop, ticket, prompt, screenshot or demo.
+- **Make progress visible:** share a short update at the agreed check-in: completed, evidence, next step and blocker.
+
+### What to show in a demo or stakeholder meeting
+
+Use synthetic or explicitly approved data. A safe demo can show a documented workflow such as private study material, a generated practice/written assessment and advisory feedback; role-scoped institution views; or the consent request experience with adult dummy accounts in an isolated environment.
+
+Before a demo, label each item as **available in this environment**, **pilot/testing**, **gated**, or **planned**. State any human review step. Do not imply official school registration, government integration, legal guardian verification, accredited assessment, certified qualifications, App Store/Play Store release or production compliance unless independent evidence supports the exact claim.
+
+### First-month outcomes
+
+By the end of the first month, a new team member should have:
+
+- Completed environment setup with approved, individual access.
+- Explained the platform identity, core audiences, architecture and trust boundaries.
+- Traced at least one assigned workflow from UI to API to data store and back.
+- Completed one or more small reviewed changes with recorded verification.
+- Identified the release gates relevant to their area.
+- Updated documentation when their work changed the behavior or maturity of a module.
+- Agreed with their manager on a clear next area of responsibility.
+
+The manager and teammate should review these outcomes together; they are onboarding goals, not an assumption about an individual's seniority or performance.
+
 ---
 
 **Maintenance note:** Update this guide when the product's canonical identity, system boundaries or major user journeys change. Update implementation status only after checking code, tests, migrations and the delivery register. Keep detailed module behavior in its owning document and link it here rather than letting this overview become a substitute for technical specifications.
