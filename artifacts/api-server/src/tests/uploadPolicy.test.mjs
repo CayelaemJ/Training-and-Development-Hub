@@ -20,7 +20,7 @@ test('retrieval context samples separate sections within its budget and rejects 
  assert.ok(selected.includes('SECTION_0'));
  assert.ok(selected.includes('FINAL_SENTINEL'));
  assert.ok(selected.includes('[Next section]'));
- await assert.rejects(questionBatches(text,31,async()=>[]),/between 1 and 30/);
+ await assert.rejects(questionBatches(text,51,async()=>[]),/between 1 and 50/);
 });
 test('user-facing errors do not expose HTTP prefixes or upstream HTML',()=>{
  const err=new ApiError(new Response('',{status:503}),{error:'Your material is saved. Try again shortly.'},{method:'POST',url:'/api/materials'});assert.equal(err.message,'Your material is saved. Try again shortly.');
