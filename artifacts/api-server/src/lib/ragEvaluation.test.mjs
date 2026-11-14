@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { evaluateRetrieval } from "./ragEvaluation.mjs";
-import benchmark from "../../../../../../data/rag-eval.synthetic.json" with { type: "json" };
+const benchmark = JSON.parse(readFileSync(new URL("../../../../data/rag-eval.synthetic.json", import.meta.url), "utf8"));
 
 test("synthetic benchmark passes configured retrieval quality gates", () => {
   const result = evaluateRetrieval(benchmark.cases, benchmark.thresholds);
