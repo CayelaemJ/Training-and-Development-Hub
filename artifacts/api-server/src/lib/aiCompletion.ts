@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { logger } from "./logger";
 import { createProviderScheduler, ProviderQuotaError } from "./providerQuota";
 import { groqApiKey } from "./aiProviderPolicy";
+import { recordAiMetric, type AiOperation } from "./aiObservability";
 const providerSchedulers = { groq: createProviderScheduler() };
 
 import { aiFailureAction } from "./aiRetryPolicy";
@@ -82,13 +83,21 @@ export async function completeAIJson<T>(args: {
   payload: unknown;
   validate: (value: unknown) => T;
   maxCompletionTokens?: number;
-}): Promise<{ value: T; modelId: string }> {
+  operation?: AiOperation;
+}): Promise<{ value: T; modelId: string; inputTokens: number | null; outputTokens: number | null }> {
+  const startedAt=Date.now();
+  const operation=args.operation??"ai_generation";
   const deadline=Date.now()+180000;
   let quotaError: ProviderQuotaError | undefined;
+  let lastModel="unresolved";
   const providers = await configuredProviders();
-  if (!providers.length) throw new AiUnavailableError();
+  if (!providers.length) {
+    void recordAiMetric(operation,"groq",process.env.GROQ_EXAM_MODEL?.trim()||lastModel,"failure",startedAt);
+    throw new AiUnavailableError();
+  }
   providers: for (const provider of providers) {
     for (const model of provider.models) {
+      lastModel=model;
       for (const jsonMode of [true, false]) {
         const remaining=deadline-Date.now();
         if(remaining<=0)throw new AiUnavailableError();
@@ -107,7 +116,10 @@ export async function completeAIJson<T>(args: {
           if (!body) throw new Error("Empty completion");
           const parsed = args.validate(jsonFromAnswer(body));
           logger.info({ provider: provider.name, model }, "CABO AI completion validated");
-          return { value: parsed, modelId: model };
+          const inputTokens=response.usage?.prompt_tokens??null;
+          const outputTokens=response.usage?.completion_tokens??null;
+          void recordAiMetric(operation,provider.name,model,"success",startedAt,{inputTokens,outputTokens});
+          return { value: parsed, modelId: model, inputTokens, outputTokens };
         } catch (error) {
           if (error instanceof ProviderQuotaError) { quotaError = error; continue providers; }
           const err = error as { status?: number; code?: string; name?: string };
@@ -120,5 +132,6 @@ export async function completeAIJson<T>(args: {
       }
     }
   }
+  void recordAiMetric(operation,"groq",lastModel,"failure",startedAt);
   throw quotaError ?? new AiUnavailableError();
 }

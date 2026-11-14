@@ -170,6 +170,15 @@ CABO's development branch includes new school attendance/notices, a candidate ap
 4. The superadmin can inspect aggregate errors/latency at `GET /api/platform/mlops`. A configured API key is **not** proof of successful inference; use an authenticated test call with synthetic data and verify the metrics.
 5. Before production: add per-model prompt versions, eval fixtures, PII-safe tracing policies, regression benchmark gates, budget/quotas, model rollback and incident alerting.
 
+### Cross-platform operational health
+- Superadmins can open **Platform health** from the app navigation (including the mobile navigation) or visit `/platform-health`. It refreshes service and AI telemetry every 30 seconds while open.
+- RAG is exercised in **Study materials**: open an uploaded source and choose **Ask this material**. Requests and failures are grouped as `material_qa`; OCR extraction is grouped as `material_ocr`.
+- Apply `lib/db/migrations/20261114_platform_health_telemetry.sql` before deploying this page. It adds bounded token/cost fields and aggregate client heartbeats.
+- Web, iOS, Android and Windows builds report their platform/version on authenticated API calls. The database stores only platform, app version, last seen time and HTTP status; no account, device, prompt or answer identifiers are recorded. “Active” means recent API traffic, not proof that every screen or device feature passed an end-to-end test.
+- The dashboard graphs hourly AI volume/failures, average/p95 latency and token-based cost estimates, and summarizes those measures by AI operation. Provider health is checked with the superadmin's **Run synthetic Groq check** action rather than continuous paid inference.
+- To estimate spend, configure `GROQ_MODEL_COST_RATES_JSON` on the API service with current rates for each exact model ID, for example `{"<model-id>":{"inputUsdPerMillion":0,"outputUsdPerMillion":0}}`. Replace the example values with the provider's current rates. Unpriced requests remain unpriced; displayed cost is an estimate, not billing data.
+- This is an operational dashboard, not an alerting service: it polls only while open and does not send alerts. Native UI/build checks continue to run in CI.
+
 ### Verification and local development
 ```bash
 pnpm install --frozen-lockfile

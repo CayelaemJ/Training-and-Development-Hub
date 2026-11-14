@@ -324,6 +324,13 @@ export async function customFetch<T = unknown>(
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
 
+  // Coarse client metadata supports platform health monitoring without
+  // collecting account, school, device, or learner identifiers.
+  if (typeof document !== "undefined") {
+    headers.set("x-cabo-client", "web");
+    headers.set("x-cabo-client-version", "web");
+  }
+
   if (
     typeof init.body === "string" &&
     !headers.has("content-type") &&

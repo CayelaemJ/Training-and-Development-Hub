@@ -27,7 +27,7 @@ router.post("/development-plans/draft",async(req,res)=>{
   });
   const data=JSON.parse(response.choices[0]?.message.content||"null");
   const plan=output.parse(data);
-  await recordAiMetric("development_plan",provider,model,"success",now);
+  await recordAiMetric("development_plan",provider,model,"success",now,{inputTokens:response.usage?.prompt_tokens,outputTokens:response.usage?.completion_tokens});
   res.json({plan:{...plan,recommendations:plan.recommendations.map(x=>({...x,reviewWeek:Math.min(parsed.data.periodWeeks,x.reviewWeek)}))},status:"draft",verified:false,generatedAt:new Date().toISOString(),source:"self_reported_input"});
  } catch(e) {
   await recordAiMetric("development_plan",provider,model,"failure",now);

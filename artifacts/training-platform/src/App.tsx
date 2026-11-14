@@ -17,6 +17,7 @@ import InstitutionRecordsPage from '@/pages/institution-records';
 import GovernancePage from '@/pages/governance';
 import RoleHomePage from '@/pages/role-home';
 import PlatformAdminPage from '@/pages/platform-admin';
+import PlatformHealthPage from '@/pages/platform-health';
 import SchoolOperationsPage from '@/pages/school-operations';
 import SportsDevelopmentPage from '@/pages/sports-development';
 import DevelopmentPlanPage from '@/pages/development-plan';
@@ -42,7 +43,7 @@ import {
 } from '@workspace/api-client-react';
 import type { QuizDetail, QuizAttemptResult, StudyMaterial, QuizSummary } from '@workspace/api-client-react';
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
+  Activity, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
   CheckCircle2, ChevronRight, CircleHelp, Clock3, FileText, FileUp, GraduationCap,
   LayoutDashboard, LoaderCircle, LogOut, Plus, RotateCcw, Search,
   Sparkles, Target, Trash2, X,
@@ -53,7 +54,7 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
  provincial_director:['/','/education-command','/organizations','/governance'],
  district_director:['/','/education-command','/organizations','/governance'],
@@ -86,6 +87,7 @@ const navItems = [
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
   { href: '/platform-admin', label: 'Platform administration', icon: GraduationCap },
+  { href: '/platform-health', label: 'Platform health', icon: Activity },
   { href: '/school-operations', label: 'School operations', icon: BookOpen },
   { href: '/sports-development', label: 'Sports & activities', icon: Target },
   { href: '/development-plan', label: 'My development plan', icon: Sparkles },
@@ -146,6 +148,7 @@ function Router() {
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
     <Route path="/platform-admin" component={PlatformAdminPage} />
+    <Route path="/platform-health" component={PlatformHealthPage} />
     <Route path="/school-operations" component={SchoolOperationsPage} />
     <Route path="/sports-development" component={SportsDevelopmentPage} />
     <Route path="/development-plan" component={DevelopmentPlanPage} />
@@ -192,7 +195,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   return <div className="app-frame">
     <aside className="sidebar">
@@ -230,6 +233,7 @@ function AppShell({ user }: { user: any }) {
         {([
           {href:'/',label:'Home',icon:LayoutDashboard},
           ...(allowedNav[portalRole].includes('/platform-admin')?[{href:'/platform-admin',label:'Admin',icon:GraduationCap}]:[]),
+          ...(allowedNav[portalRole].includes('/platform-health')?[{href:'/platform-health',label:'Health',icon:Activity}]:[]),
           ...(allowedNav[portalRole].includes('/school-operations')?[{href:'/school-operations',label:'School',icon:BookOpen}]:[]),
           ...(allowedNav[portalRole].includes('/institution-records')?[{href:'/institution-records',label:'Records',icon:FileText}]:[]),
           ...(allowedNav[portalRole].includes('/academics')?[{href:'/academics',label:'Academics',icon:Target}]:[]),

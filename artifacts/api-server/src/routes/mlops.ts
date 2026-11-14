@@ -2,10 +2,13 @@ import {Router,type IRouter} from "express";
 import OpenAI from "openai";
 import {and,desc,eq,gte} from "drizzle-orm";
 import {z} from "zod/v4";
-import {db,aiInferenceMetricsTable,organizationMembersTable,mlModelVersionsTable,mlEvaluationRunsTable,mlOperationalEventsTable} from "@workspace/db";
+import {db,pool,aiInferenceMetricsTable,clientPlatformHeartbeatsTable,organizationMembersTable,mlModelVersionsTable,mlEvaluationRunsTable,mlOperationalEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {aiConfiguration,recordAiMetric} from "../lib/aiObservability";
+import {aiCostPricingConfigured} from "../lib/aiObservability";
 import {groqApiKey} from "../lib/aiProviderPolicy";
+import {checkRedisReadiness} from "../lib/redisReadiness";
+import {redisConfigStatus} from "../lib/redisRateLimit";
 import {evaluateAiMarking} from "../lib/mlopsEvaluation";
 import {recordMLOpsEvent} from "../lib/mlopsTelemetry";
 import {canAccessMLOps} from "../lib/mlopsAccessPolicy";
@@ -108,6 +111,77 @@ router.get("/platform/mlops",async(req,res)=>{
  res.json({configured:config.configured,provider:config.preferredProvider,model:config.developmentModel,windowDays:7,requests:records.length,successes:successful.length,failures:records.length-successful.length,averageLatencyMs:records.length?Math.round(records.reduce((n,r)=>n+r.durationMs,0)/records.length):null,recent:records.slice(0,30)});
 });
 
+router.get("/platform/health",async(req,res)=>{
+ if(!req.isAuthenticated()){res.sendStatus(401);return}
+ if(!isPlatformSuperadmin(req.user.id)){res.sendStatus(403);return}
+ res.setHeader("Cache-Control","private, no-store");
+ const now=new Date(),since=new Date(now.getTime()-24*60*60_000);
+ let database:"healthy"|"unavailable"="unavailable";
+ try{await pool.query("SELECT 1");database="healthy"}catch{}
+ const redisState=redisConfigStatus();
+ const redis=redisState==="disabled"?"disabled":redisState==="invalid"?"unavailable":
+  await checkRedisReadiness().then(ok=>ok?"healthy":"unavailable").catch(()=>"unavailable");
+ let platforms:Record<string,unknown>[]=[];
+ let series:Record<string,unknown>[]=[];
+ let operations:Record<string,unknown>[]=[];
+ let telemetryReady=database==="healthy";
+ if(database==="healthy"){
+  const [heartbeats,metrics,operationMetrics]=await Promise.allSettled([
+   db.select({platform:clientPlatformHeartbeatsTable.platform,version:clientPlatformHeartbeatsTable.version,lastSeenAt:clientPlatformHeartbeatsTable.lastSeenAt,lastHttpStatus:clientPlatformHeartbeatsTable.lastHttpStatus})
+    .from(clientPlatformHeartbeatsTable).orderBy(desc(clientPlatformHeartbeatsTable.lastSeenAt)).limit(40),
+   pool.query(`SELECT date_trunc('hour', created_at) AS bucket,
+     count(*)::int AS requests,
+     count(*) FILTER (WHERE outcome = 'failure')::int AS failures,
+     round(avg(duration_ms))::int AS average_latency_ms,
+     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::int AS p95_latency_ms,
+     coalesce(sum(input_tokens),0)::bigint AS input_tokens,
+     coalesce(sum(output_tokens),0)::bigint AS output_tokens,
+     sum(estimated_cost_usd)::numeric AS estimated_cost_usd,
+     count(estimated_cost_usd)::int AS priced_requests
+    FROM ai_inference_metrics WHERE created_at >= $1
+    GROUP BY date_trunc('hour', created_at) ORDER BY bucket`,[since]),
+   pool.query(`SELECT operation,count(*)::int AS requests,
+     count(*) FILTER (WHERE outcome = 'failure')::int AS failures,
+     round(avg(duration_ms))::int AS average_latency_ms,
+     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::int AS p95_latency_ms,
+     coalesce(sum(input_tokens),0)::bigint AS input_tokens,
+     coalesce(sum(output_tokens),0)::bigint AS output_tokens,
+     sum(estimated_cost_usd)::numeric AS estimated_cost_usd,
+     count(estimated_cost_usd)::int AS priced_requests,
+     max(created_at) AS last_request_at
+    FROM ai_inference_metrics WHERE created_at >= $1 GROUP BY operation ORDER BY requests DESC`,[since]),
+  ]);
+  const latest=new Map<string,{platform:string;version:string;lastSeenAt:Date;lastHttpStatus:number}>();
+  if(heartbeats.status==="fulfilled"){
+   for(const row of heartbeats.value)if(!latest.has(row.platform))latest.set(row.platform,row);
+  }else telemetryReady=false;
+  const expected=["web","ios","android","windows"];
+  platforms=expected.map(platform=>{
+   const row=latest.get(platform),ageSeconds=row?Math.max(0,Math.floor((now.getTime()-row.lastSeenAt.getTime())/1000)):null;
+   return {platform,version:row?.version??null,lastSeenAt:row?.lastSeenAt.toISOString()??null,ageSeconds,lastHttpStatus:row?.lastHttpStatus??null,
+    state:!row?"no_signal":row.lastHttpStatus>=500&&ageSeconds!<300?"degraded":ageSeconds!<300?"active":ageSeconds!<3600?"recent":"stale"};
+  });
+  if(metrics.status==="fulfilled")series=metrics.value.rows.map(row=>({
+   bucket:new Date(row.bucket).toISOString(),requests:Number(row.requests),failures:Number(row.failures),
+   averageLatencyMs:Number(row.average_latency_ms),p95LatencyMs:Number(row.p95_latency_ms),
+   inputTokens:Number(row.input_tokens),outputTokens:Number(row.output_tokens),
+   estimatedCostUsd:row.estimated_cost_usd===null?null:Number(row.estimated_cost_usd),pricedRequests:Number(row.priced_requests),
+  }));
+  else telemetryReady=false;
+  if(operationMetrics.status==="fulfilled")operations=operationMetrics.value.rows.map(row=>({
+   operation:row.operation,requests:Number(row.requests),failures:Number(row.failures),
+   averageLatencyMs:Number(row.average_latency_ms),p95LatencyMs:Number(row.p95_latency_ms),
+   inputTokens:Number(row.input_tokens),outputTokens:Number(row.output_tokens),
+   estimatedCostUsd:row.estimated_cost_usd===null?null:Number(row.estimated_cost_usd),pricedRequests:Number(row.priced_requests),
+   lastRequestAt:row.last_request_at?new Date(row.last_request_at).toISOString():null,
+  }));
+  else telemetryReady=false;
+ }
+ const configuration=aiConfiguration();
+ const groqConfigured=configuration.configured;
+ res.json({observedAt:now.toISOString(),windowHours:24,telemetryReady,services:{api:{state:"healthy"},database:{state:database},redis:{state:redis},groq:{state:groqConfigured?"configured":"unconfigured",provider:configuration.preferredProvider,model:configuration.developmentModel,liveProbe:"manual"}},platforms,ai:{series,operations,costPricingConfigured:aiCostPricingConfigured(),costMethod:"estimated from token usage and model-specific configured rates",rawPromptsStored:false}});
+});
+
 router.post("/platform/mlops/smoke-test",async(req,res)=>{
  if(!req.isAuthenticated()){res.sendStatus(401);return}
  if(!isPlatformSuperadmin(req.user.id)){res.sendStatus(403);return}
@@ -118,10 +192,10 @@ router.post("/platform/mlops/smoke-test",async(req,res)=>{
   const client=new OpenAI({apiKey:groqApiKey()!,baseURL:"https://api.groq.com/openai/v1",timeout:12000,maxRetries:0});
   const answer=await client.chat.completions.create({model:configuration.developmentModel,max_completion_tokens:512,...(configuration.developmentModel.startsWith("openai/gpt-oss-") ? {reasoning_effort:"low" as const} : {}),messages:[{role:"system",content:"Return the exact word READY, and no other text."},{role:"user",content:"Synthetic CABO infrastructure availability test. Respond READY."}]});
   if(!answer.choices[0]?.message?.content?.includes("READY"))throw Error("Unexpected output");
-  await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"success",start);
+  await recordAiMetric("provider_smoke_test",configuration.preferredProvider,configuration.developmentModel,"success",start,{inputTokens:answer.usage?.prompt_tokens,outputTokens:answer.usage?.completion_tokens});
   res.json({ok:true,provider:configuration.preferredProvider,model:configuration.developmentModel,latencyMs:Date.now()-start});
  }catch(e){
-  await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"failure",start);
+  await recordAiMetric("provider_smoke_test",configuration.preferredProvider,configuration.developmentModel,"failure",start);
   const status = typeof (e as {status?:unknown})?.status === "number" ? (e as {status:number}).status : null;
   console.warn("AI connection check failed", {provider: configuration.preferredProvider, status});
   const error = status === 401 ? "The AI provider rejected this API key. Check the key in Render settings." : status === 403 ? "The AI provider refused access. Check this project's permissions and provider restrictions." : status === 429 ? "The AI provider has reached its usage limit. Check the account quota and try again later." : status === 404 ? "This AI model is unavailable. Choose an available model in Render settings." : "The AI service could not complete the connection check. Please try again shortly.";

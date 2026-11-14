@@ -2,6 +2,7 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { unzipSync, strFromU8 } from "fflate";
 import OpenAI from "openai";
+import { recordAiMetric } from "./aiObservability";
 import { imageSize } from "image-size";
 import {
   MAX_FILE_BYTES,
@@ -76,9 +77,12 @@ async function readImage(dataUrl: string, allowed: boolean) {
     timeout: 25000,
     maxRetries: 0,
   });
+  const model = process.env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b";
+  const startedAt=Date.now();
+  let usage:{inputTokens?:number|null;outputTokens?:number|null}={};
   try {
     const r = await client.chat.completions.create({
-      model: process.env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b",
+      model,
       max_completion_tokens: 6000,
       messages: [
         {
@@ -95,6 +99,7 @@ async function readImage(dataUrl: string, allowed: boolean) {
         },
       ],
     });
+    usage={inputTokens:r.usage?.prompt_tokens,outputTokens:r.usage?.completion_tokens};
     if (r.choices[0]?.finish_reason === "length")
       throw new MaterialReadError(
         "This page contains too much text to read in one go. Crop it into smaller sections and upload each one.",
@@ -104,8 +109,10 @@ async function readImage(dataUrl: string, allowed: boolean) {
       throw new MaterialReadError(
         "We could not read the words clearly. Try a sharper photo, better lighting or a text-based document.",
       );
+    void recordAiMetric("material_ocr","groq",model,"success",startedAt,usage);
     return text;
   } catch (e) {
+    void recordAiMetric("material_ocr","groq",model,"failure",startedAt,usage);
     if (e instanceof MaterialReadError) throw e;
     throw new MaterialReadError(
       "Text recognition is unavailable right now. Your upload is kept so you can retry, or use a text-based copy.",

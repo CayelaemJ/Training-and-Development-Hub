@@ -550,6 +550,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         request.timeoutInterval = min(max(timeoutInterval, 12), 180)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("ios", forHTTPHeaderField: "X-CABO-Client")
+        request.setValue(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "ios", forHTTPHeaderField: "X-CABO-Client-Version")
         if let idempotencyKey {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
         }
@@ -2108,6 +2110,8 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var request = URLRequest(url: origin.appendingPathComponent("api/native/logout"))
             request.httpMethod = "POST"
             request.timeoutInterval = 6
+            request.setValue("ios", forHTTPHeaderField: "X-CABO-Client")
+            request.setValue(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "ios", forHTTPHeaderField: "X-CABO-Client-Version")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             _ = try? await URLSession.shared.data(for: request)
         }
