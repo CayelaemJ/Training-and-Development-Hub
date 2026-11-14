@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod/v4";
 import {recordAiMetric,aiConfiguration} from "../lib/aiObservability";
 import {draftPlanTemplate} from "../lib/planFallback";
+import {groqApiKey} from "../lib/aiProviderPolicy";
 
 const router: IRouter = Router();
 const item = z.object({ area: z.enum(["academic","sport","creative","leadership","extracurricular"]), activity: z.string().trim().min(2).max(100), currentLevel: z.string().trim().max(280), strengths: z.string().trim().max(450), focus: z.string().trim().max(450) });
@@ -14,12 +15,11 @@ router.post("/development-plans/draft",async(req,res)=>{
  const parsed=input.safeParse(req.body);
  if(!parsed.success){res.status(400).json({error:"Provide a valid goal and observations"});return}
  const now=Date.now();
- const groq=process.env.GROQ_API_KEY;
- const openai=process.env.OPENAI_API_KEY;
- if(!groq&&!openai){res.json({plan:draftPlanTemplate(parsed.data),status:"draft",verified:false,generatedAt:new Date().toISOString(),source:"deterministic_template",providerAvailable:false});return}
- const provider=groq?"groq":"openai";const model=aiConfiguration().developmentModel;
+ const groq=groqApiKey();
+ if(!groq){res.json({plan:draftPlanTemplate(parsed.data),status:"draft",verified:false,generatedAt:new Date().toISOString(),source:"deterministic_template",providerAvailable:false});return}
+ const provider="groq";const model=aiConfiguration().developmentModel;
  try {
-  const client=new OpenAI({apiKey:groq||openai, ...(groq?{baseURL:"https://api.groq.com/openai/v1"}:{}),timeout:25000,maxRetries:1});
+  const client=new OpenAI({apiKey:groq,baseURL:"https://api.groq.com/openai/v1",timeout:25000,maxRetries:1});
   const response=await client.chat.completions.create({
    model,
    response_format:{type:"json_object"},

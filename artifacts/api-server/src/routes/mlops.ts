@@ -5,6 +5,7 @@ import {z} from "zod/v4";
 import {db,aiInferenceMetricsTable,organizationMembersTable,mlModelVersionsTable,mlEvaluationRunsTable,mlOperationalEventsTable} from "@workspace/db";
 import {isPlatformSuperadmin} from "../lib/portalAccess";
 import {aiConfiguration,recordAiMetric} from "../lib/aiObservability";
+import {groqApiKey} from "../lib/aiProviderPolicy";
 import {evaluateAiMarking} from "../lib/mlopsEvaluation";
 import {recordMLOpsEvent} from "../lib/mlopsTelemetry";
 import {canAccessMLOps} from "../lib/mlopsAccessPolicy";
@@ -113,10 +114,9 @@ router.post("/platform/mlops/smoke-test",async(req,res)=>{
  const configuration=aiConfiguration();
  if(!configuration.configured){res.status(503).json({error:"No model credentials configured"});return}
  const start=Date.now();
- const groq=configuration.preferredProvider==="groq";
  try {
-  const client=new OpenAI({apiKey:groq?process.env.GROQ_API_KEY:process.env.OPENAI_API_KEY,baseURL:groq?"https://api.groq.com/openai/v1":undefined,timeout:12000,maxRetries:0});
-  const answer=await client.chat.completions.create({model:configuration.developmentModel,max_completion_tokens:512,...(groq && configuration.developmentModel.startsWith("openai/gpt-oss-") ? {reasoning_effort:"low" as const} : {}),messages:[{role:"system",content:"Return the exact word READY, and no other text."},{role:"user",content:"Synthetic CABO infrastructure availability test. Respond READY."}]});
+  const client=new OpenAI({apiKey:groqApiKey()!,baseURL:"https://api.groq.com/openai/v1",timeout:12000,maxRetries:0});
+  const answer=await client.chat.completions.create({model:configuration.developmentModel,max_completion_tokens:512,...(configuration.developmentModel.startsWith("openai/gpt-oss-") ? {reasoning_effort:"low" as const} : {}),messages:[{role:"system",content:"Return the exact word READY, and no other text."},{role:"user",content:"Synthetic CABO infrastructure availability test. Respond READY."}]});
   if(!answer.choices[0]?.message?.content?.includes("READY"))throw Error("Unexpected output");
   await recordAiMetric("development_plan",configuration.preferredProvider,configuration.developmentModel,"success",start);
   res.json({ok:true,provider:configuration.preferredProvider,model:configuration.developmentModel,latencyMs:Date.now()-start});

@@ -1,11 +1,12 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
 import { createProviderScheduler, ProviderQuotaError } from "./providerQuota";
-const providerSchedulers = { groq: createProviderScheduler(), openai: createProviderScheduler() };
+import { groqApiKey } from "./aiProviderPolicy";
+const providerSchedulers = { groq: createProviderScheduler() };
 
 import { aiFailureAction } from "./aiRetryPolicy";
 
-type AiProvider = "groq" | "openai";
+type AiProvider = "groq";
 type Provider = { name: AiProvider; client: OpenAI; models: string[] };
 
 export class AiUnavailableError extends Error {
@@ -16,7 +17,7 @@ export class AiUnavailableError extends Error {
 }
 
 export function hasAiProvider(): boolean {
-  return Boolean(process.env.GROQ_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
+  return groqApiKey() !== null;
 }
 
 const groqModelCache: { expires: number; models: string[] | null } = { expires: 0, models: null };
@@ -49,8 +50,9 @@ async function groqModels(client: OpenAI): Promise<string[] | null> {
 
 async function configuredProviders(): Promise<Provider[]> {
   const providers: Provider[] = [];
-  if (process.env.GROQ_API_KEY?.trim()) {
-    const client = new OpenAI({ apiKey: process.env.GROQ_API_KEY.trim(), baseURL: GROQ_BASE_URL, timeout: 25_000, maxRetries: 0 });
+  const apiKey = groqApiKey();
+  if (apiKey) {
+    const client = new OpenAI({ apiKey, baseURL: GROQ_BASE_URL, timeout: 25_000, maxRetries: 0 });
     const discovered = await groqModels(client);
     const candidates = cleanModels([
       process.env.GROQ_EXAM_MODEL,
@@ -61,10 +63,6 @@ async function configuredProviders(): Promise<Provider[]> {
       ...(discovered ?? []),
     ], discovered);
     if (candidates.length) providers.push({ name: "groq", client, models: candidates.slice(0, 5) });
-  }
-  if (process.env.OPENAI_API_KEY?.trim()) {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim(), timeout: 25_000, maxRetries: 0 });
-    providers.push({ name: "openai", client, models: cleanModels([process.env.OPENAI_EXAM_MODEL, "gpt-4.1-mini", "gpt-4o-mini"]).slice(0, 3) });
   }
   return providers;
 }
@@ -78,7 +76,7 @@ function jsonFromAnswer(content: string): unknown {
   return JSON.parse(trimmed.slice(start, end + 1)) as unknown;
 }
 
-/** Tries accessible Groq models and then OpenAI when configured. Validates every response before accepting it. */
+/** Uses Groq models only and validates every response before accepting it. */
 export async function completeAIJson<T>(args: {
   system: string;
   payload: unknown;

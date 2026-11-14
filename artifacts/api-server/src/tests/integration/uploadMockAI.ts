@@ -3,6 +3,16 @@ export function hasAiProvider() {
   return true;
 }
 export async function completeAIJson(args: any) {
+  if (Array.isArray(args.payload.excerpts)) {
+    const excerpt = String(args.payload.excerpts[0] ?? "").slice(0, 120);
+    return {
+      value: args.validate({
+        answer: "The supplied study notes explain the relevant concept.",
+        citations: [{ excerpt }],
+      }),
+      modelId: "synthetic-test-provider",
+    };
+  }
   const text = args.payload.materialText ?? args.payload.text;
   const questions = Array.from(
     { length: args.payload.questionCount },

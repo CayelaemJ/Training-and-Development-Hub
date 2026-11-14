@@ -38,7 +38,7 @@ AI-generated marks are advisory. They should not be treated as final decisions f
 - Run UI: `pnpm --filter @workspace/training-platform run dev`
 - Validate: `pnpm run typecheck && pnpm run build`
 
-Environment: `DATABASE_URL` for PostgreSQL and `OPENAI_API_KEY` for AI generation and marking; private object storage and authentication must also be configured per the existing project infrastructure. Override the exam model with `OPENAI_EXAM_MODEL` if needed. Never expose secrets to the browser.
+Environment: `DATABASE_URL` for PostgreSQL and `GROQ_API_KEY` for AI generation and marking; private object storage and authentication must also be configured per the existing project infrastructure. Set `GROQ_EXAM_MODEL` to an active Groq chat model when overriding the default. Never expose secrets to the browser.
 
 ## Architecture
 
@@ -141,7 +141,7 @@ CABO's development branch includes new school attendance/notices, a candidate ap
 - Backend: Express API under `artifacts/api-server`.
 - Data: PostgreSQL with Drizzle schemas under `lib/db/src/schema`.
 - Deployment: isolated Render native-test preview backed by a separate Neon PostgreSQL project.
-- AI: OpenAI-compatible SDK, with Groq selected when `GROQ_API_KEY` is provided, otherwise `OPENAI_API_KEY`. Model IDs use `GROQ_EXAM_MODEL` and `OPENAI_EXAM_MODEL` for the existing development-plan endpoint.
+- AI: Groq only for generation, marking, material question answering and development-plan drafts. `GROQ_API_KEY` is required for AI output; `GROQ_EXAM_MODEL` selects the preferred Groq chat model. Without Groq, development plans use the labelled deterministic template and other AI routes report that the provider is unavailable.
 
 ### Education workflow modules
 - `/school-stages`: grade RR–R, 1–7 and 8–12 development observations; enrolment and organisation access enforced server-side.
@@ -168,7 +168,7 @@ CABO's development branch includes new school attendance/notices, a candidate ap
 2. `POST /api/development-plans/draft` validates input, rate-limits calls, requests structured JSON and validates the model response. All AI recommendations are drafts subject to educator/guardian review.
 3. The server records model provider, model ID, operation, duration and success/failure into `ai_inference_metrics`, deliberately excluding learner prompts, answers and personal profiles.
 4. The superadmin can inspect aggregate errors/latency at `GET /api/platform/mlops`. A configured API key is **not** proof of successful inference; use an authenticated test call with synthetic data and verify the metrics.
-5. Before production: add per-model prompt versions, eval fixtures, PII-safe tracing policies, regression benchmark gates, budget/quotas, model rollback, provider failover and incident alerting.
+5. Before production: add per-model prompt versions, eval fixtures, PII-safe tracing policies, regression benchmark gates, budget/quotas, model rollback and incident alerting.
 
 ### Verification and local development
 ```bash

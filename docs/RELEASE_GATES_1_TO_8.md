@@ -15,7 +15,7 @@ Current pilot: institution-scoped attendance, offline sync API, opt-in IndexedDB
 Sign-off requires real mobile device offline/reconnect E2E, account-bound draft clearing, device encryption or approved managed-device policy, teacher-substitution approval and notification, safe QR attendance design with anti-spoof/replay protections and actual timetable optimisation.
 
 ## 4. Academic intelligence and MLOps
-Current pilot: subject-level marks, threshold-based risk indicators, human-reviewed development plans, Groq/OpenAI configuration, latency/failure metrics, isolated provider smoke test. If the model is unavailable, plan drafting returns a clearly labelled non-AI template.
+Current pilot: subject-level marks, threshold-based risk indicators, human-reviewed development plans, Groq-only configuration, latency/failure metrics, isolated provider smoke test. If Groq is unavailable, plan drafting returns a clearly labelled non-AI template.
 Sign-off requires privacy-preserving offline eval fixtures, fairness/accuracy review, safeguards against unreliable high-stakes predictions, model/prompt version control, failure budgets, escalation, monitoring and actual end-to-end provider evidence.
 
 ## 5. Assessment Studio
