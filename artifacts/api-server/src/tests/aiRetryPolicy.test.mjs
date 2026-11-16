@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { aiFailureAction } from "../lib/aiRetryPolicy.ts";
 
-for (const status of [401, 403, 429, 500, 502, 503, 504]) {
+for (const status of [401, 402, 403, 429, 500, 502, 503, 504]) {
   test(`HTTP ${status} immediately advances to the next provider`, () => {
     for (const jsonMode of [true, false]) {
       assert.equal(aiFailureAction({ status }, jsonMode), "next-provider");

@@ -20,6 +20,7 @@ export function quotaDelay(error: unknown, now = Date.now()): number | null {
 export function createProviderScheduler(
   now = () => Date.now(),
   sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)),
+  options: { fastFailOnQuota?: boolean } = {},
 ) {
   let tail: Promise<unknown> = Promise.resolve();
   let blockedUntil = 0;
@@ -31,6 +32,7 @@ export function createProviderScheduler(
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
         const wait = Math.max(0, blockedUntil - now());
+        if (wait > 0 && options.fastFailOnQuota) throw new ProviderQuotaError(wait / 1000);
         if (now() + wait + 1000 >= deadline) throw new ProviderQuotaError(Math.max(wait / 1000, 1));
         if (wait) await sleep(wait);
         try { return await operation(); }
@@ -38,7 +40,8 @@ export function createProviderScheduler(
           const delay = quotaDelay(error, now());
           if (delay === null) throw error;
           blockedUntil = now() + delay;
-          if (attempt === 2) throw new ProviderQuotaError(delay / 1000);
+          // A routed request can fail over immediately without hammering this provider.
+          if (options.fastFailOnQuota || attempt === 2) throw new ProviderQuotaError(delay / 1000);
         }
       }
       throw new ProviderQuotaError(60);
