@@ -24,7 +24,11 @@ router.post("/organizations/:orgId/attendance/sync",async(req,res)=>{
   const [existing]=await db.select({id:schoolAttendanceTable.id,status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(and(eq(schoolAttendanceTable.organizationId,org.data),eq(schoolAttendanceTable.learnerId,v.learnerId),eq(schoolAttendanceTable.day,v.day))).limit(1);
   if(existing){accepted.push({learnerId:v.learnerId,day:v.day,result:existing.status===v.status?"already_synced":"conflict_manual_review"});continue}
   const [created]=await db.insert(schoolAttendanceTable).values({organizationId:org.data,learnerId:v.learnerId,day:v.day,status:v.status,note:v.note,recordedBy:req.user.id}).onConflictDoNothing().returning();
-  accepted.push({learnerId:v.learnerId,day:v.day,result:created?"synced":"already_synced"});
+  if(created){accepted.push({learnerId:v.learnerId,day:v.day,result:"synced"});continue}
+  // Another sync may have inserted this learner/day after the read above.
+  // Re-read the winner so a different status is reported for manual review.
+  const [raced]=await db.select({status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(and(eq(schoolAttendanceTable.organizationId,org.data),eq(schoolAttendanceTable.learnerId,v.learnerId),eq(schoolAttendanceTable.day,v.day))).limit(1);
+  accepted.push({learnerId:v.learnerId,day:v.day,result:raced?.status===v.status?"already_synced":"conflict_manual_review"});
  }
  const counts={received:accepted.length,synced:accepted.filter(x=>x.result==="synced").length,alreadySynced:accepted.filter(x=>x.result==="already_synced").length,conflicts:accepted.filter(x=>x.result==="conflict_manual_review").length,rejected:accepted.filter(x=>x.result==="rejected_no_active_enrollment").length};
  res.setHeader("Cache-Control","private, no-store");res.json({results:accepted,counts,synced:counts.synced,conflicts:counts.conflicts,provenance:{source:"offline_attendance_sync",recordedBy:req.user.id,recordedAt:new Date().toISOString()}});
