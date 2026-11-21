@@ -16,7 +16,7 @@ router.post("/organizations/:orgId/attendance/sync",async(req,res)=>{
  const items=parsed.data.entries;
  const duplicateKeys=new Set(items.map(x=>x.learnerId+":"+x.day));
  if(duplicateKeys.size!==items.length){res.status(400).json({error:"Repeated learner/day in batch"});return}
- const accepted=[] as {learnerId:string;day:string;result:string}[];
+ const accepted=[] as {learnerId:string;day:string;result:"synced"|"already_synced"|"conflict_manual_review"|"rejected_no_active_enrollment"}[];
  for(const v of items){
   const year=Number(v.day.slice(0,4));
   const [enrollment]=await db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(eq(verifiedEnrollmentsTable.organizationId,org.data),eq(verifiedEnrollmentsTable.learnerId,v.learnerId),eq(verifiedEnrollmentsTable.academicYear,year),eq(verifiedEnrollmentsTable.status,"active"))).limit(1);
@@ -24,7 +24,10 @@ router.post("/organizations/:orgId/attendance/sync",async(req,res)=>{
   const [existing]=await db.select({id:schoolAttendanceTable.id,status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(and(eq(schoolAttendanceTable.organizationId,org.data),eq(schoolAttendanceTable.learnerId,v.learnerId),eq(schoolAttendanceTable.day,v.day))).limit(1);
   if(existing){accepted.push({learnerId:v.learnerId,day:v.day,result:existing.status===v.status?"already_synced":"conflict_manual_review"});continue}
   const [created]=await db.insert(schoolAttendanceTable).values({organizationId:org.data,learnerId:v.learnerId,day:v.day,status:v.status,note:v.note,recordedBy:req.user.id}).onConflictDoNothing().returning();
-  accepted.push({learnerId:v.learnerId,day:v.day,result:created?"synced":"already_synced"});
+  if(created){accepted.push({learnerId:v.learnerId,day:v.day,result:"synced"});continue}
+  // A concurrent sync may have won the unique learner/day insert after the read.
+  const [raced]=await db.select({status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(and(eq(schoolAttendanceTable.organizationId,org.data),eq(schoolAttendanceTable.learnerId,v.learnerId),eq(schoolAttendanceTable.day,v.day))).limit(1);
+  accepted.push({learnerId:v.learnerId,day:v.day,result:raced?.status===v.status?"already_synced":"conflict_manual_review"});
  }
  const counts={
   received:accepted.length,
