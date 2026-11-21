@@ -157,9 +157,9 @@ router.get('/callback', async (req: Request, res: Response) => {
     return;
   }
 
-  const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
-  );
+  // Parse the provider response against the already validated callback origin.
+  // Never use an inbound Host header as the URL base for token validation.
+  const currentUrl = new URL(req.url, callbackUrl);
 
   let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
