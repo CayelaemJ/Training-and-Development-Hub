@@ -14,12 +14,16 @@ export function evaluateRetrieval(cases, options = {}) {
     const expected = new Set(sample.expectedDocIds);
     const results = sample.retrieved.slice(0, k);
     const ids = new Set();
+    const relevantIds = new Set();
     let firstRelevant = -1;
     for (let i = 0; i < results.length; i++) {
       const item = results[i]; retrievedTotal++;
       if (item.tenantId !== sample.tenantId) leakage++;
       if (ids.has(item.docId)) duplicates++; else ids.add(item.docId);
-      if (expected.has(item.docId)) { relevantFound++; if (firstRelevant < 0) firstRelevant = i; }
+      if (expected.has(item.docId)) {
+        if (!relevantIds.has(item.docId)) { relevantIds.add(item.docId); relevantFound++; }
+        if (firstRelevant < 0) firstRelevant = i;
+      }
       if (item.cited !== undefined) { citationEligible++; if (item.cited) cited++; }
     }
     relevantTotal += expected.size;
