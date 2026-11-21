@@ -24,11 +24,16 @@ export type HandoffSignals = {
 };
 export type HandoffOutcome = { code: 0 | 1; status: "blocked" | "ready_for_handoff"; blockers: string[] };
 const schoolStages: readonly StudyStage[] = ["preprimary", "primary", "secondary"];
+const supportedStages: readonly StudyStage[] = [...schoolStages, "college", "undergraduate", "postgraduate", "adult_training"];
+const supportedCountries: readonly Country[] = ["ZA", "BW"];
 export function guardianRequired(stage: StudyStage, adultStatus: HandoffSignals["adultStatus"]): boolean {
   return schoolStages.includes(stage) || adultStatus === "verified_minor";
 }
 export function assessAdmissionHandoff(s: HandoffSignals, now: Date = new Date()): HandoffOutcome {
   const blockers: string[] = [];
+  if (!supportedStages.includes(s.stage)) blockers.push("study_stage_not_supported");
+  if (!supportedCountries.includes(s.country)) blockers.push("country_not_supported");
+  if (!["verified_adult", "verified_minor", "unknown"].includes(s.adultStatus)) blockers.push("age_or_capacity_not_verified");
   if (!s.institutionApprovedForIntake || !s.receivingInstitutionAuthorized) blockers.push("institution_not_authorized");
   if (!s.institutionCountryCleared) blockers.push("country_release_not_cleared");
   if (!s.applicantDisclosureApproved) blockers.push("applicant_disclosure_not_approved");
