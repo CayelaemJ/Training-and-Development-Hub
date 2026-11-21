@@ -95,6 +95,8 @@ export function planModules(s: {
   doubleMajorApprovedByAdvisor: boolean;
 }): { advisoryOnly: true; eligibleForSubmission: false; credits: number; missingPrerequisites: string[]; issues: string[] } {
   const issues: string[] = [];
+  const catalogueCodes = new Set(s.modules.map(m => m.code));
+  if (catalogueCodes.size !== s.modules.length) issues.push("duplicate_catalogue_code");
   const catalogue = new Map(s.modules.map(m => [m.code, m]));
   const chosen = new Set(s.selectedCodes);
   const completed = new Set(s.completedCodes);
