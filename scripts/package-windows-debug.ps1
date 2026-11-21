@@ -3,4 +3,4 @@ $target = Get-ChildItem "native-apps/windows/CABO.Native/bin" -Recurse -Filter "
 if (-not $target) { throw "Compiled WinUI executable not found" }
 $folder = $target.Directory.FullName
 New-Item -ItemType Directory -Force "native-apps/windows/artifacts" | Out-Null
-Compress-Archive -Path (Join-Path $folder '*') -DestinationPath "native-apps/windows/artifacts/CABO-Windows-DEBUG-test-only.zip" -Force
+Compress-Archive -Path (Join-Path $folder '*') -DestinationPath "native-apps/windows/artifacts/CABO-Windows-DEBUG-no-test-login.zip" -Force
