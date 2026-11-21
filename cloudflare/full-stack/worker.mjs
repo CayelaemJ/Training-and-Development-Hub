@@ -25,7 +25,7 @@ export default {
   const u=new URL(request.url),gate=validateLearningHubCutover(env,u.hostname);
   if(u.pathname==="/__migration/status")
    return new Response(JSON.stringify({product:"CABO Learning Hub",fullStackReady:gate.ready,
-     privacyReview:env.CABO_CHILD_DATA_REVIEW_COMPLETE==="true",production:false}),{headers:noStore});
+     failures:gate.failures,privacyReview:env.CABO_CHILD_DATA_REVIEW_COMPLETE==="true",production:false}),{headers:noStore});
   if(!gate.ready)return new Response(JSON.stringify({error:"Learning Hub complete application deployment not enabled"}),{status:503,headers:noStore});
   try{return await env.CABO_LEARNING_CONTAINER.getByName("learning-hub").fetch(request);}
   catch{return new Response(JSON.stringify({error:"Learning Hub temporarily unavailable"}),{status:503,headers:noStore});}
