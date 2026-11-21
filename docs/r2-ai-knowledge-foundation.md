@@ -54,3 +54,16 @@ A GIN index for lexical search and a filtered pgvector index are separate concer
 
 ## Release boundary
 The first RAG release is limited to approved, owner-scoped learning material. Institution/class sharing requires verified tenant and enrolment authorization. Do not index learner profiles or emotional-support records, and do not send child personal records to external providers without a documented legal basis and approved safeguards.
+
+
+## Implemented lexical foundation (13 November 2026)
+
+The stacked branch `feat/rag-lexical-retrieval-foundation-20261113` adds the first retrieval code slice while keeping it disabled:
+
+- `20261113_rag_lexical_foundation.sql` defines owner-scoped, versioned chunks with source offsets, content hashes, a multilingual-safe PostgreSQL `simple` text-search vector, a GIN search index and owner/material B-tree filters.
+- `ragLexical.ts` provides deterministic paragraph-aware chunking, transactional replacement and a bounded top-eight lexical query.
+- Index replacement is allowed only when PostgreSQL confirms the same owner, material/object relationship, R2 state `approved`, explicit R2 AI consent and material AI-reading consent. Retrieval repeats those checks in SQL.
+- `CABO_RAG_LEXICAL_ENABLED` remains false unless explicitly set. No route, background worker, migration application, learner upload, embedding call or production deployment is included in this slice.
+- Deleting a material or its R2 ledger row cascades its chunks. Re-indexing deletes the previous material version and inserts the new version in one transaction, preventing stale mixed versions.
+
+Next dependency: the approved-content scan/promotion worker must call the index replacement function after a durable approval event. Only after that worker and its authorization checks exist should an authenticated retrieval/answer route be exposed.
