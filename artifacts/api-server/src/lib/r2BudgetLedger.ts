@@ -141,7 +141,7 @@ export async function reserveR2Read(key:string,userId:string,tenantId:string):Pr
     const r=await client.query(
       `SELECT 1 FROM cabo_r2_objects WHERE object_key=$1
        AND owner_user_id=$2 AND tenant_id=$3 AND state='approved'
-       AND deleted_at IS NULL`,[key,userId,tenantId],
+       AND ai_read_consent = true AND deleted_at IS NULL`,[key,userId,tenantId],
     );
     if(r.rowCount!==1)throw new R2LedgerError("NOT_FOUND");
     await countOp(client,"read_operations");
