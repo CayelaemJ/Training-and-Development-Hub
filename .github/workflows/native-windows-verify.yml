@@ -33,7 +33,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: CABO-Windows-DEBUG-no-test-login
-          path: native-apps/windows/artifacts/CABO-Windows-DEBUG-test-only.zip
+          path: native-apps/windows/artifacts/CABO-Windows-DEBUG-no-test-login.zip
           retention-days: 2
           if-no-files-found: error
       - name: Validation boundary
