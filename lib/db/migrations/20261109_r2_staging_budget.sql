@@ -25,9 +25,11 @@ CREATE TABLE IF NOT EXISTS cabo_r2_objects (
   object_key text PRIMARY KEY,
   owner_user_id varchar NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   -- Authoritative institution identifier must come from server-side membership validation.
-  tenant_id text NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 128),
-  file_name varchar(512) NOT NULL,
-  media_type varchar(255) NOT NULL,
+  tenant_id text NOT NULL CHECK (
+    tenant_id ~ '^[a-zA-Z0-9_-]+$' AND length(tenant_id) BETWEEN 1 AND 128
+  ),
+  file_name varchar(512) NOT NULL CHECK (length(file_name) BETWEEN 1 AND 512),
+  media_type varchar(255) NOT NULL CHECK (length(media_type) BETWEEN 1 AND 255),
   expected_sha256 char(64) NOT NULL CHECK (expected_sha256 ~ '^[0-9a-f]{64}$'),
   size_bytes integer NOT NULL CHECK (size_bytes BETWEEN 1 AND 8388608),
   -- All new objects start in quarantine. Never index or serve unapproved files.
@@ -40,7 +42,9 @@ CREATE TABLE IF NOT EXISTS cabo_r2_objects (
   expires_at timestamptz NOT NULL DEFAULT (now() + interval '15 minutes'),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz,
-  CHECK (object_key ~ '^quarantine/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+  CHECK (object_key ~ '^quarantine/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
+  CHECK (state IN ('quarantined','approved') OR billing_stage = 'reserved' OR billing_stage = 'stored'),
+  CHECK (state NOT IN ('quarantined','approved') OR billing_stage = 'stored')
 );
 CREATE INDEX IF NOT EXISTS cabo_r2_objects_owner_tenant_state_idx
   ON cabo_r2_objects(owner_user_id, tenant_id, state);
