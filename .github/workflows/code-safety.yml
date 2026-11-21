@@ -50,7 +50,15 @@ jobs:
           tar --no-same-owner -xz -C "$RUNNER_TEMP" -f "$RUNNER_TEMP/$archive" gitleaks
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Scan git history for leaked secrets
-        run: gitleaks git --redact --exit-code 1
+        run: gitleaks git --redact --report-format json --report-path "$RUNNER_TEMP/gitleaks-report.json" --exit-code 1
+      - name: Upload short-lived redacted triage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gitleaks-redacted-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gitleaks-report.json
+          if-no-files-found: ignore
+          retention-days: 1
 
   static-security:
     name: Semgrep static security
