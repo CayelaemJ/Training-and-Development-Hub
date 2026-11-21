@@ -20,7 +20,7 @@ export function evaluateRetrieval(cases, options = {}) {
       const item = results[i]; retrievedTotal++;
       if (item.tenantId !== sample.tenantId) leakage++;
       if (ids.has(item.docId)) duplicates++; else ids.add(item.docId);
-      if (expected.has(item.docId)) {
+      if (item.tenantId === sample.tenantId && expected.has(item.docId)) {
         if (!relevantIds.has(item.docId)) { relevantIds.add(item.docId); relevantFound++; }
         if (firstRelevant < 0) firstRelevant = i;
       }
