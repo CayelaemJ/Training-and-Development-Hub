@@ -157,9 +157,11 @@ router.get('/callback', async (req: Request, res: Response) => {
     return;
   }
 
-  // Parse the provider response against the already validated callback origin.
-  // Never use an inbound Host header as the URL base for token validation.
-  const currentUrl = new URL(req.url, callbackUrl);
+  // Express strips the mounted /api prefix from req.url. Parse only its
+  // query against a fixed inert origin, then attach it to the validated
+  // callback URL so the redirect URI path remains exact.
+  const callbackQuery = new URL(req.url, "https://cabo-request.invalid").search;
+  const currentUrl = new URL(`${callbackUrl}${callbackQuery}`);
 
   let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
