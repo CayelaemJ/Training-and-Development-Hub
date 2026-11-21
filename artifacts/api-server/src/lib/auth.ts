@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { type Request, type Response } from 'express';
 import * as client from 'openid-client';
 import type { TrustedMfaEvidence } from './mfaAssurance';
+import { sessionIdFromCredentials } from './sessionIdPolicy';
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? 'https://replit.com/oidc';
 export const SESSION_COOKIE = 'sid';
@@ -78,9 +79,8 @@ export async function clearSession(res: Response, sid?: string): Promise<void> {
 }
 
 export function getSessionId(req: Request): string | undefined {
-  const authHeader = req.headers['authorization'];
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
-  return req.cookies?.[SESSION_COOKIE];
+  return sessionIdFromCredentials(
+    req.headers['authorization'],
+    req.cookies?.[SESSION_COOKIE],
+  );
 }
