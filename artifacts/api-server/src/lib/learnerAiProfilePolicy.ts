@@ -18,3 +18,12 @@ export const emptyLearnerAiProfile = {
   explanationStyle: "step_by_step" as const,
   learningPreferences: [] as string[],
 };
+
+
+/** Return only learner-selected context after explicit opt-in. Never include account IDs or inferred traits. */
+export function learnerAiPersonalizationContext(profile: unknown) {
+  const parsed = learnerAiProfileInput.safeParse(profile);
+  if (!parsed.success || !parsed.data.personalizationEnabled) return null;
+  const { goals, interests, preferredLanguage, explanationStyle, learningPreferences } = parsed.data;
+  return { goals, interests, preferredLanguage, explanationStyle, learningPreferences };
+}
