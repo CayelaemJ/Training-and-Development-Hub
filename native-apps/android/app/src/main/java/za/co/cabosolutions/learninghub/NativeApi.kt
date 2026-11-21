@@ -248,6 +248,11 @@ internal class NativeApi(private val context: Context) {
     private val clientId = "cabo-android"
     private val callbackScheme = "cabo-learninghub-android"
 
+    private fun addClientTelemetryHeaders(connection: HttpURLConnection) {
+        connection.setRequestProperty("X-CABO-Client", "android")
+        connection.setRequestProperty("X-CABO-Client-Version", BuildConfig.VERSION_NAME)
+    }
+
     private fun random(): String {
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
@@ -413,6 +418,7 @@ internal class NativeApi(private val context: Context) {
                     throw IllegalStateException("CABO returned an unexpected upload destination.")
                 }
                 val upload = targetUrl.openConnection() as HttpURLConnection
+                addClientTelemetryHeaders(upload)
                 upload.connectTimeout = 15_000
                 upload.readTimeout = 30_000
                 upload.instanceFollowRedirects = false
@@ -518,6 +524,7 @@ internal class NativeApi(private val context: Context) {
                         auth: Boolean = false, requestKey: String? = null, timeoutMs: Int = 9000): JSONObject {
         val url = URL(origin + route)
         val connection = url.openConnection() as HttpURLConnection
+        addClientTelemetryHeaders(connection)
         connection.connectTimeout = timeoutMs.coerceIn(9000, 180000)
         connection.readTimeout = timeoutMs.coerceIn(9000, 180000)
         connection.instanceFollowRedirects = false
@@ -547,6 +554,7 @@ internal class NativeApi(private val context: Context) {
     private fun getArray(route: String): JSONArray {
         val token = secrets.get("token") ?: throw IllegalStateException("Sign in required")
         val connection = URL(origin + route).openConnection() as HttpURLConnection
+        addClientTelemetryHeaders(connection)
         connection.connectTimeout = 9000
         connection.readTimeout = 9000
         connection.instanceFollowRedirects = false
@@ -1854,6 +1862,7 @@ internal class NativeApi(private val context: Context) {
             val token = secrets.get("token")
             if (token != null) {
                 val c = URL("$origin/api/native/logout").openConnection() as HttpURLConnection
+                addClientTelemetryHeaders(c)
                 c.requestMethod = "POST"
                 c.connectTimeout = 5000
                 c.readTimeout = 5000

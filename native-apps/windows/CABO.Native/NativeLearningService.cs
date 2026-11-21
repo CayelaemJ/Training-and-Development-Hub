@@ -70,6 +70,12 @@ public sealed class NativeLearningService
     }
     private static readonly Uri Callback = new("http://127.0.0.1:47787/auth");
     private static readonly HttpClient Http = new() { BaseAddress = Origin, Timeout = TimeSpan.FromSeconds(15) };
+    static NativeLearningService()
+    {
+        Http.DefaultRequestHeaders.TryAddWithoutValidation("X-CABO-Client", "windows");
+        Http.DefaultRequestHeaders.TryAddWithoutValidation("X-CABO-Client-Version",
+            typeof(NativeLearningService).Assembly.GetName().Version?.ToString() ?? "windows");
+    }
     private readonly string tokenFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CABO", "LearningHub", "native-session.bin");

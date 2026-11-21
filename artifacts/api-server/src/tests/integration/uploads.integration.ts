@@ -130,6 +130,11 @@ try {
       { questionCount: 7, optionCount: 4, difficulty: "beginner" },
     );
     assert.equal(forbidden.status, 404);
+    assert.equal((await call("", `/materials/${material.data.id}/ask`, { question: "What are equivalent fractions?" })).status, 401);
+    assert.equal((await call("b", `/materials/${material.data.id}/ask`, { question: "What are equivalent fractions?" })).status, 404);
+    const groundedAnswer = await call("a", `/materials/${material.data.id}/ask`, { question: "What are equivalent fractions?" });
+    assert.equal(groundedAnswer.status, 200, JSON.stringify(groundedAnswer.data));
+    assert.match(groundedAnswer.data.citations[0].excerpt, /Fractions|fractions|equivalent/i);
     const quiz = await call("a", `/materials/${material.data.id}/quizzes`, {
       questionCount: 7,
       optionCount: 4,

@@ -5,6 +5,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { clientPlatformHeartbeat } from "./middlewares/clientPlatformHeartbeat";
 import { privilegedMfaGuard } from "./middlewares/privilegedMfaGuard";
 import router from "./routes";
 import qstashMaterialPreviewRouter from "./routes/qstashMaterialPreview";
@@ -55,6 +56,7 @@ app.use("/api/internal/qstash/material-preview", express.json({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
+app.use(clientPlatformHeartbeat);
 // Requires explicit provider migration/MFA acceptance; otherwise existing workflows remain unchanged.
 app.use("/api", privilegedMfaGuard);
 // Explicit rollout flag. Remains off on established Render services until

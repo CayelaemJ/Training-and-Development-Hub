@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-Node 24, pnpm, PostgreSQL, working session authentication and normal application deployment environment. Existing OpenAI key is only needed for written-exam generation and AI marking, not for this phase's voluntary potential profile.
+Node 24, pnpm, PostgreSQL, working session authentication and normal application deployment environment. `GROQ_API_KEY` is used for AI generation, written-exam marking and development-plan drafts; the application does not fall back to OpenAI.
 
 ## Development
 
@@ -19,7 +19,7 @@ Node 24, pnpm, PostgreSQL, working session authentication and normal application
 
 ## Configuration
 
-`DATABASE_URL`: PostgreSQL connection; `OPENAI_API_KEY`: existing AI examination features; `PORT` and `BASE_PATH`: build and preview tools. `ENABLE_EMPLOYER_ACCESS_PILOT` defaults to off. **Do not enable for public production** until all safeguards in PRIVACY_AND_CONSENT.md pass.
+`DATABASE_URL`: PostgreSQL connection; `GROQ_API_KEY`: Groq AI features; optional `GROQ_EXAM_MODEL`: preferred active Groq chat model; `PORT` and `BASE_PATH`: build and preview tools. `ENABLE_EMPLOYER_ACCESS_PILOT` defaults to off. **Do not enable for public production** until all safeguards in PRIVACY_AND_CONSENT.md pass.
 
 ## Required tests
 
