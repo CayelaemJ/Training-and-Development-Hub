@@ -43,7 +43,6 @@ CREATE TABLE IF NOT EXISTS cabo_r2_objects (
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz,
   CHECK (object_key ~ '^quarantine/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
-  CHECK (state IN ('quarantined','approved') OR billing_stage = 'reserved' OR billing_stage = 'stored'),
   CHECK (state NOT IN ('quarantined','approved') OR billing_stage = 'stored')
 );
 CREATE INDEX IF NOT EXISTS cabo_r2_objects_owner_tenant_state_idx
