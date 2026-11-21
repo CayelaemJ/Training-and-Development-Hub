@@ -92,7 +92,15 @@ export default function LearnerAiProfilePage() {
     }
     setSaving(true);
     try {
-      const value = await profileRequest("PUT", { ...profile, goals, interests });
+      // The API schema is strict; never send the server-managed updatedAt field back.
+      const value = await profileRequest("PUT", {
+        personalizationEnabled: profile.personalizationEnabled,
+        goals,
+        interests,
+        preferredLanguage: profile.preferredLanguage,
+        explanationStyle: profile.explanationStyle,
+        learningPreferences: profile.learningPreferences,
+      });
       if (value) {
         setProfile(value);
         setGoalsText(value.goals.join("\n"));
