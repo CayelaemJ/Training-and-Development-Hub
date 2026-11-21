@@ -33,15 +33,25 @@ test("R2 staging schema enforces immutable opaque keys, byte caps and tenant own
     ]), /check constraint/i);
     await assert.rejects(db.query(insert, [
       "quarantine/550e8400-e29b-41d4-a716-446655440002",
-      ...values.slice(1, 6), 8_388_609,
+      ...values.slice(1, 2), "school/with-slash", ...values.slice(3),
     ]), /check constraint/i);
     await assert.rejects(db.query(insert, [
       "quarantine/550e8400-e29b-41d4-a716-446655440003",
+      ...values.slice(1, 6), 8_388_609,
+    ]), /check constraint/i);
+    await assert.rejects(db.query(insert, [
+      "quarantine/550e8400-e29b-41d4-a716-446655440004",
       ...values.slice(1, 2), "", ...values.slice(3),
     ]), /check constraint/i);
     await assert.rejects(db.query(
       "UPDATE cabo_r2_usage SET reserved_bytes=$1 WHERE singleton=true",
       [2_147_483_649],
+    ), /check constraint/i);
+    await assert.rejects(db.query(
+      `UPDATE cabo_r2_objects
+       SET state='approved', billing_stage='reserved'
+       WHERE object_key=$1`,
+      [key],
     ), /check constraint/i);
     // Re-applying the additive migration must not erase stored quota.
     await db.exec(migration);
