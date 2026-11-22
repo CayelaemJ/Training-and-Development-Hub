@@ -212,7 +212,12 @@ try {
       assert.equal(known.status, 202);
       for (const r of [unknown, self, again]) assert.deepEqual(r, known);
       const rows = (await engine.query<{ guardian_id: string; status: string }>("SELECT guardian_id, status FROM guardian_relationships WHERE learner_id='learner-1b'")).rows;
-      assert.deepEqual(rows, [{ guardian_id: "g-ok", status: "pending" }], "only the real, different account gets one pending request");
+      const diagnostics = JSON.stringify({
+        lookup: (await engine.query("SELECT id, email FROM users WHERE email = 'g.ok@family.test'")).rows,
+        all: (await engine.query("SELECT learner_id, guardian_id, status FROM guardian_relationships ORDER BY id")).rows,
+        responses: [known, unknown, self, again].map(r => r.status),
+      });
+      assert.deepEqual(rows, [{ guardian_id: "g-ok", status: "pending" }], "only the real, different account gets one pending request; " + diagnostics);
     } finally {
       delete process.env.ENABLE_LEARNER_GUARDIAN_INVITES;
     }
