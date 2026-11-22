@@ -68,7 +68,7 @@ app.use("/api", router);
 const server = app.listen(0, "127.0.0.1");
 await new Promise<void>(r => server.once("listening", r));
 const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api`;
-async function call(user: string, path: string, opts: { method?: string; body?: unknown; sid?: string } = {}) {
+async function call(user: string, path: string, opts: { method?: string; body?: unknown; sid?: string } = {}): Promise<{ status: number; data: any }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (user) headers["x-test-user"] = user;
   if (opts.sid) headers.authorization = `Bearer ${opts.sid}`;
