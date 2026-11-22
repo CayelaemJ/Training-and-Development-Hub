@@ -1,6 +1,9 @@
 import XCTest
 @testable import CABOLearningHub
 
+// NativeSession is main-actor isolated (it presents the sign-in sheet), so
+// these tests run on the main actor.
+@MainActor
 final class NativeSessionIsolationTests: XCTestCase {
     func testResetClearsEveryAccountScopedRecord() throws {
         let session = NativeSession()
