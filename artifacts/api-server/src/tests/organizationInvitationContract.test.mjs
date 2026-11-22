@@ -20,6 +20,11 @@ test("adding a member by email creates an invitation, never a membership", () =>
   assert.match(add, /insert\(organizationInvitationsTable\)/);
   assert.match(add, /uniformInvitationResponse\(\)/);
   assert.match(add, /status\(202\)/);
+  // Expired open invitations are refreshed, unexpired ones left unchanged.
+  assert.match(add, /onConflictDoUpdate\(/);
+  assert.match(add, /targetWhere:sql`status = 'pending'`/);
+  assert.match(add, /setWhere:sql`\$\{organizationInvitationsTable\.expiresAt\} <= now\(\)`/);
+  assert.doesNotMatch(add, /onConflictDoNothing/);
   // The old account-existence oracle must not return.
   assert.doesNotMatch(add, /status\(404\)/);
   assert.doesNotMatch(add, /userId:person\.id/);

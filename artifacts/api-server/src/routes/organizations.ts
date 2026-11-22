@@ -67,8 +67,16 @@ router.post("/organizations/:orgId/members",async(req,res)=>{
  const [pending]=await db.select({value:count()}).from(organizationInvitationsTable)
   .where(and(eq(organizationInvitationsTable.organizationId,oid.data),eq(organizationInvitationsTable.status,"pending")));
  if((pending?.value??0)>=MAX_PENDING_INVITATIONS_PER_ORG){res.status(429).json({error:"Too many open invitations. Revoke unused invitations first."});return;}
- // An open invitation for the same email is left unchanged (idempotent).
- await db.insert(organizationInvitationsTable).values({organizationId:oid.data,email,role,invitedBy:req.user!.id}).onConflictDoNothing();
+ // One open slot per organization and email. An unexpired invitation is left
+ // unchanged (idempotent); an expired one is refreshed atomically so the new
+ // request really reaches the invitee instead of silently doing nothing.
+ await db.insert(organizationInvitationsTable).values({organizationId:oid.data,email,role,invitedBy:req.user!.id})
+  .onConflictDoUpdate({
+   target:[organizationInvitationsTable.organizationId,organizationInvitationsTable.email],
+   targetWhere:sql`status = 'pending'`,
+   set:{role,invitedBy:req.user!.id,createdAt:sql`now()`,expiresAt:sql`now() + interval '14 days'`},
+   setWhere:sql`${organizationInvitationsTable.expiresAt} <= now()`
+  });
  res.setHeader("Cache-Control","no-store");
  res.status(202).json(uniformInvitationResponse());
 });
@@ -77,7 +85,7 @@ router.get("/organizations/:orgId/invitations",async(req,res)=>{
  if(!await guard(req,res,oid.data,managers))return;
  res.setHeader("Cache-Control","no-store");
  // Lists only what managers typed; never joins to users, so it reveals nothing about accounts.
- res.json(await db.select({id:organizationInvitationsTable.id,email:organizationInvitationsTable.email,role:organizationInvitationsTable.role,createdAt:organizationInvitationsTable.createdAt,expiresAt:organizationInvitationsTable.expiresAt})
+ res.json(await db.select({id:organizationInvitationsTable.id,email:organizationInvitationsTable.email,role:organizationInvitationsTable.role,createdAt:organizationInvitationsTable.createdAt,expiresAt:organizationInvitationsTable.expiresAt,expired:sql<boolean>`${organizationInvitationsTable.expiresAt} <= now()`})
   .from(organizationInvitationsTable)
   .where(and(eq(organizationInvitationsTable.organizationId,oid.data),eq(organizationInvitationsTable.status,"pending")))
   .orderBy(desc(organizationInvitationsTable.createdAt)).limit(MAX_PENDING_INVITATIONS_PER_ORG));

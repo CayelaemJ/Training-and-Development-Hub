@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 // - PendingInvitations: open invitations a manager has sent (shows only what they typed).
 
 type IncomingInvitation = { id: number; organizationId: number; organization: string; role: string; expiresAt: string };
-type SentInvitation = { id: number; email: string; role: string; createdAt: string; expiresAt: string };
+type SentInvitation = { id: number; email: string; role: string; createdAt: string; expiresAt: string; expired?: boolean };
 
 async function request<T>(path: string, init?: { method: "POST" | "DELETE"; body?: object }): Promise<T | null> {
   const r = await fetch("/api" + path, {
@@ -96,7 +96,7 @@ export function PendingInvitations({ organizationId, refreshKey }: { organizatio
       <ul className="space-y-1">
         {items.map(i => (
           <li key={i.id} className="flex flex-wrap items-center gap-2 text-sm">
-            <span>{i.email} — {i.role} · expires {formatDate(i.expiresAt)}</span>
+            <span>{i.email} — {i.role} · {i.expired ? <>expired {formatDate(i.expiresAt)}; send the invitation again to renew it</> : <>expires {formatDate(i.expiresAt)}</>}</span>
             <button className="rounded-md border px-2 py-0.5" onClick={() => revoke(i.id)} aria-label={`Revoke invitation for ${i.email}`}>Revoke</button>
           </li>
         ))}

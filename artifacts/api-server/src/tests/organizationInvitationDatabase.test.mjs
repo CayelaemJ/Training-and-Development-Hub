@@ -48,6 +48,20 @@ test("organization invitation migration enforces normalized, single-open, bounde
     await insert(11, "learner@example.org");
     await assert.rejects(pg.query("UPDATE organization_invitations SET responded_at=now() WHERE organization_id=11 AND status='pending'"), /check constraint/i);
   });
+  await t.test("re-inviting refreshes only an expired open invitation", async () => {
+    const upsert = (email, role) => pg.query(
+      "INSERT INTO organization_invitations(organization_id,email,role,invited_by) VALUES (11,$1,$2,'owner-a') " +
+      "ON CONFLICT (organization_id,email) WHERE status = 'pending' DO UPDATE SET role=EXCLUDED.role, invited_by=EXCLUDED.invited_by, " +
+      "created_at=now(), expires_at=now() + interval '14 days' WHERE organization_invitations.expires_at <= now()", [email, role]);
+    await upsert("renew@example.org", "learner");
+    await upsert("renew@example.org", "teacher");
+    let r = await pg.query("SELECT role FROM organization_invitations WHERE email='renew@example.org' AND status='pending'");
+    assert.deepEqual(r.rows.map(x => x.role), ["learner"], "unexpired invitation unchanged");
+    await pg.query("UPDATE organization_invitations SET created_at=now()-interval '20 days', expires_at=now()-interval '6 days' WHERE email='renew@example.org'");
+    await upsert("renew@example.org", "teacher");
+    r = await pg.query("SELECT role, expires_at > now() AS live FROM organization_invitations WHERE email='renew@example.org' AND status='pending'");
+    assert.deepEqual(r.rows, [{ role: "teacher", live: true }], "expired invitation refreshed in place");
+  });
   await t.test("foreign keys reject unknown organizations and inviters; deleting an organization removes its invitations", async () => {
     await assert.rejects(insert(999, "a@example.org"), /foreign key/i);
     await assert.rejects(insert(11, "b@example.org", "learner", "nobody"), /foreign key/i);

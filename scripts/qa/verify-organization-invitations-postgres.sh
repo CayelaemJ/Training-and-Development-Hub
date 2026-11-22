@@ -29,6 +29,14 @@ expect_err "unknown org rejected" "$(ins 999 z@example.org learner owner-a)" "fo
 $P -c "BEGIN; SELECT id FROM organization_invitations WHERE organization_id=11 AND status='pending' FOR UPDATE; INSERT INTO organization_members(organization_id,user_id,role) SELECT organization_id,'learner-1',role FROM organization_invitations WHERE organization_id=11 AND status='pending' ON CONFLICT DO NOTHING; UPDATE organization_invitations SET status='accepted',responded_at=now(),responded_by='learner-1' WHERE organization_id=11 AND status='pending'; COMMIT;"
 expect_eq "acceptance creates exactly one membership in the inviting org only" "SELECT string_agg(organization_id||':'||role,',') FROM organization_members WHERE user_id='learner-1'" "11:learner"
 expect_eq "slot reopens after answer" "$(ins 11 learner.one@example.org teacher owner-a) RETURNING status" "pending"
+# Re-invite: the route's upsert refreshes an EXPIRED open invitation and leaves an unexpired one untouched.
+upsert(){ echo "INSERT INTO organization_invitations(organization_id,email,role,invited_by) VALUES (11,'$1','$2','owner-a') ON CONFLICT (organization_id,email) WHERE status = 'pending' DO UPDATE SET role=EXCLUDED.role, invited_by=EXCLUDED.invited_by, created_at=now(), expires_at=now() + interval '14 days' WHERE organization_invitations.expires_at <= now()"; }
+$P -c "$(upsert renew@example.org learner)"
+$P -c "$(upsert renew@example.org teacher)"
+expect_eq "re-invite of an unexpired invitation is a no-op" "SELECT role||':'||count(*) OVER () FROM organization_invitations WHERE email='renew@example.org' AND status='pending'" "learner:1"
+$P -c "UPDATE organization_invitations SET created_at=now()-interval '20 days', expires_at=now()-interval '6 days' WHERE email='renew@example.org'"
+$P -c "$(upsert renew@example.org teacher)"
+expect_eq "re-invite of an expired invitation refreshes it in place" "SELECT role||':'||(expires_at>now())||':'||count(*) OVER () FROM organization_invitations WHERE email='renew@example.org' AND status='pending'" "teacher:true:1"
 # Concurrency: two sessions race to accept the same invitation; the row lock serializes them.
 ID=$($P -c "SELECT id FROM organization_invitations WHERE organization_id=22 AND status='pending'")
 OUT=$(mktemp -d)
