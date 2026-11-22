@@ -4,24 +4,15 @@
 // from production tables. Bundle with @workspace/db aliased to supportTestDb.ts
 // (see scripts/test-academic-records.mjs). No real data.
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
 import express from "express";
-import * as schema from "../../../../../lib/db/src/schema";
 import academicRouter from "../../routes/academic";
 import reportCardsRouter from "../../routes/reportCards";
 import institutionRecordsRouter from "../../routes/institutionRecords";
 import { engine } from "./supportTestDb";
+import { createSchemaFromDrizzle, syncSequences } from "./schemaFromDrizzle";
 
-const kit = createRequire(process.cwd() + "/lib/db/package.json")("drizzle-kit/api");
-const statements: string[] = await kit.generateMigration(kit.generateDrizzleJson({}), kit.generateDrizzleJson(schema as Record<string, unknown>));
-// drizzle-kit emits foreign keys before indexes, but a composite foreign key
-// (e.g. ml_eval -> ml_model_versions(id, organization_id)) needs its unique
-// index to exist first. Apply tables, then indexes, then foreign keys.
-const isForeignKey = (s: string) => /FOREIGN KEY/i.test(s);
-const isIndex = (s: string) => /^\s*CREATE\s+(UNIQUE\s+)?INDEX/i.test(s);
-const ordered = [...statements.filter(s => !isForeignKey(s) && !isIndex(s)), ...statements.filter(isIndex), ...statements.filter(isForeignKey)];
-for (const statement of ordered) await engine.exec(statement);
-console.log(`# schema: ${statements.length} statements generated from lib/db/src/schema`);
+const statementCount = await createSchemaFromDrizzle();
+console.log(`# schema: ${statementCount} statements generated from lib/db/src/schema`);
 
 // School 1 and school 2. teacher-1 teaches Mathematics at school 1; teacher-1b
 // is a school 1 teacher NOT assigned to Mathematics. Guardians:
@@ -64,12 +55,7 @@ INSERT INTO guardian_verification_events(relationship_id,organization_id,reviewe
  (1,1,'owner-1','verified',now()),(3,2,'owner-2','verified',now()),
  (4,1,'owner-1','verified',now()-interval '2 days'),(4,1,'owner-1','revoked',now()-interval '1 day');
 `);
-// Rows above use explicit ids, which do not advance serial sequences. Without
-// this, the next insert by a route reuses id 1, hits the primary key and is
-// silently skipped by ON CONFLICT DO NOTHING.
-for (const table of ["organizations", "academic_courses", "academic_periods", "academic_assessments", "verified_enrollments", "guardian_relationships"]) {
-  await engine.exec(`SELECT setval(pg_get_serial_sequence('${table}','id'), (SELECT max(id) FROM ${table}))`);
-}
+await syncSequences(["organizations", "academic_courses", "academic_periods", "academic_assessments", "verified_enrollments", "guardian_relationships"]);
 
 const app = express();
 app.use(express.json());
