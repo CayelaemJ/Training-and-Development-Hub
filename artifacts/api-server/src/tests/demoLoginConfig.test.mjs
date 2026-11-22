@@ -60,6 +60,6 @@ test("weak demo passwords require separate explicit consent", () => {
 
 test("browser test login and logout both require the isolated database flag", () => {
   const source = readFileSync("artifacts/api-server/src/routes/auth.ts", "utf8");
-  const gates = source.match(/process\\.env\\.CABO_TEST_DATABASE_ISOLATED!=='true'/g) ?? [];
+  const gates = source.match(/process\.env\.CABO_TEST_DATABASE_ISOLATED!=='true'/g) ?? [];
   assert.ok(gates.length >= 2, "both password sign-in and sign-out must be testing-only");
 });
