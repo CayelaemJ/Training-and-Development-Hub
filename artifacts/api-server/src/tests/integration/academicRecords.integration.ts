@@ -64,6 +64,12 @@ INSERT INTO guardian_verification_events(relationship_id,organization_id,reviewe
  (1,1,'owner-1','verified',now()),(3,2,'owner-2','verified',now()),
  (4,1,'owner-1','verified',now()-interval '2 days'),(4,1,'owner-1','revoked',now()-interval '1 day');
 `);
+// Rows above use explicit ids, which do not advance serial sequences. Without
+// this, the next insert by a route reuses id 1, hits the primary key and is
+// silently skipped by ON CONFLICT DO NOTHING.
+for (const table of ["organizations", "academic_courses", "academic_periods", "academic_assessments", "verified_enrollments", "guardian_relationships"]) {
+  await engine.exec(`SELECT setval(pg_get_serial_sequence('${table}','id'), (SELECT max(id) FROM ${table}))`);
+}
 
 const app = express();
 app.use(express.json());
