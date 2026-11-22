@@ -62,7 +62,7 @@ export default function NotificationPreferencesPage(){
    }catch(e){setError(e instanceof Error?e.message:"Could not save your preference.")}
    finally{setSaving("")}
  }
- return <main className="mx-auto max-w-5xl space-y-6 pb-16" aria-labelledby="notification-preferences-title">
+ return <div className="mx-auto max-w-5xl space-y-6 pb-16" aria-labelledby="notification-preferences-title">
   <header className="space-y-3 border-b pb-5">
    <p className="text-xs uppercase tracking-widest text-muted-foreground">CABO · Account safety</p>
    <div className="flex items-center gap-3"><Bell size={27} aria-hidden="true"/><h1 id="notification-preferences-title" className="font-display text-3xl sm:text-4xl">Notification preferences</h1></div>
@@ -103,5 +103,5 @@ export default function NotificationPreferencesPage(){
    <div className="flex items-center gap-2"><ShieldCheck size={19}/><h2 className="font-display text-lg">Your privacy comes first</h2></div>
    <p className="text-sm text-muted-foreground">Every send also checks the school's latest guardian or educator authorization and your current permission. Changing your school or withdrawing consent stops future eligible sends. Account security notices are handled separately by the identity provider.</p>
   </aside>
- </main>;
+ </div>;
 }

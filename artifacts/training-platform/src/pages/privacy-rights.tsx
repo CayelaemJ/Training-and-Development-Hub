@@ -25,7 +25,7 @@ export default function PrivacyRightsPage() {
   const [error, setError] = useState("");
   useEffect(() => { api<Mine>("/privacy/regimes/me").then(setMine).catch(e => setError((e as Error).message)); }, []);
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-8" id="main-content">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       <header className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Privacy &amp; your rights</p>
         <h1 className="font-display text-3xl">The rules that protect your information</h1>
@@ -51,6 +51,6 @@ export default function PrivacyRightsPage() {
           <p className="text-xs text-muted-foreground">{s.regime.notLegalAdvice}</p>
         </section>
       ))}
-    </main>
+    </div>
   );
 }

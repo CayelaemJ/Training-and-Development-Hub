@@ -30,6 +30,7 @@ targets:
       - path: NativeLearnerPassportView.swift
       - path: NativeAdmissionsView.swift
       - path: NativeGuardianReport.swift
+      - path: NativeAppIntents.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub

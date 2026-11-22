@@ -87,7 +87,7 @@ export default function AccountabilityPage() {
   const school = schools.find(s => s.id === org);
   const staff = school && school.role !== "learner" && school.role !== "guardian";
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-8" id="main-content">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       <header className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Concerns &amp; accountability</p>
         <h1 className="font-display text-3xl">Raise a concern. See it handled.</h1>
@@ -193,6 +193,6 @@ export default function AccountabilityPage() {
           <p className="text-xs text-muted-foreground">This history cannot be edited.</p>
         </section>
       )}
-    </main>
+    </div>
   );
 }

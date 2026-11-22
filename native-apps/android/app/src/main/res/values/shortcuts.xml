@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="shortcut_learn_short">Study</string>
+  <string name="shortcut_learn_long">Open my study materials and practice tests</string>
+  <string name="shortcut_progress_short">My progress</string>
+  <string name="shortcut_progress_long">Open my results and progress</string>
+  <string name="shortcut_support_short">Help</string>
+  <string name="shortcut_support_long">Ask a teacher for help or see family updates</string>
+  <string-array name="feature_learn"><item>study</item><item>learn</item><item>materials</item><item>practice tests</item></string-array>
+  <string-array name="feature_progress"><item>progress</item><item>results</item><item>marks</item><item>report</item></string-array>
+  <string-array name="feature_support"><item>help</item><item>support</item><item>family</item><item>teacher</item></string-array>
+</resources>

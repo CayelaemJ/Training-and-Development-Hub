@@ -39,6 +39,7 @@ import ClassChatPage from '@/pages/class-chat';
 import PrivacyRightsPage from '@/pages/privacy-rights';
 import MyProfilePage from '@/pages/my-profile';
 import { Avatar } from '@/components/avatar';
+import { ReadAloud, VoiceInput } from '@/components/speech';
 import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '@/lib/appearance';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
@@ -218,6 +219,7 @@ function AppShell({ user }: { user: any }) {
   const pinned = me?.appearance?.pinned ?? [];
   const orderedNav = [...navItems].sort((a,b)=>{const ia=pinned.indexOf(a.href),ib=pinned.indexOf(b.href);return (ia<0?99:ia)-(ib<0?99:ib);});
   return <div className="app-frame">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:shadow">Skip to main content</a>
     <aside className="sidebar">
       <Link href="/" className="brand"><Mark /><span>Training &amp; Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
@@ -266,7 +268,7 @@ function AppShell({ user }: { user: any }) {
         <div className="mobile-family-more-heading"><strong>All your workspaces</strong><button type="button" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}><X size={20}/></button></div>
         {navItems.filter(item=>alwaysNav.includes(item.href)||allowedNav[portalRole].includes(item.href)).map(({href,label,icon:Icon})=><Link key={href} href={href} onClick={()=>setMobileMenuOpen(false)} className="mobile-family-more-link"><Icon size={18} aria-hidden="true"/>{label}<ChevronRight size={16} aria-hidden="true"/></Link>)}
       </div>}
-      <main className="main-content"><Router /></main>
+      <main className="main-content" id="main-content" tabIndex={-1}><Router /></main>
       <footer className="footer cabo-product-footer"><Mark /><span>Training &amp; Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
     </div>
   </div>;
@@ -504,13 +506,13 @@ function MaterialConfigurePage() {
     <section className="rounded-xl border bg-card p-5 sm:p-6 space-y-4" aria-labelledby="ask-material-title">
       <div className="flex items-start gap-3"><CircleHelp size={20} aria-hidden="true" /><div><h2 id="ask-material-title" className="text-xl font-semibold">Ask this material</h2><p className="text-sm text-muted-foreground">Get an answer grounded in the most relevant passages from “{material.title}”.</p></div></div>
       <form className="space-y-3" onSubmit={ask}>
-        <label className="field-label" htmlFor="material-question">Your question</label>
+        <div className="flex items-center justify-between gap-2"><label className="field-label" htmlFor="material-question">Your question</label><VoiceInput label="Ask by voice" onText={t=>setAskQuestion(q=>(q?q+" ":"")+t)} /></div>
         <textarea id="material-question" className="text-input min-h-24 w-full resize-y" value={askQuestion} onChange={(event)=>setAskQuestion(event.target.value)} minLength={5} maxLength={2000} required placeholder="What is the difference between mitosis and meiosis?" />
         <p className="text-xs text-muted-foreground">Relevant passages from this material are sent to the configured AI provider to answer. Answers include source quotations and should be checked against your notes.</p>
         {askError && <p role="alert" className="form-error">{askError}</p>}
         <button type="submit" className="button button-primary" disabled={asking || askQuestion.trim().length<5}>{asking?<><LoaderCircle className="spin" size={17}/>Finding an answer…</>:<>Ask from this material <ArrowRight size={16}/></>}</button>
       </form>
-      {groundedAnswer && <div className="rounded-lg border bg-background p-4 space-y-3" aria-live="polite"><h3 className="font-semibold">Answer</h3><p className="whitespace-pre-wrap text-sm leading-6">{groundedAnswer.answer}</p><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source quotations</p><ul className="mt-2 space-y-2">{groundedAnswer.citations.map((citation,index)=><li key={`${index}-${citation.excerpt}`} className="border-l-2 pl-3 text-sm italic">“{citation.excerpt}”</li>)}</ul></div><p className="text-xs text-muted-foreground">AI draft · Check the quoted passages and confirm important details with your educator.</p></div>}
+      {groundedAnswer && <div className="rounded-lg border bg-background p-4 space-y-3" aria-live="polite"><div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Answer</h3><ReadAloud text={groundedAnswer.answer} label="Read the answer aloud" /></div><p className="whitespace-pre-wrap text-sm leading-6">{groundedAnswer.answer}</p><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source quotations</p><ul className="mt-2 space-y-2">{groundedAnswer.citations.map((citation,index)=><li key={`${index}-${citation.excerpt}`} className="border-l-2 pl-3 text-sm italic">“{citation.excerpt}”</li>)}</ul></div><p className="text-xs text-muted-foreground">AI draft · Check the quoted passages and confirm important details with your educator.</p></div>}
     </section>
   </div>;
 }

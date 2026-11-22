@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Flag, Lock, MessageSquare, ShieldCheck } from "lucide-react";
 import { api, mySchools, when, type SchoolOption } from "@/lib/schoolApi";
+import { ReadAloud, VoiceInput } from "@/components/speech";
 
 // Teacher-moderated class chat. One channel per subject; no private messages.
 // Messages with contact details or links wait for a teacher; reports go to
@@ -81,7 +82,7 @@ export default function ClassChatPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-8" id="main-content">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       <header className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Class chat</p>
         <h1 className="font-display text-3xl">Talk about your subjects, safely.</h1>
@@ -125,6 +126,7 @@ export default function ClassChatPage() {
                     <p className="whitespace-pre-wrap text-sm">{m.body}</p>
                     {m.notice && <p className="text-xs text-muted-foreground">{m.notice}</p>}
                     <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                      <ReadAloud text={`${m.author} said: ${m.body}`} label="Listen" />
                       {thread.moderator && m.status !== "visible" && <button className="underline" onClick={() => moderate(m, "approve")}>Show to class</button>}
                       {thread.moderator && m.status !== "hidden" && !m.mine && <button className="underline" onClick={() => moderate(m, "hide")}>Hide</button>}
                       {thread.moderator && !m.mine && m.authorId && <button className="underline" onClick={() => pause(m)}>Pause sender for 1 hour</button>}
@@ -143,6 +145,7 @@ export default function ClassChatPage() {
                 ? <form onSubmit={send} className="flex gap-2">
                     <label className="sr-only" htmlFor="chat-input">Message</label>
                     <input id="chat-input" className="flex-1 rounded-md border p-2" maxLength={1000} value={text} onChange={e => setText(e.target.value)} placeholder="Ask or answer a question about this subject" />
+                    <VoiceInput onText={v => setText(x => (x ? x + " " : "") + v)} />
                     <button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" disabled={!text.trim()}>Send</button>
                   </form>
                 : <p className="text-sm text-muted-foreground">{thread.mutedUntil ? `You are paused from posting until ${when(thread.mutedUntil)}.` : thread.status !== "open" ? "This chat is closed." : "You cannot post here."}</p>)}
@@ -150,6 +153,6 @@ export default function ClassChatPage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -68,10 +68,10 @@ export default function MyProfilePage() {
   const toggle = (key: keyof Appearance) => preview({ ...look, [key]: !look[key] } as Appearance);
   const pin = (href: string) => preview({ ...look, pinned: look.pinned.includes(href) ? look.pinned.filter(h => h !== href) : [...look.pinned, href].slice(0, 8) });
 
-  if (!profile || !me) return <main className="mx-auto max-w-4xl p-4 md:p-8" id="main-content">{error ? <p role="alert">{error}</p> : <p>Loading your profile…</p>}</main>;
+  if (!profile || !me) return <div className="mx-auto max-w-4xl p-4 md:p-8">{error ? <p role="alert">{error}</p> : <p>Loading your profile…</p>}</div>;
   const photoUrl = me.photo?.url ?? null;
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-4 md:p-8" id="main-content">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
       <header className="flex items-center gap-4">
         <Avatar initials={profile.initials} color={profile.avatarColor} style={profile.avatarStyle} photoUrl={photoUrl} size={64} />
         <div>
@@ -195,6 +195,6 @@ export default function MyProfilePage() {
             className={`rounded-full border px-3 py-1 text-sm ${look.pinned.includes(p.href) ? "border-primary bg-primary text-primary-foreground" : ""}`}>{p.label}</button>))}</div>
       </section>
       <button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" onClick={saveLook}>Save look and accessibility</button>
-    </main>
+    </div>
   );
 }
