@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.CABO_ANDROID_RUNNER_LABELS || '["ubuntu-latest"]') }}
     permissions:
       contents: read
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify Android emulator host virtualization
@@ -43,7 +43,11 @@ jobs:
           target: default
           arch: x86_64
           profile: Nexus 5X
-          emulator-boot-timeout: 300
+          # API 23 x86_64 images boot slowly on hosted runners; three consecutive
+          # runs on 2026-11-22 hit "Timeout waiting for emulator to boot" at 300 s.
+          emulator-boot-timeout: 900
+          ram-size: 2048M
+          cores: 2
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: true
           working-directory: native-apps/android
