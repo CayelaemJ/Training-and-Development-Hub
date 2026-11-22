@@ -107,6 +107,19 @@ Two test-authoring defects were found and fixed via CI logs: a wrong table name,
 
 The schema helper (`schemaFromDrizzle.ts`) is now shared with the academic records suite.
 
+## 4h. Guardian child-progress analytics (`be9b0b6`)
+
+- Policy unit tests (`guardianProgressPolicy.test.mjs`): 12/12. They cover weighting, trend thresholds, standing bands with ties, outlook rules, attendance trend, the minimum class size of 5 for comparisons, no classmate identifiers or marks in the output, same-subject and same-term comparison only, the release-gate classification, and the three guardian checks in the route source.
+- Two-school integration suite (`scripts/test-guardian-progress.mjs`): 7/7 in CI (job 137284236496):
+  - the children list is limited to schools where the guardian is verified;
+  - term results and improvement come from published marks only (a draft 0% quiz is excluded);
+  - class standing is `{cohortSize 6, classAverage 70, upper_middle, +3}` for Maths and withheld for English (3 results), with no classmate identity in the response;
+  - outlook, focus areas, attendance (no notes) and recent results are correct;
+  - seven refusal cases (other school, revoked, stranger, staff, wrong school, wrong child, classmate) all return 403 with no body;
+  - withdrawn enrolment ends access;
+  - an empty year gives `not_enough_data`.
+- The `build` job is green at `be9b0b6`: typecheck, production build and browser checks.
+
 ## 5. Not run (and why)
 
 | Check | Reason |

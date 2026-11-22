@@ -31,7 +31,8 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 - P1-02 Windows per-user `.exe` installer with install/uninstall CI test (`a0ef12e`); passed on `windows-latest`, unsigned.
 - P0-06 (part) runtime two-school suites: organizations (15), academic records (20), school operations (13) — all green in CI.
 - F-2026-11-22-03 attendance view stopped returning staff notes (`d3e2e64`).
-- Logged D-2026-11-22-01 (global guardian status vs per-school verification) for owner decision.
+- D-2026-11-22-01 (global guardian status): owner accepted current behaviour.
+- P1-12 guardian child-progress analytics, API + web (`be9b0b6`), 12 unit + 7 integration checks green in CI. Next: native parent apps; P1-13 email updates on published results (needs owner consent decisions).
 
 ## In progress / next priority
 
