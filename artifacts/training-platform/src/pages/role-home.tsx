@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {Link} from "wouter";
 import { InvitationInbox } from "../components/organization-invitations";
+import { ChildProgress } from "../components/child-progress";
 type Portal={role:string;organizationIds:number[];scopes:{organizationId:number;unitId:number;role:string}[];summary:Record<string,number>;cards:{label:string;href:string}[]};
 const roleCopy:Record<string,{title:string;description:string}>={
  superadmin:{title:"Platform command centre",description:"CABO test-platform oversight across institutions. Administrative scope is explicit, audited access still requires endpoint-specific permission checks."},
@@ -31,6 +32,7 @@ export default function RoleHomePage(){
   <header className="space-y-3 border-b pb-6"><p className="text-xs uppercase tracking-[.18em] text-muted-foreground">CABO / {portal.role.replaceAll("_"," ")}</p><h1 className="font-display text-3xl sm:text-5xl">{copy.title}</h1><p className="max-w-2xl text-muted-foreground leading-relaxed">{copy.description}</p></header>
   {/* Every portal can reach "/", so new invitees (who default to the learner portal) can find invitations here. Joining can change the portal and navigation, so reload after accepting. */}
   <InvitationInbox onAccepted={()=>window.location.reload()} />
+  {portal.role==="parent"&&<ChildProgress />}
   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Role summary">
    {Object.entries(portal.summary).map(([key,n])=><div className="rounded-xl border p-5" key={key}><p className="text-xs uppercase tracking-wide text-muted-foreground">{key.replace(/([A-Z])/g," $1")}</p><strong className="mt-2 block text-3xl tabular-nums">{n.toLocaleString()}</strong></div>)}
    {portal.role==="superadmin"&&<div className="rounded-xl border p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Platform authority</p><strong className="mt-2 block text-xl">Superadmin</strong><p className="mt-2 text-xs text-muted-foreground">Isolated test environment only</p></div>}
