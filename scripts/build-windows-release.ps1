@@ -40,6 +40,11 @@ if ($LASTEXITCODE -ne 0) { throw "msbuild publish failed ($LASTEXITCODE)" }
 
 $exe = Join-Path $publishDir 'CABO.Native.exe'
 if (-not (Test-Path $exe)) { throw "Published executable not found at $exe" }
+foreach ($required in 'CABO.Native.pri', 'CABO.Native.Core.dll', 'Assets\cabo.ico') {
+  if (-not (Test-Path (Join-Path $publishDir $required))) {
+    throw "Published output is missing $required; the app would fail at startup."
+  }
+}
 $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
 if ($fileVersion -ne "$Version.0") { throw "Executable FileVersion '$fileVersion' does not match $Version.0" }
 
