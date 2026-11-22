@@ -24,6 +24,17 @@ test("native learner practice data contains owned notes and server-graded sample
   assert.match(seed, /eq\(quizzesTable\.userId, owner\)/);
   assert.doesNotMatch(seed, /openai\.com|groq\.com|https:\/\/.*api/);
 });
+test("role demo covers enrolment, attendance, intervention and connected hub features", () => {
+  assert.match(seed, /verifiedEnrollmentsTable/);
+  assert.match(seed, /learnerSupportTicketsTable/);
+  assert.match(seed, /learnerSupportEventsTable/);
+  assert.match(seed, /hubRecordsTable/);
+  assert.match(seed, /academic_intervention/);
+  assert.match(seed, /family_meeting/);
+  assert.match(seed, /talent_skill/);
+  assert.match(seed, /onConflictDoNothing/);
+  assert.match(seed, /Never overwrite manual test results/);
+});
 test("isolated test deploy refuses to push a schema to an unmarked existing database", () => {
   assert.match(guard, /tables\.rows\.length === 0/);
   assert.match(guard, /Existing unmarked database: refusing bootstrap/);
