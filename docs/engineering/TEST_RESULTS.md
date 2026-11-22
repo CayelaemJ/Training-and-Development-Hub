@@ -85,13 +85,17 @@ Runs the real organizations router against PGlite with real session rows. 15/15 
 
 At `8a4a42b` the full `build` job is green: install, built-in tests, all five integration scripts, typecheck, production build, browser and mobile checks.
 
+## 4e. Android emulator UI tests (`3beb15f`, job 137252976562)
+
+`connectedDebugAndroidTest` on the API 23 (Android 6.0, minimum supported) x86_64 emulator: **31 tests started, 31 finished, BUILD SUCCESSFUL**. All four earlier failures on this PR came from inaccessible `/dev/kvm` (the log shows `-accel off` rejected by the emulator), not from the app or tests.
+
 ## 5. Not run (and why)
 
 | Check | Reason |
 |---|---|
 | `pnpm install --frozen-lockfile`, `pnpm run typecheck`, `pnpm run build` | No registry access; no pnpm |
 | Playwright browser and mobile checks | Depend on build and Chromium download |
-| Android emulator tests / APK / AAB | No Android SDK or Google Maven access |
+| Android emulator tests / APK / AAB (locally) | No Android SDK or Google Maven access here; emulator tests now run and pass in CI (4e) |
 | Windows MSBuild | No Windows runner or .NET |
 | iOS simulator build | No macOS |
 | Gitleaks, Semgrep, Trivy, Snyk, ZAP | Not installed; no network |

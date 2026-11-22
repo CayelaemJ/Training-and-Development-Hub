@@ -33,7 +33,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 
 ## In progress / next priority
 
-1. PR #198 CI at `9bb83ef`: build, typecheck, tests, browser, Semgrep, secret scans, iOS and android-build pass. `android-tests` fails before any test runs (API 23 emulator never boots; P2-10, owner decision).
+1. PR #198 CI at `3beb15f`: every check green, including android-tests (31/31 UI tests on API 23 after the KVM fix) and the Windows installer job.
 2. Owner comments `@codex review` to re-review after `85ee311`.
 3. P0-08 owner reviews pre-fix memberships (query in SECURITY_REVIEW.md).
 4. P0-06 runtime two-tenant authorization integration suite (start with organizations, institutionRecords, academic, learnerSupport, reportCards) — needs an installed workspace.
