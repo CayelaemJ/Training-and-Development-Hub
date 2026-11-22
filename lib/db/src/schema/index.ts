@@ -64,3 +64,4 @@ export * from "./learnerAiProfile";
 
 export * from "./accountability";
 export * from "./classChat";
+export * from "./profiles";

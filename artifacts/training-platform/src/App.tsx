@@ -37,6 +37,9 @@ import EducationCommandPage from '@/pages/education-command';
 import AccountabilityPage from '@/pages/accountability';
 import ClassChatPage from '@/pages/class-chat';
 import PrivacyRightsPage from '@/pages/privacy-rights';
+import MyProfilePage from '@/pages/my-profile';
+import { Avatar } from '@/components/avatar';
+import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '@/lib/appearance';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -49,7 +52,7 @@ import {
   Activity, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
   CheckCircle2, ChevronRight, CircleHelp, Clock3, FileText, FileUp, GraduationCap,
   LayoutDashboard, LoaderCircle, LogOut, Plus, RotateCcw, Search,
-  Sparkles, Target, Trash2, X, ShieldAlert, MessageSquare, Scale,
+  Sparkles, Target, Trash2, X, ShieldAlert, MessageSquare, Scale, Palette,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -57,7 +60,7 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 // Every signed-in person can raise a concern and see which privacy rules apply.
-const alwaysNav=['/notification-preferences','/accountability','/privacy'];
+const alwaysNav=['/me','/notification-preferences','/accountability','/privacy'];
 const allowedNav:Record<PortalKind,string[]>={
  superadmin:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
@@ -91,6 +94,7 @@ const navItems = [
   { href: '/accountability', label: 'Concerns & accountability', icon: ShieldAlert },
   { href: '/class-chat', label: 'Class chat', icon: MessageSquare },
   { href: '/privacy', label: 'Privacy & my rights', icon: Scale },
+  { href: '/me', label: 'My profile & look', icon: Palette },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
@@ -155,6 +159,7 @@ function Router() {
     <Route path="/accountability" component={AccountabilityPage} />
     <Route path="/class-chat" component={ClassChatPage} />
     <Route path="/privacy" component={PrivacyRightsPage} />
+    <Route path="/me" component={MyProfilePage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
@@ -208,19 +213,23 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
   const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
+  const [me,setMe] = useState<{profile:{initials:string;name:string;avatarStyle:'initials'|'pattern'|'photo';avatarColor:Appearance['accent']};appearance:Appearance;photo:{status:string;url:string}|null}|null>(null);
+  useEffect(()=>{let live=true;fetch('/api/me/profile',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(!live)return;setMe(d);applyAppearance({...DEFAULT_APPEARANCE,...d.appearance});}).catch(()=>undefined);return()=>{live=false};},[location==='/me']);
+  const pinned = me?.appearance?.pinned ?? [];
+  const orderedNav = [...navItems].sort((a,b)=>{const ia=pinned.indexOf(a.href),ib=pinned.indexOf(b.href);return (ia<0?99:ia)-(ib<0?99:ib);});
   return <div className="app-frame">
     <aside className="sidebar">
       <Link href="/" className="brand"><Mark /><span>Training &amp; Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
         <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
-        {navItems.filter(item=>portalRole!==null&&(alwaysNav.includes(item.href)||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
+        {orderedNav.filter(item=>portalRole!==null&&(alwaysNav.includes(item.href)||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
         <div className="side-note"><span className="note-mark"><Target size={17} /></span><p>Small sessions add up.<br /><strong>Keep your rhythm.</strong></p></div>
         <div className="profile-row">
-          <div className="avatar">{initials}</div>
-          <div className="profile-copy"><strong>{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Learner'}</strong><span>{user?.email || 'Your account'}</span></div>
+          <Link href="/me" aria-label="My profile and look">{me?<Avatar initials={me.profile.initials} color={me.profile.avatarColor} style={me.profile.avatarStyle} photoUrl={me.photo?.url} size={38} />:<div className="avatar">{initials}</div>}</Link>
+          <div className="profile-copy"><strong>{me?.profile.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Learner'}</strong><span>{user?.email || 'Your account'}</span></div>
         </div>
         <button type="button" className="sidebar-signout" disabled={signingOut} onClick={signOut} data-testid="button-logout">
           <LogOut size={16} /><span>{signingOut ? 'Signing out…' : 'Sign out'}</span>

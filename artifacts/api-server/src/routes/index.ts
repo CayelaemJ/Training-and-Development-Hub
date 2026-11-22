@@ -48,6 +48,7 @@ import learnerAiProfileRouter from "./learnerAiProfile";
 import accountabilityRouter from "./accountability";
 import classChatRouter from "./classChat";
 import privacyRouter from "./privacy";
+import profileRouter from "./profile";
 
 const router: IRouter = Router();
 
@@ -99,5 +100,6 @@ router.use(learnerAiProfileRouter);
 router.use(accountabilityRouter);
 router.use(classChatRouter);
 router.use(privacyRouter);
+router.use(profileRouter);
 
 export default router;
