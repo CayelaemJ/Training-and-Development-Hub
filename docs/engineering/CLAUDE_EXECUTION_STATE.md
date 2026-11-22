@@ -38,7 +38,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 3. P0-08 owner reviews pre-fix memberships (query in SECURITY_REVIEW.md).
 4. P0-06 runtime two-tenant authorization integration suite (start with organizations, institutionRecords, academic, learnerSupport, reportCards) — needs an installed workspace.
 5. P1-01: confirm the PR's Android debug job passes with the new build script, then run the manual release workflow unsigned; owner adds signing secrets for a signed candidate.
-6. P0-06 extend the two-tenant suite to institutionRecords, academic, learnerSupport, reportCards (same harness: `scripts/test-*.mjs` + `supportTestDb.ts`).
+6. P0-06 extend two-school suites to timetables, materials, sports, careers, admissions. Use the schema-generated pattern in `academicRecords.integration.ts` (drizzle-kit API; then `setval` sequences after explicit-id seeds).
 7. CI job logs are readable without auth via `api.github.com/repos/.../actions/jobs/<id>/logs` — use them to diagnose failures.
 
 ## Blockers

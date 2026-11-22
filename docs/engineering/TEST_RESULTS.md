@@ -89,6 +89,12 @@ At `8a4a42b` the full `build` job is green: install, built-in tests, all five in
 
 `connectedDebugAndroidTest` on the API 23 (Android 6.0, minimum supported) x86_64 emulator: **31 tests started, 31 finished, BUILD SUCCESSFUL**. All four earlier failures on this PR came from inaccessible `/dev/kvm` (the log shows `-accel off` rejected by the emulator), not from the app or tests.
 
+## 4f. Academic records two-school suite (`scripts/test-academic-records.mjs`, CI `verify` job)
+
+Database generated from the real Drizzle schema with the drizzle-kit API (355 statements, applied as tables → indexes → foreign keys). 20/20 checks passed at `e3ee138` (job 137262487534): grading limited to the assigned teacher, own school and enrolled learners, with an audit event; no cross-school enrolment or staffing (same answer for unknown accounts); learners see only their own published marks and no staff reporting; staff reporting limited to own subjects; report cards exclude drafts and other learners; a school manager gets 404 with no data for a learner enrolled elsewhere; guardian report access refused for unverified relationships, verification only at another school, a later revoked decision, no relationship, the wrong child, and inactive enrolment; verified-enrolment lists limited to own managers; learner guardian/transfer requests off by default, and uniform when enabled; only the addressed guardian can answer, and accepted is not verified.
+
+Two test-authoring defects were found and fixed via CI logs: a wrong table name, and seed rows with explicit ids that left a serial sequence behind.
+
 ## 5. Not run (and why)
 
 | Check | Reason |
