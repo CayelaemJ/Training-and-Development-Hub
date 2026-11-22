@@ -6,6 +6,15 @@ CABO Learning Hub is a **Connected Education and Lifelong Development Platform**
 
 **Release claims:** Existing prototype or pilot functionality must not be mistaken for accredited school operations, official national integrations, mature mobile distribution or child-data compliance sign-off. See the [delivery register](./PHASES_1_TO_4_DELIVERY_REGISTER.md).
 
+## Demo, evidence and case-study resources (23–29 November 2026)
+
+- [Full platform capability catalogue and maturity claims](./DEMO_CAPABILITY_CATALOGUE_2026-11.md)
+- [Five synthetic learner-to-pathway case studies and evidence form](./CASE_STUDIES_SYNTHETIC_2026-11.md)
+- [One-week case-study sprint, responsibilities and 20-minute demo script](./CASE_STUDY_SPRINT_2026-11-23.md)
+- [Synthetic fixture accounts and isolation rules](./DEMO_CLIENTS.md)
+
+All scenarios are simulated. Do not represent these as successful live pilots or customer case studies.
+
 ## Document index
 
 - [Team handover and onboarding pack — start here](./PLATFORM_GUIDE.md)
