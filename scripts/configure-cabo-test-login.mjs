@@ -8,13 +8,14 @@
 // 5+ characters; the server enforces the same rule (lib/testPasswordPolicy.ts).
 import { randomBytes, scryptSync } from "node:crypto";
 
-// Mirrors the 13 fictional identities created by lib/demoSeed.ts.
+// Mirrors the 14 fictional identities created by lib/demoSeed.ts.
 const DEMO_FIXTURES = [
   ["headmaster-south", "Nomsa", "Dube"],
   ["teacher-south", "Thabo", "Maseko"],
   ["assessor-south", "Palesa", "Mokoena"],
   ["learner-south-a", "Lerato", "Mahlobo"],
   ["learner-south-b", "Sipho", "Khumalo"],
+  ["learner-south-c", "Anele", "Radebe"],
   ["parent-south", "Mpho", "Mahlobo"],
   ["district-south", "Zanele", "Nkosi"],
   ["university-head", "Dr Nandi", "Molefe"],

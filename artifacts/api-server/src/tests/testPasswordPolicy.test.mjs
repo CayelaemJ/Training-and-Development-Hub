@@ -68,8 +68,8 @@ test("operator script output for all demo roles parses as valid test principals"
   const line = out.split("\n").find(l => l.startsWith("CABO_TEST_USERS_JSON="));
   assert.ok(line);
   const principals = configuredPrincipals(line.slice("CABO_TEST_USERS_JSON=".length));
-  assert.equal(principals.length, 13);
-  assert.equal(new Set(principals.map(p => p.hash.split(":")[0])).size, 13, "each principal has its own salt");
+  assert.equal(principals.length, 14);
+  assert.equal(new Set(principals.map(p => p.hash.split(":")[0])).size, 14, "each principal has its own salt");
   assert.ok(!out.includes(shortDemo), "script never prints the password");
   const landing = readFileSync("artifacts/training-platform/src/components/cabo-access-landing.tsx", "utf8");
   for (const p of principals) assert.match(landing, new RegExp(`username: '${p.username}'`));
