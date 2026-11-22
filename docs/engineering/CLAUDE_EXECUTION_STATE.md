@@ -28,6 +28,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 - P1-01 Android release build type, secret-only signing, manual APK/AAB workflow (`d1e8ade`) — debug job evaluates the script in CI; release workflow **not yet run**.
 - P1-08 effective scores with assessor overrides (`a8ab4e8`) and learner reviewed-results view (`51ab90f`).
 - Three Codex P2 findings on PR #198 fixed (`85ee311`).
+- P1-02 Windows per-user `.exe` installer with install/uninstall CI test (`a0ef12e`); passed on `windows-latest`, unsigned.
 
 ## In progress / next priority
 
@@ -36,7 +37,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 3. P0-08 owner reviews pre-fix memberships (query in SECURITY_REVIEW.md).
 4. P0-06 runtime two-tenant authorization integration suite (start with organizations, institutionRecords, academic, learnerSupport, reportCards) — needs an installed workspace.
 5. P1-01: confirm the PR's Android debug job passes with the new build script, then run the manual release workflow unsigned; owner adds signing secrets for a signed candidate.
-6. P1-02 Windows: release configuration and MSIX packaging on `windows-latest`.
+6. P0-06 runtime two-tenant authorization tests (CI can run PGlite + esbuild bundles).
 
 ## Blockers
 

@@ -27,7 +27,7 @@ Replies could not be posted on the threads from the implementing session (GitHub
 |---|---|
 | Branch | `fix/org-member-consent-invitations-20261122` |
 | Base commit | `5a30e1c9bbcf44d9e2f3d8c17f41b9109316061f` (main, 2026-11-21) |
-| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes |
+| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes · `a0ef12e` Windows installer |
 | Docs commit | the commit after `83fb70e` on this branch (audit, backlog, security review, test results, this handoff, execution state) |
 | Related PRs | none open for this defect; PR numbers for older security work (#58/#59/#60) are referenced in the backlog only |
 | Migration | `lib/db/migrations/20261122_organization_invitations.sql` (additive: one table, two indexes) |

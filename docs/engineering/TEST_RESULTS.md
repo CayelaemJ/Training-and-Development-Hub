@@ -75,6 +75,10 @@ The signing/version logic at the top of `native-apps/android/app/build.gradle.kt
 
 The `android { signingConfigs / buildTypes }` additions, `assembleRelease`, `bundleRelease` and the new workflow were **not run** (no Android SDK or Google Maven). The workflow YAML parses (PyYAML) and uses the same pinned action SHAs as `native-android-debug.yml`.
 
+## 4c. Windows installer (`a0ef12e`, GitHub Actions run 45035333823, `windows-latest`)
+
+All 16 steps succeeded (status read from the public Actions API): Release x64 msbuild; assembly scan (positive control found the production origin; `CABO_ISOLATED_TEST_ORIGIN` absent); Inno Setup compile; silent install (executable and HKCU uninstall key present); 15 s startup check (informational, result in the job summary); silent uninstall (files, uninstall key and synthetic local token removed); SHA-256 checksum. Artifact `CABO-Windows-installer-UNSIGNED`, 21,497,925 bytes. Signing steps skipped (no certificate secrets).
+
 ## 5. Not run (and why)
 
 | Check | Reason |
