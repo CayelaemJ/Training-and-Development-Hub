@@ -43,6 +43,29 @@ Each test principal must have `userId: "cabo-fixture-<suffix>"`, `email: "<suffi
 - Twelve days of varied attendance for three learners, active enrolments, a teacher-owned support case, connected-hub examples and a school notice.
 - School/university management-unit roles and one synthetic accepted guardian relationship. This is **not** legal guardianship verification.
 
+## Temporary credentials for the isolated web demo
+
+The 14 fictional roles can share one **temporary** password for a supervised demo. Their credentials are not stored in the seeder, and the demo identity email addresses remain non-deliverable. Generate a fresh, independent salted-scrypt hash for every fixture role using `scripts/generate-demo-login-config.mjs`. This creates **web test-login** principals only; it does not modify OIDC users, production accounts, or the separately guarded `cabo_test` native/superadmin credential.
+
+In WSL/Linux, run the following **locally**, with a disposable test database and a private test deployment already identified:
+
+```bash
+umask 077
+export CABO_ENVIRONMENT=testing CABO_TEST_DATABASE_ISOLATED=true NODE_ENV=test
+export CABO_ALLOW_WEAK_DEMO_PASSWORD=true  # required only for passwords shorter than 12 characters
+read -r -s -p "Temporary synthetic-demo password: " CABO_DEMO_PASSWORD
+printf '\\n'
+export CABO_DEMO_PASSWORD
+node scripts/generate-demo-login-config.mjs > /tmp/cabo-demo-users.json
+unset CABO_DEMO_PASSWORD
+```
+
+Copy the **complete JSON contents** of `/tmp/cabo-demo-users.json` to the test-only service's secret environment variable `CABO_TEST_USERS_JSON`, then securely delete the temporary file. Ensure `ENABLE_CABO_TEST_LOGIN=true`, `CABO_ENVIRONMENT=testing`, and `CABO_TEST_DATABASE_ISOLATED=true` **on that test service**. All 14 usernames in the table above will use the password you supplied. No command in this guide automatically changes a deployed service, and a seed run alone does not activate web sign-in.
+
+If you choose a 5-character demo password, it is trivially guessable. **Never use it on a public or production service, for real learners, or for the platform superadmin.** Restrict network access to the disposable testing service, supervise its use, and disable `ENABLE_CABO_TEST_LOGIN` or rotate the test credentials immediately after demonstrations. `CABO_ALLOW_WEAK_DEMO_PASSWORD` is only a local generator opt-in; it does not weaken the application authentication policy.
+
+Verification: run `node --test artifacts/api-server/src/tests/demoLoginConfig.test.mjs`, then validate each role's own dashboard and cross-tenant 403/404 denials in the isolated browser session. A successful generator run does not prove environment updates, deployment, login, or end-to-end authorization.
+
 ## How to activate
 
 1. In an isolated **testing** API service only, set `CABO_ENVIRONMENT=testing`, `CABO_TEST_DATABASE_ISOLATED=true`, and `ENABLE_CABO_DEMO_SEED=true`. All three gates are mandatory. Do not set them on a shared environment or production.
