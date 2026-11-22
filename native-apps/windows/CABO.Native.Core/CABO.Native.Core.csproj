@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- UI-free API, session and policy logic shared by the WinUI client and the
+       unit tests. Keeping it free of WinUI lets the tests run on any runner. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>CABO.Native</RootNamespace>
+    <AssemblyName>CABO.Native.Core</AssemblyName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CABO.Native.Tests" />
+  </ItemGroup>
+</Project>
