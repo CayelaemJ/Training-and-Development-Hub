@@ -74,7 +74,7 @@ final class NativeMaterialTutorTests: XCTestCase {
         XCTAssertTrue(NativeMaterialTutor.message(for: URLError(.notConnectedToInternet)).contains("offline"))
         XCTAssertTrue(NativeMaterialTutor.message(for: NativeTutorError.accountChanged).contains("account changed"))
         // Unknown errors never echo internal detail.
-        let internal = NSError(domain: "Other", code: 1, userInfo: [NSLocalizedDescriptionKey: "db host 10.0.0.1"])
-        XCTAssertFalse(NativeMaterialTutor.message(for: internal).contains("10.0.0.1"))
+        let internalError = NSError(domain: "Other", code: 1, userInfo: [NSLocalizedDescriptionKey: "db host 10.0.0.1"])
+        XCTAssertFalse(NativeMaterialTutor.message(for: internalError).contains("10.0.0.1"))
     }
 }
