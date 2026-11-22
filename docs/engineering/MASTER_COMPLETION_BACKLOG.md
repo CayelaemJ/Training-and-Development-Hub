@@ -15,14 +15,16 @@ Priority: **P0** production blocker · **P1** core product completion · **P2** 
 | P0-03 | Run `pnpm run typecheck && pnpm run build` and browser checks on the branch | — | all | CI `verify` must pass on the pushed branch | CI | BLOCKED (no registry here) | — | — |
 | P0-04 | Confirm PR #58/#59/#60 are superseded by main, then close or rebase | #58 #59 #60 #89 | auth, origin policy, native parent | Main already contains origin-checked mutations, OIDC host/return-path validation and per-school guardian verification (`lib/originPolicy.ts`, `routes/nativeParent.ts`). Confirm each PR's remaining diff is empty or obsolete. | Existing `originPolicy`, `nativeGuardianReports`, `parentMobilePolicy` tests | IMPLEMENTED (on main) | PR state unknown | — |
 | P0-05 | Production identity configuration and privileged MFA enforcement | #132 (merged) | auth | Owner configures production OIDC provider; decide whether `privilegedMfaGuard` is enforced for owner/admin/superadmin before launch. Store only `email_verified` addresses or keep all email-trust decisions on `verified_email`. | `mfaAssurance` tests + staging login | PARTIALLY IMPLEMENTED | Owner | — |
-| P0-06 | Independent penetration test and route-by-route authorization review | — | API | Every `/:orgId` and `/:id` route reviewed for object-level checks with two-tenant negative tests | Synthetic two-tenant integration suite | NOT STARTED | — | — |
+| P0-06 | Independent penetration test and runtime two-tenant authorization tests | — | API | Static route-by-route review done 2026-11-22 (201 handlers, see `SECURITY_REVIEW.md`); still needed: synthetic two-tenant integration suite and external pen test | Synthetic two-tenant integration suite | PARTIALLY (static review only) | Static only | — |
 | P0-07 | Backups and tested restore for the production database | — | Neon/Render | Documented, executed restore into an isolated branch with checksum comparison | Restore drill record | NOT EVIDENCED | Owner (infra access) | — |
+| P0-08 | Review non-owner organization memberships created before P0-01 (none were consented) | — | production data | Run the read-only query in `SECURITY_REVIEW.md`; decide on notifying members or requiring re-acceptance | — | NOT STARTED | Owner (data decision) | — |
+| P0-09 | Learner-initiated guardian invites and transfers reachable although disabled in the UI | — | `routes/institutionRecords.ts`, `lib/learnerInitiatedRequestPolicy.ts` | Server returns 404 unless `ENABLE_LEARNER_GUARDIAN_INVITES` / `ENABLE_LEARNER_TRANSFER_REQUESTS` is `true`; uniform 202 when enabled | Policy + source contract (4) | COMPLETE ON BRANCH | Unit/contract pass; typecheck not run | `2ed9974` |
 
 ## P1 — core product completion
 
 | ID | Item | Related PR | Status | Next step / acceptance | Blocker |
 |---|---|---|---|---|---|
-| P1-01 | Android release build type, signing config from CI secrets, AAB | — | NOT IMPLEMENTED | Add `release` buildType reading keystore from env/CI secrets only; `bundleRelease`; mark unsigned outputs as such | Owner supplies upload keystore (never committed) |
+| P1-01 | Android release build type, signing config from CI secrets, AAB | — | IMPLEMENTED BUT UNVERIFIED (`d1e8ade`) | Release build type (test login/demo forced off), secret-only signing, manual APK+AAB workflow. Next: run the workflow unsigned, then with secrets; install on a device | Owner adds the four signing secrets (upload keystore never committed); Android SDK runner |
 | P1-02 | Windows installer (MSIX or packaged) + release configuration | #41 | NOT IMPLEMENTED | Release x64 build, MSIX packaging, install/upgrade/uninstall on a real Windows runner | Code-signing certificate (owner) |
 | P1-03 | Native parity work not provable in main | #112–115, #129, #134, #150–154, #160, #169 | UNKNOWN | Main contains "Native Phase 10–20" commits; diff each PR against main and close superseded ones | GitHub API access |
 | P1-04 | Learner chat zone (moderated, teacher-supervised) | — | NOT IMPLEMENTED | Owner approves a child-safety policy first: no learner-to-learner DMs by default, teacher-moderated class channels, report/block, retention, no contact details | Owner policy + legal review |
@@ -37,7 +39,7 @@ Priority: **P0** production blocker · **P1** core product completion · **P2** 
 
 | ID | Item | Related PR | Status | Note |
 |---|---|---|---|---|
-| P2-01 | Guardian-link request is an account-existence oracle (`POST /guardian-relationships` returns 400 for unknown email) | — | NOT STARTED | Return uniform response; guardian must still accept. Lower severity: no name disclosure. |
+| P2-01 | Guardian-link requests: replace account-id links with email-keyed requests before enabling `ENABLE_LEARNER_GUARDIAN_INVITES` | — | PARTIALLY (gated off + uniform 202 in `2ed9974`) | The learner's own relationship list still reveals which emails had accounts. |
 | P2-02 | Postgres row-level security as defence in depth | — | NOT IMPLEMENTED | App-layer checks only today |
 | P2-03 | Full migration history from an empty database (base schema is `drizzle-kit push`) | — | PARTIALLY | Generate a reviewed baseline migration and test clean install + upgrade |
 | P2-04 | Render blueprint (`render.yaml`) for reproducible staging/production | #73 #78 #80 | NOT IMPLEMENTED | Consolidate the three Render runbook PRs into one |

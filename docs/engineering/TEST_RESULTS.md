@@ -16,6 +16,7 @@ node --test artifacts/api-server/src/tests/*.test.mjs
 | main `5a30e1c`, no packages | 201 | 184 | 17 | missing `esbuild` (14), `zod`, `typescript`, `@electric-sql/pglite` |
 | main `5a30e1c`, esbuild linked | 233 | 229 | 4 | missing `zod` (learnerAiProfilePolicy), `typescript` (mlopsEvaluation), `@electric-sql/pglite` (notificationSyntheticDatabase), `@upstash/blob` (privateBlobPolicy) |
 | branch `83fb70e`, esbuild linked | 247 | 242 | 5 | the same 4, plus new `organizationInvitationDatabase.test.mjs` (missing `@electric-sql/pglite`) |
+| branch `2ed9974`, esbuild linked | 251 | 246 | 5 | the same 5 |
 
 No failure was caused by an assertion. Every failing file was individually checked for its module-resolution error.
 
@@ -29,6 +30,14 @@ node --test artifacts/api-server/src/tests/organizationInvitationPolicy.test.mjs
 Result: **13/13 pass** (8 policy, 5 contract).
 
 Negative control — main's unfixed `routes/organizations.ts` swapped in temporarily, contract test re-run: **4 of 5 fail** (the fifth covers the separately fixed academic/hierarchy files). The fixed file was restored and confirmed by diff.
+
+### 2b. Learner-initiated request gates (F-2026-11-22-02)
+
+```sh
+node --test artifacts/api-server/src/tests/learnerInitiatedRequestPolicy.test.mjs
+```
+
+Result: **4/4 pass**. Negative control with main's `routes/institutionRecords.ts`: **2/4 fail** (gate presence; uniform response). The first version of this test passed against unfixed code because a missing gate made `indexOf` return −1; it was corrected to assert the gate is present before comparing positions.
 
 ## 3. Migration on real PostgreSQL 16
 
@@ -45,11 +54,26 @@ The script refuses to run unless `PGHOST` is a local socket path or localhost an
 
 | Check | Command | Result |
 |---|---|---|
-| Secret scan (tracked files) | `node scripts/security/scan-secrets.mjs` | 0 issues, 689 files (main); 0 issues, 696 files (branch, before docs commit) |
+| Secret scan (tracked files) | `node scripts/security/scan-secrets.mjs` | 0 issues, 689 files (main); 0 issues, 706 files (branch `2ed9974`) |
 | Secret scanner self-test | `node --test scripts/security/scan-secrets.test.mjs` | 5/5 pass |
 | Native demo script syntax | `bash -n scripts/render-native-test-start.sh`; `node --check` on 5 scripts | pass |
 | Changed TS/TSX syntax | esbuild `transform` on 7 changed files | pass |
 | Script tests (`scripts/test-*.mjs`) | `node scripts/test-learner-support.mjs` etc. | **not runnable**: require `express` from an installed workspace |
+
+## 4b. Android release configuration (`d1e8ade`)
+
+The signing/version logic at the top of `native-apps/android/app/build.gradle.kts` does not depend on the Android Gradle Plugin, so it was copied into a scratch project and run with local Gradle 8.14.3 (`--offline`):
+
+| Case | Expected | Result |
+|---|---|---|
+| no signing variables | unsigned, version 1 / 0.1.0 | pass |
+| all four variables | signing ready | pass |
+| only `CABO_ANDROID_KEYSTORE_PATH` | build fails with "Set all of …" | pass |
+| `-PcaboVersionCode=7 -PcaboVersionName=1.2.3-rc.1` | accepted | pass |
+| `-PcaboVersionName=latest` | rejected | pass |
+| `-PcaboVersionCode=0` | rejected | pass |
+
+The `android { signingConfigs / buildTypes }` additions, `assembleRelease`, `bundleRelease` and the new workflow were **not run** (no Android SDK or Google Maven). The workflow YAML parses (PyYAML) and uses the same pinned action SHAs as `native-android-debug.yml`.
 
 ## 5. Not run (and why)
 

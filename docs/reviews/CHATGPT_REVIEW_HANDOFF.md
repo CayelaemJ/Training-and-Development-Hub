@@ -1,4 +1,4 @@
-# Independent review handoff — consent-based organization membership
+# Independent review handoff — consent-based membership and learner-request gates
 
 **Implementer:** Claude · **Reviewer requested:** ChatGPT · **Owner decision:** pending
 **Review status:** NOT YET REVIEWED. Do not treat as approved.
@@ -17,11 +17,11 @@
 |---|---|
 | Branch | `fix/org-member-consent-invitations-20261122` |
 | Base commit | `5a30e1c9bbcf44d9e2f3d8c17f41b9109316061f` (main, 2026-11-21) |
-| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) |
+| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config |
 | Docs commit | the commit after `83fb70e` on this branch (audit, backlog, security review, test results, this handoff, execution state) |
 | Related PRs | none open for this defect; PR numbers for older security work (#58/#59/#60) are referenced in the backlog only |
 | Migration | `lib/db/migrations/20261122_organization_invitations.sql` (additive: one table, two indexes) |
-| Config changes | none; no new environment variables or feature flags |
+| Config changes | two new opt-in flags, default off: `ENABLE_LEARNER_GUARDIAN_INVITES`, `ENABLE_LEARNER_TRANSFER_REQUESTS` |
 
 Modified files (code):
 
@@ -38,6 +38,13 @@ artifacts/api-server/src/tests/organizationInvitationPolicy.test.mjs   (new)
 artifacts/api-server/src/tests/organizationInvitationContract.test.mjs (new)
 artifacts/api-server/src/tests/organizationInvitationDatabase.test.mjs (new, PGlite, runs in CI)
 scripts/qa/verify-organization-invitations-postgres.sh             (new, local-only harness)
+artifacts/api-server/src/lib/learnerInitiatedRequestPolicy.ts      (new, batch 2)
+artifacts/api-server/src/routes/institutionRecords.ts              (batch 2: gates + uniform 202)
+artifacts/api-server/src/tests/learnerInitiatedRequestPolicy.test.mjs (new, batch 2)
+docs/INSTITUTION_TRANSFERS_AND_GUARDIANS.md                        (batch 2: flags documented)
+native-apps/android/app/build.gradle.kts                           (batch 3: release build type + signing)
+.github/workflows/native-android-release.yml                       (batch 3: new, manual dispatch only)
+native-apps/android/TEST_BUILDS.md                                 (batch 3: release candidate guide)
 ```
 
 API surface:
@@ -49,6 +56,8 @@ API surface:
 | `DELETE /api/organizations/:orgId/invitations/:id` | owner, admin | Revoke pending → 204, else 404 |
 | `GET /api/organization-invitations` | any signed-in | Pending, unexpired invitations for the session's **verified** email; org name and role only |
 | `POST /api/organization-invitations/:id/decision` `{decision}` | addressee | Row-locked; accept inserts membership with invitation role; uniform 404 for missing/answered/expired/not-yours |
+| `POST /api/guardian-relationships` | learner | **404 unless `ENABLE_LEARNER_GUARDIAN_INVITES=true`**; when on, 202 with one body for every email (was 400/201/409) |
+| `POST /api/institution-records/transfers` | learner | **404 unless `ENABLE_LEARNER_TRANSFER_REQUESTS=true`**; otherwise unchanged |
 
 ## Verification evidence
 
@@ -56,7 +65,9 @@ See `docs/engineering/TEST_RESULTS.md` for exact commands and output summaries.
 
 - New policy + contract tests: 13/13 pass; contract tests fail 4/5 against main's unfixed route (negative control).
 - Local PostgreSQL 16.15: 14/14 migration and transaction checks pass, including a real concurrent double-accept.
-- Full built-in suite: 242/247 pass; 5 failures are missing packages only (no assertion failures).
+- Learner-request gates: 4/4 pass; 2/4 fail against main's unfixed route.
+- Full built-in suite: 246/251 pass; 5 failures are missing packages only (no assertion failures).
+- Static route inventory of all 201 handlers: no further high-severity defect found (`SECURITY_REVIEW.md`, pass 2).
 - Secret scan: 0 issues.
 - **Not run:** typecheck, production build, Playwright, PGlite test, staging E2E. CI must run these.
 
@@ -81,3 +92,6 @@ See `docs/engineering/TEST_RESULTS.md` for exact commands and output summaries.
 8. Are the tests meaningful and sufficient? What route-level integration test would you require before merge?
 9. Any performance concerns (pending-count query per invite, inbox query by email index)?
 10. Is the change safe to integrate ahead of the other open PRs listed in `MASTER_COMPLETION_BACKLOG.md`?
+11. Batch 2: is returning 404 for the gated learner routes the right failure mode, and does gating them conflict with any staged country-pilot workflow you can see?
+12. Does the pass-2 route inventory method miss a class of authorization defect you would check for?
+13. Batch 3 (Android): is the secret handling in `native-android-release.yml` sound (keystore in `RUNNER_TEMP`, values via `GITHUB_ENV`, removal on `always()`)? Does overriding `ENABLE_TEST_LOGIN`/`ENABLE_DEMO_MODE` in the `release` build type reliably beat `defaultConfig` fields in AGP 8.9? This batch is **unverified** until the PR's Android debug job and one manual release run pass.
