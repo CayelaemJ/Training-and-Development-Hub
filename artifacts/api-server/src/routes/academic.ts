@@ -155,9 +155,10 @@ router.post("/organizations/:orgId/academic/course-staff",async(req,res)=>{
  if(!await allowed(req,res,org.data,managers))return;
  const foundCourse=await course(org.data,body.data.courseId);
  const [person]=await db.select({id:usersTable.id}).from(usersTable).where(eq(usersTable.email,body.data.email)).limit(1);
- if(!foundCourse||!person){res.status(404).json({error:"Course or registered staff account not found"});return}
- const [membership]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,person.id))).limit(1);
- if(!membership||!staff.includes(membership.role as MemberRole)){res.status(403).json({error:"Staff member must belong to this institution"});return}
+ if(!foundCourse){res.status(404).json({error:"Course not found"});return}
+ // Same response for "no account" and "not staff here": no account-existence oracle.
+ const [membership]=person?await db.select({role:organizationMembersTable.role}).from(organizationMembersTable).where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,person.id))).limit(1):[];
+ if(!person||!membership||!staff.includes(membership.role as MemberRole)){res.status(403).json({error:"Staff member must belong to this institution"});return}
  const [assignment]=await db.insert(courseStaffAssignmentsTable).values({organizationId:org.data,courseId:foundCourse.id,staffId:person.id,assignedBy:req.user!.id}).onConflictDoNothing().returning();
  if(!assignment){res.status(409).json({error:"Already assigned"});return}
  res.status(201).json({courseId:assignment.courseId,userId:assignment.staffId});

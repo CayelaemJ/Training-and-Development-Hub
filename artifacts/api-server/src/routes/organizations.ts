@@ -1,9 +1,11 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq, desc, count, avg } from "drizzle-orm";
+import { and, eq, desc, count, avg, gt, sql } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, usersTable, organizationsTable, organizationMembersTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
+import { db, usersTable, organizationsTable, organizationMembersTable, organizationInvitationsTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
 import { auditSuperadmin } from "../lib/platformAudit";
+import { normalizeInvitationEmail, isInvitableRole, mayInvite, uniformInvitationResponse, mayRespondToInvitation, isInvitationDecision, verifiedInviteeEmail } from "../lib/organizationInvitationPolicy";
+import { getSession, getSessionId } from "../lib/auth";
 const router: IRouter=Router();
 const num=z.coerce.number().int().positive();
 function me(req:Request,res:Response):string|null {if (!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null;} return req.user!.id;}
@@ -43,16 +45,86 @@ router.get("/organizations/:orgId/members",async(req,res)=>{
  if(!await guard(req,res,id.data,managers))return;
  res.json(await db.select({userId:organizationMembersTable.userId,role:organizationMembersTable.role,email:usersTable.email,firstName:usersTable.firstName,lastName:usersTable.lastName}).from(organizationMembersTable).innerJoin(usersTable,eq(usersTable.id,organizationMembersTable.userId)).where(eq(organizationMembersTable.organizationId,id.data)));
 });
+// Consent-based membership. A manager invites an email; nobody becomes a member
+// until the account holder for that email accepts. The response is identical
+// whether or not the email belongs to an account (no account-existence oracle,
+// no name/email disclosure through the members list). See
+// lib/organizationInvitationPolicy.ts and docs/engineering/SECURITY_REVIEW.md.
+const MAX_PENDING_INVITATIONS_PER_ORG=500;
 router.post("/organizations/:orgId/members",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);
- const body=z.object({email:z.email(),role:z.enum(["admin","teacher","assessor","learner"])}).safeParse(req.body);
- if(!oid.success||!body.success){res.status(400).json({error:"Invalid member details"});return;}
- if(!await guard(req,res,oid.data,["owner","admin"]))return;
- if(body.data.role==="admin" && !isPlatformSuperadmin(req.user!.id) && (await member(oid.data,req.user!.id))?.role!=="owner"){res.sendStatus(403);return;}
- const [person]=await db.select().from(usersTable).where(eq(usersTable.email,body.data.email)).limit(1);
- if(!person){res.status(404).json({error:"User must sign up before they can be added"});return;}
- try {await db.insert(organizationMembersTable).values({organizationId:oid.data,userId:person.id,role:body.data.role});res.status(201).json({userId:person.id,role:body.data.role});}
- catch {res.status(409).json({error:"Already a member"});}
+ const email=normalizeInvitationEmail(req.body?.email);
+ const role=req.body?.role;
+ if(!oid.success||!email||!isInvitableRole(role)){res.status(400).json({error:"Invalid member details"});return;}
+ const actor=await guard(req,res,oid.data,managers);if(!actor)return;
+ if(!mayInvite(actor.role,role,isPlatformSuperadmin(req.user!.id))){res.sendStatus(403);return;}
+ // Only an existing membership is reported, and managers can already see member emails.
+ const [existingMember]=await db.select({userId:organizationMembersTable.userId}).from(organizationMembersTable)
+  .innerJoin(usersTable,eq(usersTable.id,organizationMembersTable.userId))
+  .where(and(eq(organizationMembersTable.organizationId,oid.data),sql`lower(${usersTable.email}) = ${email}`)).limit(1);
+ if(existingMember){res.status(409).json({error:"Already a member"});return;}
+ const [pending]=await db.select({value:count()}).from(organizationInvitationsTable)
+  .where(and(eq(organizationInvitationsTable.organizationId,oid.data),eq(organizationInvitationsTable.status,"pending")));
+ if((pending?.value??0)>=MAX_PENDING_INVITATIONS_PER_ORG){res.status(429).json({error:"Too many open invitations. Revoke unused invitations first."});return;}
+ // An open invitation for the same email is left unchanged (idempotent).
+ await db.insert(organizationInvitationsTable).values({organizationId:oid.data,email,role,invitedBy:req.user!.id}).onConflictDoNothing();
+ res.setHeader("Cache-Control","no-store");
+ res.status(202).json(uniformInvitationResponse());
+});
+router.get("/organizations/:orgId/invitations",async(req,res)=>{
+ const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
+ if(!await guard(req,res,oid.data,managers))return;
+ res.setHeader("Cache-Control","no-store");
+ // Lists only what managers typed; never joins to users, so it reveals nothing about accounts.
+ res.json(await db.select({id:organizationInvitationsTable.id,email:organizationInvitationsTable.email,role:organizationInvitationsTable.role,createdAt:organizationInvitationsTable.createdAt,expiresAt:organizationInvitationsTable.expiresAt})
+  .from(organizationInvitationsTable)
+  .where(and(eq(organizationInvitationsTable.organizationId,oid.data),eq(organizationInvitationsTable.status,"pending")))
+  .orderBy(desc(organizationInvitationsTable.createdAt)).limit(MAX_PENDING_INVITATIONS_PER_ORG));
+});
+router.delete("/organizations/:orgId/invitations/:invitationId",async(req,res)=>{
+ const oid=num.safeParse(req.params.orgId),iid=num.safeParse(req.params.invitationId);
+ if(!oid.success||!iid.success){res.sendStatus(400);return;}
+ if(!await guard(req,res,oid.data,managers))return;
+ const [revoked]=await db.update(organizationInvitationsTable).set({status:"revoked",respondedAt:new Date(),respondedBy:req.user!.id})
+  .where(and(eq(organizationInvitationsTable.id,iid.data),eq(organizationInvitationsTable.organizationId,oid.data),eq(organizationInvitationsTable.status,"pending")))
+  .returning({id:organizationInvitationsTable.id});
+ if(!revoked){res.sendStatus(404);return;}
+ res.sendStatus(204);
+});
+// The stored account email is copied from identity claims without requiring
+// verification; only trust it when this session also holds the same
+// provider-verified email (same rule as notification consent).
+async function inviteeEmail(req:Request,userId:string):Promise<string|null>{
+ const sid=getSessionId(req),session=sid?await getSession(sid):null;
+ if(!session||session.user?.id!==userId)return null;
+ const [row]=await db.select({email:usersTable.email}).from(usersTable).where(eq(usersTable.id,userId)).limit(1);
+ return verifiedInviteeEmail(row?.email,session.verified_email);
+}
+// Invitee inbox: only invitations addressed to the signed-in account's own verified email.
+router.get("/organization-invitations",async(req,res)=>{
+ const id=me(req,res);if(!id)return;
+ res.setHeader("Cache-Control","no-store");
+ const email=await inviteeEmail(req,id);if(!email){res.json([]);return;}
+ res.json(await db.select({id:organizationInvitationsTable.id,organizationId:organizationInvitationsTable.organizationId,organization:organizationsTable.name,role:organizationInvitationsTable.role,expiresAt:organizationInvitationsTable.expiresAt})
+  .from(organizationInvitationsTable).innerJoin(organizationsTable,eq(organizationsTable.id,organizationInvitationsTable.organizationId))
+  .where(and(eq(organizationInvitationsTable.email,email),eq(organizationInvitationsTable.status,"pending"),gt(organizationInvitationsTable.expiresAt,new Date())))
+  .orderBy(desc(organizationInvitationsTable.createdAt)).limit(100));
+});
+router.post("/organization-invitations/:invitationId/decision",async(req,res)=>{
+ const id=me(req,res);if(!id)return;
+ const iid=num.safeParse(req.params.invitationId),decision=req.body?.decision;
+ if(!iid.success||!isInvitationDecision(decision)){res.sendStatus(400);return;}
+ const email=await inviteeEmail(req,id);
+ const result=await db.transaction(async tx=>{
+  const [invitation]=await tx.select().from(organizationInvitationsTable).where(eq(organizationInvitationsTable.id,iid.data)).limit(1).for("update");
+  // Same 404 for missing, answered, expired or someone else's invitation.
+  if(!invitation||!mayRespondToInvitation(invitation,email,new Date()))return null;
+  if(decision==="accepted")await tx.insert(organizationMembersTable).values({organizationId:invitation.organizationId,userId:id,role:invitation.role}).onConflictDoNothing();
+  await tx.update(organizationInvitationsTable).set({status:decision,respondedAt:new Date(),respondedBy:id}).where(eq(organizationInvitationsTable.id,invitation.id));
+  return {organizationId:invitation.organizationId,status:decision};
+ });
+ if(!result){res.status(404).json({error:"Pending invitation not found"});return;}
+ res.json(result);
 });
 router.get("/organizations/:orgId/groups",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
