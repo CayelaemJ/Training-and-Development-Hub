@@ -31,7 +31,7 @@ Priority: **P0** production blocker · **P1** core product completion · **P2** 
 | P1-05 | AI tutoring chat with layered safety | #95, #180, #181, #187 | PARTIALLY | Reuse `aiCompletion` + quota + retry; add input/output classifiers, per-learner rate limits, no learner PII in prompts, refusal templates, eval set | Owner decision on HF routing (#95 billing blocked) |
 | P1-06 | Safeguarding escalation process (no AI "diagnosis") | — | NOT IMPLEMENTED | Human-reviewed concern flags routed to approved school safeguarding contacts only; no automatic guardian disclosure | Owner + school policy + legal basis |
 | P1-07 | Admissions & transfers | #96 | PARTIALLY | Keep draft until institution, child-data and jurisdiction gates pass | External gates |
-| P1-08 | Effective scores incorporate assessor overrides | — | NOT IMPLEMENTED | README records overrides are audited but not applied to dashboards | — |
+| P1-08 | Effective scores incorporate assessor overrides | #198 | IMPLEMENTED BUT UNVERIFIED IN STAGING (`a8ab4e8`, `51ab90f`) | Staff submissions and dashboard use latest override per question; learners see reviewed results via `/api/my-assignment-results`. Remaining: native apps do not show reviewed marks; reviewed scores are not certified finals | — |
 | P1-09 | Data-subject export and authorized deletion workflows; retention enforcement | — | PARTIALLY | Implement per POPIA/BW gap assessment | Counsel |
 | P1-10 | Qualified legal review of POPIA/PAIA/Botswana DPA position | — | BLOCKED | `docs/legal/*` are drafts | Counsel |
 

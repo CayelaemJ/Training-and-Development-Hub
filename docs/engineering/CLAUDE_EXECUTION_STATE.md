@@ -15,7 +15,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 
 | Branch | Base | Head (code) | State |
 |---|---|---|---|
-| `fix/org-member-consent-invitations-20261122` | `5a30e1c` | `d1e8ade` (+ docs commits) | Local to the 2026-11-22 session; **not pushed** — this session had read-only access. Delivered as a git bundle and patch series to the owner. |
+| `fix/org-member-consent-invitations-20261122` | `5a30e1c` | `85ee311` (+ docs commit) — **PR #198 open, pushed directly** | Pushed to origin; PR #198. Push access granted mid-session; PR create/update/comment and job re-run are still refused (403) for the GitHub app. |
 
 ## Completed
 
@@ -25,12 +25,14 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 - Audit, backlog, security review, test results, release readiness, review handoff.
 - P0-09 learner guardian-invite and transfer routes gated server-side (`2ed9974`), 4 tests.
 - Static authorization review of all 201 route handlers (SECURITY_REVIEW.md pass 2); no further high-severity defect found.
-- P1-01 Android release build type, secret-only signing, manual APK/AAB workflow (`d1e8ade`) — **not yet run**.
+- P1-01 Android release build type, secret-only signing, manual APK/AAB workflow (`d1e8ade`) — debug job evaluates the script in CI; release workflow **not yet run**.
+- P1-08 effective scores with assessor overrides (`a8ab4e8`) and learner reviewed-results view (`51ab90f`).
+- Three Codex P2 findings on PR #198 fixed (`85ee311`).
 
 ## In progress / next priority
 
-1. **Owner:** push the branch, open a PR, let CI run typecheck/build/Playwright/PGlite. Fix any CI failure before review.
-2. ChatGPT review of the handoff; address findings.
+1. Check PR #198 CI for `85ee311`. `android-tests` failed twice on emulator boot timeout before any test ran (runner infrastructure); owner re-runs it.
+2. Owner comments `@codex review` to re-review after `85ee311`.
 3. P0-08 owner reviews pre-fix memberships (query in SECURITY_REVIEW.md).
 4. P0-06 runtime two-tenant authorization integration suite (start with organizations, institutionRecords, academic, learnerSupport, reportCards) — needs an installed workspace.
 5. P1-01: confirm the PR's Android debug job passes with the new build script, then run the manual release workflow unsigned; owner adds signing secrets for a signed candidate.

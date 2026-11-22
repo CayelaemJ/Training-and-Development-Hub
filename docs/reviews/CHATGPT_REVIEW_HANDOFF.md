@@ -3,6 +3,16 @@
 **Implementer:** Claude · **Reviewer requested:** ChatGPT · **Owner decision:** pending
 **Review status:** NOT YET REVIEWED. Do not treat as approved.
 
+## Responses to Codex review of `06a16ae` (2026-11-22)
+
+| Codex finding | Response | Commit |
+|---|---|---|
+| P2: invitation inbox unreachable for users without an organization (learner/parent navigation omits `/organizations`) | Agreed. `InvitationInbox` is now also mounted on the role dashboard `/`, which every portal can reach. The page reloads after acceptance so portal and navigation update | `85ee311` |
+| P2: expired pending invitation blocks re-inviting while returning 202 | Agreed. The insert is now `ON CONFLICT (organization_id,email) WHERE status='pending' DO UPDATE … WHERE expires_at <= now()`: an expired row is refreshed in place (new role, inviter, 14-day expiry); an unexpired row is unchanged. Managers see expired invitations flagged. PostgreSQL 16 harness 16/16; PGlite test extended | `85ee311` |
+| P2: Android version code above Int range silently becomes 1 | Agreed. The default applies only when `caboVersionCode` is absent; unparsable values (e.g. `3000000000`) fail the build. Validated with local Gradle for absent, 7, 3000000000, abc, 0 and 2100000000 | `85ee311` |
+
+Replies could not be posted on the threads from the implementing session (GitHub app lacks PR write permission). Comment `@codex review` to re-review.
+
 ## Implementation summary
 
 **What:** organization managers can no longer add a registered account to their organization by email. They create an invitation; the account holder accepts or declines. The invite response is identical for every email. Two smaller account-existence oracles (course-staff and hierarchy assignment) were also removed.
@@ -17,7 +27,7 @@
 |---|---|
 | Branch | `fix/org-member-consent-invitations-20261122` |
 | Base commit | `5a30e1c9bbcf44d9e2f3d8c17f41b9109316061f` (main, 2026-11-21) |
-| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config |
+| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes |
 | Docs commit | the commit after `83fb70e` on this branch (audit, backlog, security review, test results, this handoff, execution state) |
 | Related PRs | none open for this defect; PR numbers for older security work (#58/#59/#60) are referenced in the backlog only |
 | Migration | `lib/db/migrations/20261122_organization_invitations.sql` (additive: one table, two indexes) |
@@ -58,6 +68,8 @@ API surface:
 | `POST /api/organization-invitations/:id/decision` `{decision}` | addressee | Row-locked; accept inserts membership with invitation role; uniform 404 for missing/answered/expired/not-yours |
 | `POST /api/guardian-relationships` | learner | **404 unless `ENABLE_LEARNER_GUARDIAN_INVITES=true`**; when on, 202 with one body for every email (was 400/201/409) |
 | `POST /api/institution-records/transfers` | learner | **404 unless `ENABLE_LEARNER_TRANSFER_REQUESTS=true`**; otherwise unchanged |
+| `GET /api/organizations/:orgId/submissions`, `…/dashboard` | owner, admin | Adds effective marks (latest assessor override per question, else AI), `reviewStatus`, `averageEffectiveScore`, `assessorAdjustedSubmissions`; AI fields unchanged |
+| `GET /api/my-assignment-results` | signed-in learner | Own submissions only (latest 100): AI and effective scores, reviewed questions with review reason; no assessor identity, no stored answers |
 
 ## Verification evidence
 
