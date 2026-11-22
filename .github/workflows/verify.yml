@@ -29,6 +29,7 @@ jobs:
       - run: node scripts/test-school-operations.mjs
       - run: node scripts/test-guardian-progress.mjs
       - run: node scripts/test-accountability-chat.mjs
+      - run: node scripts/test-demo-scale.mjs
       - name: Verify isolated native demo scripts
         run: |
           bash -n scripts/render-native-test-start.sh

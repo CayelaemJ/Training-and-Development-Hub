@@ -33,6 +33,7 @@ const server=app.listen(port, "0.0.0.0", (err) => {
   }
   if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === "testing" && process.env.ENABLE_CABO_DEMO_SEED === "true") {
     import("./lib/demoSeed").then(({ seedCaboDemo }) => seedCaboDemo())
+      .then(() => process.env.CABO_DEMO_SCALE === "false" ? undefined : import("./lib/demoSeedScale").then(({ seedCaboDemoAtScale }) => seedCaboDemoAtScale()))
       .catch(err => logger.error({ err }, "CABO demo fixture seeding failed"));
   }
 });
