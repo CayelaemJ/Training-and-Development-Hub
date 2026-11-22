@@ -10,7 +10,7 @@ test("ordinary schoolwork is shown at once", () => {
 
 test("contact details, links, off-platform invitations, abuse and self-harm language are held", () => {
   const cases = [
-    ["my number is 071 234 5678", "phone_number"], ["call +267 71 234 567", "phone_number"],
+    ["the office is 071 234 5678", "phone_number"], ["my number is 071 234 5678", "off_platform_invite"], ["whatsapp me on 0712345678", "off_platform_invite"], ["call +267 71 234 567", "phone_number"],
     ["email me at kid@example.com", "email_address"], ["go to www.example.com", "link"],
     ["follow @coolkid99", "social_handle"], ["add me on WhatsApp", "off_platform_invite"],
     ["meet me after school, don't tell", "off_platform_invite"], ["kys", "abusive_language"],

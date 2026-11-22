@@ -88,7 +88,12 @@ router.post("/organizations/:orgId/accountability/cases", async (req, res) => {
   // reporting guardian's verified children); never accept an arbitrary account id.
   if (body.data.subjectUserId) {
     const subject = await memberContext(org.data, body.data.subjectUserId);
-    const allowed = !!subject.orgRole || (verifiedGuardian && await isVerifiedGuardianAt(org.data, userId, body.data.subjectUserId));
+    // School members may name anyone in the school. A guardian, who is not a
+    // member, may only name their own verified child, so outsiders cannot
+    // probe which accounts belong to the school.
+    const allowed = verifiedGuardian
+      ? await isVerifiedGuardianAt(org.data, userId, body.data.subjectUserId)
+      : !!subject.orgRole;
     if (!allowed) { res.status(400).json({ error: "That person is not part of this school." }); return; }
   }
   const row = await openCase({

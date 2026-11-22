@@ -17,12 +17,13 @@ export type ReportReason = (typeof REPORT_REASONS)[number];
 export type ScreenResult = { status: "visible" } | { status: "held"; reason: string };
 
 const PATTERNS: ReadonlyArray<[string, RegExp]> = [
+  // Checked first: an invitation to move off the platform is the most serious signal.
+  ["off_platform_invite", /\b(?:whats\s?app|telegram|snap\s?chat|instagram|tiktok|signal|discord|kik|dm me|inbox me|text me|call me|my number|meet (?:me|up)|come alone|don'?t tell)\b/i],
   ["email_address", /[^\s@]+@[^\s@]+\.[a-z]{2,}/i],
   // 7+ digits allowing spaces, dots, dashes and brackets, optionally with +27/+267.
   ["phone_number", /(?:\+?\d[\s().-]*){7,}/],
   ["link", /\b(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]+\.(?:com|co\.za|co\.bw|org|net|io|me|app|ly|gg)\b/i],
   ["social_handle", /(?:^|\s)@[a-z0-9_.]{3,}/i],
-  ["off_platform_invite", /\b(?:whats\s?app|telegram|snap\s?chat|instagram|tiktok|signal|discord|kik|dm me|inbox me|text me|call me|my number|meet (?:me|up)|come alone|don'?t tell)\b/i],
 ];
 const ABUSIVE = /\b(?:kill yourself|kys|go die|ugly\s+(?:loser|freak)|nobody likes you)\b/i;
 const SELF_HARM = /\b(?:want to die|kill myself|end it all|hurt myself|self[-\s]?harm|suicid(?:e|al))\b/i;
