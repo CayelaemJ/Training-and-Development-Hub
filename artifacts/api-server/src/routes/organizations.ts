@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq, desc, count, gt, sql } from "drizzle-orm";
+import { and, eq, desc, count, gt, inArray, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, usersTable, organizationsTable, organizationMembersTable, organizationInvitationsTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
@@ -200,6 +200,30 @@ async function organizationSubmissions(orgId:number){
    effectiveQuestions:result.questions.map(q=>({questionIndex:q.questionIndex,effectiveMarks:q.effectiveMarks,overridden:q.overridden}))};
  });
 }
+// Learner view of their own assigned-exam results, including assessor review.
+// Only rows where the submission belongs to the signed-in user; the assessor's
+// identity is not disclosed, the review reason is (it is feedback on their work).
+router.get("/my-assignment-results",async(req,res)=>{
+ const id=me(req,res);if(!id)return;
+ res.setHeader("Cache-Control","private, no-store");
+ const rows=await db.select({submissionId:assignmentSubmissionsTable.id,assignmentId:assignmentSubmissionsTable.assignmentId,submittedAt:assignmentSubmissionsTable.submittedAt,title:writtenExamsTable.title,organization:organizationsTable.name,feedback:writtenExamAttemptsTable.feedback})
+  .from(assignmentSubmissionsTable)
+  .innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId))
+  .innerJoin(organizationsTable,eq(organizationsTable.id,examAssignmentsTable.organizationId))
+  .innerJoin(writtenExamsTable,eq(writtenExamsTable.id,examAssignmentsTable.examId))
+  .innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId))
+  .where(and(eq(assignmentSubmissionsTable.userId,id),eq(writtenExamAttemptsTable.userId,id)))
+  .orderBy(desc(assignmentSubmissionsTable.submittedAt)).limit(100);
+ const overrides=rows.length?await db.select({id:assessorOverridesTable.id,submissionId:assessorOverridesTable.submissionId,questionIndex:assessorOverridesTable.questionIndex,awardedMarks:assessorOverridesTable.awardedMarks,assessorId:assessorOverridesTable.assessorId,reason:assessorOverridesTable.reason,createdAt:assessorOverridesTable.createdAt})
+  .from(assessorOverridesTable).where(inArray(assessorOverridesTable.submissionId,rows.map(r=>r.submissionId))):[];
+ res.json(rows.map(row=>{
+  const result=effectiveMarks(row.feedback,overrides.filter(o=>o.submissionId===row.submissionId));
+  return {submissionId:row.submissionId,assignmentId:row.assignmentId,title:row.title,organization:row.organization,submittedAt:row.submittedAt,
+   aiPercentage:result.aiPercentage,effectivePercentage:result.effectivePercentage,effectiveAwardedMarks:result.effectiveAwardedMarks,maxMarks:result.maxMarks,
+   reviewStatus:result.overriddenQuestions>0?"assessor_adjusted":"ai_provisional",
+   questions:result.questions.map(q=>({questionIndex:q.questionIndex,maxMarks:q.maxMarks,aiMarks:q.aiMarks,effectiveMarks:q.effectiveMarks,overridden:q.overridden,reviewReason:q.override?.reason??null}))};
+ }));
+});
 router.get("/organizations/:orgId/dashboard",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
  if(!await guard(req,res,oid.data,managers))return;

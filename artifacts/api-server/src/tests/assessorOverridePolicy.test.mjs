@@ -77,3 +77,17 @@ test("staff dashboard and submissions use effective marks from organization-scop
   // AI marks on the attempt row are never rewritten by the review flow.
   assert.doesNotMatch(routes, /update\(writtenExamAttemptsTable\)/);
 });
+
+test("learners see only their own reviewed results and never the assessor's identity", () => {
+  const routes = readFileSync(new URL("../routes/organizations.ts", import.meta.url), "utf8");
+  const start = routes.indexOf('router.get("/my-assignment-results"');
+  assert.ok(start >= 0, "learner results route must exist");
+  const route = routes.slice(start, routes.indexOf("\nrouter.", start + 1));
+  assert.match(route, /me\(req,res\)/);
+  assert.match(route, /eq\(assignmentSubmissionsTable\.userId,id\)/);
+  assert.match(route, /eq\(writtenExamAttemptsTable\.userId,id\)/);
+  assert.match(route, /\.limit\(100\)/);
+  const response = route.slice(route.indexOf("res.json("));
+  assert.doesNotMatch(response, /assessorId/);
+  assert.doesNotMatch(response, /answers/);
+});
