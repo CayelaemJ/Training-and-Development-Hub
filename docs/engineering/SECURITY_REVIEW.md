@@ -68,6 +68,20 @@ The web client disabled learner-initiated guardian invitations and school transf
 
 **Verification:** `learnerInitiatedRequestPolicy.test.mjs` 4/4 pass; against the unfixed route 2/4 fail (gate presence and uniform response).
 
+## Finding F-2026-11-22-03 — learner attendance view returned staff notes
+
+**Severity:** Medium (children's data minimisation). **Status:** fixed on the same branch (`d3e2e64`); not deployed.
+
+`GET /api/school/attendance/me` (used by the web school-operations page) selected every column of `school_attendance` across all schools. Learners therefore received staff `note` text and the `recorded_by` user id. The scoped endpoint and `docs/legal/ZA_BW_SCOPED_ATTENDANCE.md` require that notes and recorder identity stay private. The legacy endpoint is only blocked when `CABO_COUNTRY_PILOT_ENFORCEMENT=true`, which is off by default. It now returns `id`, `organizationId`, `day` and `status`; the page only renders day and status. Verified by `attendancePrivacyContract.test.mjs` (1 of 2 fails on the old code) and the school-operations integration suite.
+
+## Design issue D-2026-11-22-01 — guardian relationship status is global, verification is per school
+
+`guardian_relationships.status` is one value shared by every school, while verification events are per school. Consequences, found by reading `routes/guardianVerification.ts` (no data is leaked):
+- a guardian already `verified` by one school cannot be verified by a second school where the same learner is enrolled, because verification requires status `accepted` (`guardian_must_accept_first`);
+- one school's `revoked` decision sets the shared status to `revoked`, which also ends the guardian's access at the other school, whose own latest decision is still `verified`.
+
+Report access stays safe because it also requires the requesting school's own latest decision. Fixing this means per-school relationship status, or deriving status from per-school events. That is a schema and product decision for the owner, and is logged as backlog P1-11.
+
 ## Route authorization coverage (pass 2)
 
 | Inventory | Result |
@@ -87,6 +101,6 @@ Lower-severity observations (not fixed): `POST /written-exams/:id/attempts` answ
 | R-01 | Guardian-link requests still let the requesting learner infer account existence through their own relationship list, if `ENABLE_LEARNER_GUARDIAN_INVITES` is turned on | Low (off by default) | P2-01 |
 | R-02 | `users.email` stored without requiring `email_verified`; any other future email-matching feature must use `verified_email` | Medium | P0-05 |
 | R-03 | Authorization is application-layer only; no Postgres RLS | Medium | P2-02 |
-| R-04 | Runtime two-school tests now cover organizations (15/15) and academics, report cards, guardian report access and institution records (20/20); other modules are static-review only | Medium | P0-06 |
+| R-04 | Runtime two-school tests cover organizations (15), academics/report cards/guardian reports/institution records (20), and guardian verification/attendance/notices/careers/timetables (13); other modules are static-review only | Medium | P0-06 |
 | R-06 | Non-owner memberships created before F-01 was fixed were never consented to | High until reviewed | P0-08 |
 | R-05 | Security scan results in CircleCI/Snyk/ZAP not observable from this session | Unknown | P2-05 |

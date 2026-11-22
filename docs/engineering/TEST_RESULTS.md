@@ -95,6 +95,18 @@ Database generated from the real Drizzle schema with the drizzle-kit API (355 st
 
 Two test-authoring defects were found and fixed via CI logs: a wrong table name, and seed rows with explicit ids that left a serial sequence behind.
 
+## 4g. School operations two-school suite (`scripts/test-school-operations.mjs`)
+
+13/13 checks passed at `741e0e8` (job 137271607938):
+- guardian review queues limited to a school's own enrolled learners;
+- verification refused for learners the school doesn't enrol, and without a manager, reviewed evidence or the guardian's acceptance; a successful verification is recorded against the verifying school;
+- attendance recorded only by a school's own managers, for its own learners; both learner views return no notes or recorder identity;
+- staff-only notices hidden from learners; no cross-school notice posting or reading;
+- applications to another school's opportunity can't be read; career applications stay closed while the safeguard flags are off;
+- role-based timetable visibility; no cross-school teachers or slot changes.
+
+The schema helper (`schemaFromDrizzle.ts`) is now shared with the academic records suite.
+
 ## 5. Not run (and why)
 
 | Check | Reason |

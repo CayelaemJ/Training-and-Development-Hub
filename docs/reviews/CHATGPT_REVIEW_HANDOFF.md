@@ -27,7 +27,7 @@ Replies could not be posted on the threads from the implementing session (GitHub
 |---|---|
 | Branch | `fix/org-member-consent-invitations-20261122` |
 | Base commit | `5a30e1c9bbcf44d9e2f3d8c17f41b9109316061f` (main, 2026-11-21) |
-| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes · `a0ef12e` Windows installer · `4ffa2f8`/`8a4a42b` two-tenant integration suite |
+| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes · `a0ef12e` Windows installer · `4ffa2f8`/`8a4a42b` two-tenant integration suite · `e461525`…`e3ee138` academic records suite · `d3e2e64` attendance privacy fix + school operations suite |
 | Docs commit | the commit after `83fb70e` on this branch (audit, backlog, security review, test results, this handoff, execution state) |
 | Related PRs | none open for this defect; PR numbers for older security work (#58/#59/#60) are referenced in the backlog only |
 | Migration | `lib/db/migrations/20261122_organization_invitations.sql` (additive: one table, two indexes) |
@@ -107,4 +107,6 @@ See `docs/engineering/TEST_RESULTS.md` for exact commands and output summaries.
 10. Is the change safe to integrate ahead of the other open PRs listed in `MASTER_COMPLETION_BACKLOG.md`?
 11. Batch 2: is returning 404 for the gated learner routes the right failure mode, and does gating them conflict with any staged country-pilot workflow you can see?
 12. Does the pass-2 route inventory method miss a class of authorization defect you would check for?
+14. Attendance fix (F-03): is projecting `id, organizationId, day, status` enough, or should the legacy all-schools endpoint be retired in favour of the scoped one?
+15. Design issue D-2026-11-22-01: per-school guardian status vs deriving status from per-school events — which do you recommend?
 13. Batch 3 (Android): is the secret handling in `native-android-release.yml` sound (keystore in `RUNNER_TEMP`, values via `GITHUB_ENV`, removal on `always()`)? Does overriding `ENABLE_TEST_LOGIN`/`ENABLE_DEMO_MODE` in the `release` build type reliably beat `defaultConfig` fields in AGP 8.9? This batch is **unverified** until the PR's Android debug job and one manual release run pass.

@@ -29,7 +29,9 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 - P1-08 effective scores with assessor overrides (`a8ab4e8`) and learner reviewed-results view (`51ab90f`).
 - Three Codex P2 findings on PR #198 fixed (`85ee311`).
 - P1-02 Windows per-user `.exe` installer with install/uninstall CI test (`a0ef12e`); passed on `windows-latest`, unsigned.
-- P0-06 (part) runtime two-tenant integration suite for organizations (`4ffa2f8`), 15/15 in CI; full build job green at `8a4a42b`.
+- P0-06 (part) runtime two-school suites: organizations (15), academic records (20), school operations (13) — all green in CI.
+- F-2026-11-22-03 attendance view stopped returning staff notes (`d3e2e64`).
+- Logged D-2026-11-22-01 (global guardian status vs per-school verification) for owner decision.
 
 ## In progress / next priority
 
