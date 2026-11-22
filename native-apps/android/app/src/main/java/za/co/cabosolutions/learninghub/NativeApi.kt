@@ -1589,6 +1589,20 @@ internal class NativeApi(private val context: Context) {
             MaterialPage(id, obj.getString("title"), obj.getString("text"), offset, next)
         }
 
+    /** Grounded study tutor. The server runs the AI, checks ownership and verifies citations. */
+    suspend fun askMaterial(materialId: Int, question: String): TutorAnswer =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(materialId > 0 && question.length in NativeTutorRules.MIN_QUESTION..NativeTutorRules.MAX_QUESTION)
+            val obj = request("/api/materials/$materialId/ask", JSONObject().put("question", question),
+                auth = true, timeoutMs = 60000)
+            val rows = obj.getJSONArray("citations")
+            val citations = (0 until minOf(rows.length(), NativeTutorRules.MAX_CITATIONS + 1)).map { i ->
+                TutorCitation(rows.getJSONObject(i).getString("excerpt"))
+            }
+            NativeTutorRules.validate(TutorAnswer(obj.getInt("materialId"), obj.getString("materialTitle"),
+                obj.getString("answer"), citations, obj.optBoolean("reviewRequired", true)), materialId)
+        }
+
     suspend fun generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String): WrittenExam =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(materialId > 0 && questionCount in 1..10 && difficulty in setOf("beginner", "intermediate", "advanced"))

@@ -61,3 +61,19 @@ After secure sign-in, learner accounts can add a supported document from the And
 ```
 
 The standard debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. CI runs the instrumentation suite on an API 23 emulator and covers secure sign-in, quiz rules, role switching, educator support replies and triage, guidance review, material upload, the learner support-draft form, school-operations and assessment-workspace demo navigation, written exam answer validation and marking feedback, owner/admin assignment creation and mark review, and explicit notification-consent confirmation and revocation. Learner drafts and enrolled subject choices are encrypted with Android Keystore-backed storage, bound to the active session, and cleared on logout. Sending is explicit; a failed attempt leaves the draft for retry. Live object-storage uploads, physical-device checks, signed store releases, full teacher parity, and production authentication remain separate work.
+
+## Study tutor (AI)
+
+Learners with study materials can open **Learn → Study tutor** and ask questions about one of their own materials. The app calls the existing `POST /api/materials/{id}/ask` route; the server runs the configured AI provider (Groq by default), checks material ownership, treats the question as untrusted input and only returns answers whose quoted citations come from that material. The app never holds an AI provider key. Questions are bounded to 5–2,000 characters, the conversation is kept in memory only and cleared when the screen closes, and errors show fixed learner-friendly messages rather than server text.
+
+A short safeguarding phrase list catches questions that suggest a learner may be unsafe. Those questions are **not** sent to the AI; the learner is pointed to a trusted adult, Childline (116 in South Africa) and the in-app teacher support request. This is a safety net, not a classifier, and does not replace school safeguarding procedures.
+
+## Release builds
+
+```sh
+./gradlew :app:testDebugUnitTest      # JVM unit tests
+./gradlew :app:lintRelease            # static analysis
+./gradlew :app:assembleRelease :app:bundleRelease -PcaboVersionCode=2 -PcaboVersionName=0.2.0
+```
+
+Release builds enable R8 code and resource shrinking and strip verbose/debug/info logging. Signing is read only from the build machine's environment: `CABO_ANDROID_KEYSTORE_PATH`, `CABO_ANDROID_KEYSTORE_PASSWORD`, `CABO_ANDROID_KEY_ALIAS` and `CABO_ANDROID_KEY_PASSWORD`. Without all four, `app-release-unsigned.apk` and an unsigned `app-release.aab` are produced and must be signed before distribution. In GitHub Actions, the `android-release` job reads these from repository secrets (`CABO_ANDROID_KEYSTORE_BASE64` plus the three passwords/alias) and uploads the APK and AAB as a 7-day artifact. Nothing is published to Google Play automatically.

@@ -10,8 +10,9 @@ android {
         applicationId = "za.co.cabosolutions.learninghub"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI or a release engineer can raise these without editing source; defaults keep local builds working.
+        versionCode = providers.gradleProperty("caboVersionCode").orNull?.toIntOrNull() ?: 1
+        versionName = providers.gradleProperty("caboVersionName").orNull ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Test URL and login are compile-time settings, never downloaded from a web page.
         val publicOrigin = "https://cabo-learning-hub-pilot.onrender.com"
@@ -27,6 +28,40 @@ android {
         buildConfigField("boolean", "ENABLE_TEST_LOGIN", pilot.toString())
         buildConfigField("boolean", "ENABLE_DEMO_MODE", demo.toString())
     }
+    // Release signing is read only from the environment of the build machine (for example GitHub Actions
+    // secrets). Nothing secret is stored in this repository. Without all four values the release APK/AAB
+    // stay unsigned and must be signed before distribution.
+    val releaseKeystore = System.getenv("CABO_ANDROID_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+    val releaseStorePassword = System.getenv("CABO_ANDROID_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+    val releaseKeyAlias = System.getenv("CABO_ANDROID_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+    val releaseKeyPassword = System.getenv("CABO_ANDROID_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+    val canSignRelease = releaseKeystore != null && file(releaseKeystore).isFile &&
+        releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
+    signingConfigs {
+        if (canSignRelease) {
+            create("caboRelease") {
+                storeFile = file(releaseKeystore!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (canSignRelease) signingConfig = signingConfigs.getByName("caboRelease")
+        }
+    }
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+        warningsAsErrors = false
+    }
+    testOptions { unitTests.isReturnDefaultValues = true }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
@@ -40,6 +75,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
