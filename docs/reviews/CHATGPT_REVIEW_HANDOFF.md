@@ -107,6 +107,6 @@ See `docs/engineering/TEST_RESULTS.md` for exact commands and output summaries.
 10. Is the change safe to integrate ahead of the other open PRs listed in `MASTER_COMPLETION_BACKLOG.md`?
 11. Batch 2: is returning 404 for the gated learner routes the right failure mode, and does gating them conflict with any staged country-pilot workflow you can see?
 12. Does the pass-2 route inventory method miss a class of authorization defect you would check for?
+13. Batch 3 (Android): is the secret handling in `native-android-release.yml` sound (keystore in `RUNNER_TEMP`, values via `GITHUB_ENV`, removal on `always()`)? Does overriding `ENABLE_TEST_LOGIN`/`ENABLE_DEMO_MODE` in the `release` build type reliably beat `defaultConfig` fields in AGP 8.9? This batch is **unverified** until the PR's Android debug job and one manual release run pass.
 14. Attendance fix (F-03): is projecting `id, organizationId, day, status` enough, or should the legacy all-schools endpoint be retired in favour of the scoped one?
 15. Design issue D-2026-11-22-01: per-school guardian status vs deriving status from per-school events — which do you recommend?
-13. Batch 3 (Android): is the secret handling in `native-android-release.yml` sound (keystore in `RUNNER_TEMP`, values via `GITHUB_ENV`, removal on `always()`)? Does overriding `ENABLE_TEST_LOGIN`/`ENABLE_DEMO_MODE` in the `release` build type reliably beat `defaultConfig` fields in AGP 8.9? This batch is **unverified** until the PR's Android debug job and one manual release run pass.
