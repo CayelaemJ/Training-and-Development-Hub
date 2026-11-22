@@ -47,6 +47,7 @@ Priority: **P0** production blocker · **P1** core product completion · **P2** 
 | P2-06 | Monitoring/alerting to an external channel | #125 (merged) | PARTIALLY | Safe error telemetry exists; delivery not evidenced |
 | P2-07 | Dependency updates | #53 #54 #94 #161 #166 #190–193 | UNKNOWN | Several are major bumps (TypeScript 6, framer-motion 14, @types/node 26); test individually |
 | P2-08 | WCAG 2.2 AA audit of web and native | — | NOT STARTED | Use axe + manual screen reader passes |
+| P2-10 | Android UI tests never start: API 23 x86_64 emulator fails to boot on `ubuntu-latest` | #198 | OPEN — owner decision | Four consecutive "Timeout waiting for emulator to boot" on 2026-11-22, including one run with a 900 s window, 2048M RAM and 2 cores (reverted in `9bb83ef`). Options: run UI tests on API 26+ (keeping minSdk 23 builds), switch to a `google_apis` image, or use a self-hosted KVM runner via `CABO_ANDROID_RUNNER_LABELS`. Until then the emulator suite gives no evidence |
 | P2-09 | Pilot-branch backports | #103 #108 #111 #119 #123 #128 #135 #136 #140 #143 #147 #149 | UNKNOWN | Decide whether the separate pilot branch is still deployed; if not, close backports in favour of main |
 
 ## P3 — enhancements

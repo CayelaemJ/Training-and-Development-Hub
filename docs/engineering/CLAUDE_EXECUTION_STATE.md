@@ -31,7 +31,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 
 ## In progress / next priority
 
-1. Check PR #198 CI for `85ee311`. `android-tests` failed twice on emulator boot timeout before any test ran (runner infrastructure); owner re-runs it.
+1. PR #198 CI at `9bb83ef`: build, typecheck, tests, browser, Semgrep, secret scans, iOS and android-build pass. `android-tests` fails before any test runs (API 23 emulator never boots; P2-10, owner decision).
 2. Owner comments `@codex review` to re-review after `85ee311`.
 3. P0-08 owner reviews pre-fix memberships (query in SECURITY_REVIEW.md).
 4. P0-06 runtime two-tenant authorization integration suite (start with organizations, institutionRecords, academic, learnerSupport, reportCards) — needs an installed workspace.
