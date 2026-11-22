@@ -1,0 +1,18 @@
+# Reviewed migrations, in the order they must be applied (dependencies first).
+# render-start.sh applies these with the checksummed runner when
+# APPLY_REVIEWED_MIGRATIONS=true. Append new migrations at the end.
+20261021_learner_success_loop
+20261021_material_reading
+20261022_lifelong_passport_foundation
+20261022_native_auth_codes
+20261022_passport_trust_layers
+20261023_quiz_idempotency
+20261026_country_jurisdiction_setup
+20261026_institution_data_clearance
+20261028_mlops_foundation
+20261029_notification_outbox
+20261029_notification_consent
+20261029_notification_preference_audit
+20261112_learner_ai_profile
+20261114_platform_health_telemetry
+20261122_organization_invitations

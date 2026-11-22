@@ -2,7 +2,7 @@ import {useEffect,useState} from "react";
 import {listAttendanceDrafts,queueAttendanceDraft,removeAttendanceDraft,clearAttendanceDrafts,type AttendanceDraft} from "../lib/attendanceOutbox";
 type Org={id:number;name:string;role:string};
 type Notice={id:number;subject:string;message:string;audience:string;createdAt:string};
-type Attendance={id:number;day:string;status:string;note:string};
+type Attendance={id:number;organizationId:number;day:string;status:string};
 type TimetableSlot={id:number;day:number;startsAt:string;endsAt:string;grade:string;group:string;subject:string;room:string;teacherId:string;status:string};
 async function req<T>(path:string,method="GET",body?:object):Promise<T>{const r=await fetch("/api"+path,{method,credentials:"include",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});if(!r.ok){const d=await r.json().catch(()=>({}));throw Error(d.error??"Request failed")}return r.json()}
 const input="rounded-md border bg-background p-3 text-sm w-full";

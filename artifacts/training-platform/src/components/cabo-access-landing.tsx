@@ -8,6 +8,7 @@ const demoAccounts = [
   { label: 'Assessor — Ubuntu Future', username: 'cabo_assessor_south' },
   { label: 'Learner — Ubuntu Future (Lerato)', username: 'cabo_learner_south_a' },
   { label: 'Learner — Ubuntu Future (Sipho)', username: 'cabo_learner_south_b' },
+  { label: 'Learner — Ubuntu Future (Anele)', username: 'cabo_learner_south_c' },
   { label: 'Parent — Ubuntu Future', username: 'cabo_parent_south' },
   { label: 'District director — Demo district', username: 'cabo_district_south' },
   { label: 'Headmaster — Highveld Independent', username: 'cabo_headmaster_north' },
