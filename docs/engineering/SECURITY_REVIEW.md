@@ -87,6 +87,6 @@ Lower-severity observations (not fixed): `POST /written-exams/:id/attempts` answ
 | R-01 | Guardian-link requests still let the requesting learner infer account existence through their own relationship list, if `ENABLE_LEARNER_GUARDIAN_INVITES` is turned on | Low (off by default) | P2-01 |
 | R-02 | `users.email` stored without requiring `email_verified`; any other future email-matching feature must use `verified_email` | Medium | P0-05 |
 | R-03 | Authorization is application-layer only; no Postgres RLS | Medium | P2-02 |
-| R-04 | Static review only; no runtime two-tenant tests exercise the routes | Medium | P0-06 |
+| R-04 | Runtime two-tenant tests cover the organizations router only (`scripts/test-organizations.mjs`, 15/15 in CI); other modules are static-review only | Medium | P0-06 |
 | R-06 | Non-owner memberships created before F-01 was fixed were never consented to | High until reviewed | P0-08 |
 | R-05 | Security scan results in CircleCI/Snyk/ZAP not observable from this session | Unknown | P2-05 |

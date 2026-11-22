@@ -79,6 +79,12 @@ The `android { signingConfigs / buildTypes }` additions, `assembleRelease`, `bun
 
 All 16 steps succeeded (status read from the public Actions API): Release x64 msbuild; assembly scan (positive control found the production origin; `CABO_ISOLATED_TEST_ORIGIN` absent); Inno Setup compile; silent install (executable and HKCU uninstall key present); 15 s startup check (informational, result in the job summary); silent uninstall (files, uninstall key and synthetic local token removed); SHA-256 checksum. Artifact `CABO-Windows-installer-UNSIGNED`, 21,497,925 bytes. Signing steps skipped (no certificate secrets).
 
+## 4d. Two-tenant integration suite (`scripts/test-organizations.mjs`, CI `verify` job)
+
+Runs the real organizations router against PGlite with real session rows. 15/15 checks passed in GitHub Actions (job 137250791360, commit `4ffa2f8`): the F-01 attack chain yields identical responses and no membership or name disclosure; only the verified addressee can see or answer invitations; decline is final; invite role limits; accept creates exactly one membership; expired invitations renew; school A gets 403/404 on school B members, invitations, submissions, dashboard, overrides and revocation; overrides change effective scores without touching AI marks; learners see only their own results without assessor identity.
+
+At `8a4a42b` the full `build` job is green: install, built-in tests, all five integration scripts, typecheck, production build, browser and mobile checks.
+
 ## 5. Not run (and why)
 
 | Check | Reason |

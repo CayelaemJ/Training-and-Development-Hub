@@ -29,6 +29,7 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 - P1-08 effective scores with assessor overrides (`a8ab4e8`) and learner reviewed-results view (`51ab90f`).
 - Three Codex P2 findings on PR #198 fixed (`85ee311`).
 - P1-02 Windows per-user `.exe` installer with install/uninstall CI test (`a0ef12e`); passed on `windows-latest`, unsigned.
+- P0-06 (part) runtime two-tenant integration suite for organizations (`4ffa2f8`), 15/15 in CI; full build job green at `8a4a42b`.
 
 ## In progress / next priority
 
@@ -37,7 +38,8 @@ node --test artifacts/api-server/src/tests/organizationInvitation*.test.mjs
 3. P0-08 owner reviews pre-fix memberships (query in SECURITY_REVIEW.md).
 4. P0-06 runtime two-tenant authorization integration suite (start with organizations, institutionRecords, academic, learnerSupport, reportCards) — needs an installed workspace.
 5. P1-01: confirm the PR's Android debug job passes with the new build script, then run the manual release workflow unsigned; owner adds signing secrets for a signed candidate.
-6. P0-06 runtime two-tenant authorization tests (CI can run PGlite + esbuild bundles).
+6. P0-06 extend the two-tenant suite to institutionRecords, academic, learnerSupport, reportCards (same harness: `scripts/test-*.mjs` + `supportTestDb.ts`).
+7. CI job logs are readable without auth via `api.github.com/repos/.../actions/jobs/<id>/logs` — use them to diagnose failures.
 
 ## Blockers
 

@@ -27,7 +27,7 @@ Replies could not be posted on the threads from the implementing session (GitHub
 |---|---|
 | Branch | `fix/org-member-consent-invitations-20261122` |
 | Base commit | `5a30e1c9bbcf44d9e2f3d8c17f41b9109316061f` (main, 2026-11-21) |
-| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes · `a0ef12e` Windows installer |
+| Code commits | `602c830` feat(db) · `3b76778` fix(security) · `83fb70e` feat(ui) · `2ed9974` fix(security) learner-request gates · `d1e8ade` build(android) release config · `a8ab4e8` effective scores with assessor overrides · `51ab90f` learner reviewed results · `85ee311` Codex review fixes · `a0ef12e` Windows installer · `4ffa2f8`/`8a4a42b` two-tenant integration suite |
 | Docs commit | the commit after `83fb70e` on this branch (audit, backlog, security review, test results, this handoff, execution state) |
 | Related PRs | none open for this defect; PR numbers for older security work (#58/#59/#60) are referenced in the backlog only |
 | Migration | `lib/db/migrations/20261122_organization_invitations.sql` (additive: one table, two indexes) |
@@ -80,6 +80,7 @@ See `docs/engineering/TEST_RESULTS.md` for exact commands and output summaries.
 - Learner-request gates: 4/4 pass; 2/4 fail against main's unfixed route.
 - Full built-in suite: 246/251 pass; 5 failures are missing packages only (no assertion failures).
 - Static route inventory of all 201 handlers: no further high-severity defect found (`SECURITY_REVIEW.md`, pass 2).
+- Runtime two-tenant integration suite for the organizations router: 15/15 in CI. Full `build` job green at `8a4a42b` (typecheck, build, browser checks).
 - Secret scan: 0 issues.
 - **Not run:** typecheck, production build, Playwright, PGlite test, staging E2E. CI must run these.
 
