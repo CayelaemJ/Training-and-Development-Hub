@@ -61,3 +61,6 @@ export * from "./mlops";
 export * from "./notificationOutbox";
 export * from "./notificationConsent";
 export * from "./learnerAiProfile";
+
+export * from "./accountability";
+export * from "./classChat";

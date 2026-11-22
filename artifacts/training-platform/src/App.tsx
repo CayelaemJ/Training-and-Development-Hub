@@ -34,6 +34,9 @@ import ReportIssuancePage from '@/pages/report-issuance';
 import SchoolIntelligencePage from '@/pages/school-intelligence';
 import QuestionBankPage from '@/pages/assessment-question-bank';
 import EducationCommandPage from '@/pages/education-command';
+import AccountabilityPage from '@/pages/accountability';
+import ClassChatPage from '@/pages/class-chat';
+import PrivacyRightsPage from '@/pages/privacy-rights';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -46,29 +49,31 @@ import {
   Activity, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
   CheckCircle2, ChevronRight, CircleHelp, Clock3, FileText, FileUp, GraduationCap,
   LayoutDashboard, LoaderCircle, LogOut, Plus, RotateCcw, Search,
-  Sparkles, Target, Trash2, X,
+  Sparkles, Target, Trash2, X, ShieldAlert, MessageSquare, Scale,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
 const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
+// Every signed-in person can raise a concern and see which privacy rules apply.
+const alwaysNav=['/notification-preferences','/accountability','/privacy'];
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
  provincial_director:['/','/education-command','/organizations','/governance'],
  district_director:['/','/education-command','/organizations','/governance'],
  group_executive:['/','/education-command','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
- deputy_headmaster:['/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
- department_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
- grade_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
- administrator:['/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
- teacher:['/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
- assessor:['/','/learner-success','/organizations','/written-exams'],
+ headmaster:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/class-chat','/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
+ department_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
+ grade_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
+ administrator:['/class-chat','/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ teacher:['/class-chat','/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
+ assessor:['/class-chat','/','/learner-success','/organizations','/written-exams'],
  parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
- learner:['/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ learner:['/class-chat','/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
   { href: '/my-ai', label: 'My CABO AI profile', icon: BrainCircuit },
@@ -83,6 +88,9 @@ const navItems = [
   { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
   { href: '/notification-preferences', label: 'Notifications', icon: Bell },
+  { href: '/accountability', label: 'Concerns & accountability', icon: ShieldAlert },
+  { href: '/class-chat', label: 'Class chat', icon: MessageSquare },
+  { href: '/privacy', label: 'Privacy & my rights', icon: Scale },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
@@ -144,6 +152,9 @@ function Router() {
     <Route path="/education-command" component={EducationCommandPage} />
     <Route path="/guardian-connect" component={GuardianConnectPage} />
     <Route path="/notification-preferences" component={NotificationPreferencesPage} />
+    <Route path="/accountability" component={AccountabilityPage} />
+    <Route path="/class-chat" component={ClassChatPage} />
+    <Route path="/privacy" component={PrivacyRightsPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
@@ -203,7 +214,7 @@ function AppShell({ user }: { user: any }) {
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
         <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
-        {navItems.filter(item=>portalRole!==null&&(item.href==='/notification-preferences'||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
+        {navItems.filter(item=>portalRole!==null&&(alwaysNav.includes(item.href)||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
         <div className="side-note"><span className="note-mark"><Target size={17} /></span><p>Small sessions add up.<br /><strong>Keep your rhythm.</strong></p></div>
@@ -244,7 +255,7 @@ function AppShell({ user }: { user: any }) {
       </nav>}
       {portalRole && mobileMenuOpen && <div className="mobile-family-more" id="mobile-family-more" role="dialog" aria-modal="false" aria-label="All permitted pages">
         <div className="mobile-family-more-heading"><strong>All your workspaces</strong><button type="button" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}><X size={20}/></button></div>
-        {navItems.filter(item=>allowedNav[portalRole].includes(item.href)).map(({href,label,icon:Icon})=><Link key={href} href={href} onClick={()=>setMobileMenuOpen(false)} className="mobile-family-more-link"><Icon size={18} aria-hidden="true"/>{label}<ChevronRight size={16} aria-hidden="true"/></Link>)}
+        {navItems.filter(item=>alwaysNav.includes(item.href)||allowedNav[portalRole].includes(item.href)).map(({href,label,icon:Icon})=><Link key={href} href={href} onClick={()=>setMobileMenuOpen(false)} className="mobile-family-more-link"><Icon size={18} aria-hidden="true"/>{label}<ChevronRight size={16} aria-hidden="true"/></Link>)}
       </div>}
       <main className="main-content"><Router /></main>
       <footer className="footer cabo-product-footer"><Mark /><span>Training &amp; Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>

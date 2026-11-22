@@ -1,13 +1,17 @@
 import {useEffect,useState} from "react";
 import {Bell,CheckCircle2,LockKeyhole,ShieldCheck,LoaderCircle} from "lucide-react";
 
-type Choice={kind:"guardian_review_requested"|"learner_support_updated";enabled:boolean;canEnable:boolean};
+type Choice={kind:"guardian_review_requested"|"learner_support_updated"|"results_published";enabled:boolean;canEnable:boolean};
 type School={id:number;name:string;choices:Choice[]};
 type Preferences={enabled:boolean;optInAvailable:boolean;schools:School[]};
 const labels:Record<Choice["kind"],{title:string;description:string}>={
   guardian_review_requested:{
     title:"Guardian account updates",
     description:"When school-verified guardian responsibilities need your attention. No child records appear in the email.",
+  },
+  results_published:{
+    title:"New results published",
+    description:"At most one email a day when your child's school publishes new results. No names or marks are in the email; sign in to see them.",
   },
   learner_support_updated:{
     title:"Learning support updates",
