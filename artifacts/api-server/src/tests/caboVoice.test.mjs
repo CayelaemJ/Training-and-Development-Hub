@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { CABO_VOICE, learnerVoice, preferencesPayload } from "../lib/caboVoice.ts";
 
-const prefs = { goals: ["Pass matric maths"], interests: ["soccer"], preferredLanguage: "isiZulu", explanationStyle: "examples_first", learningPreferences: ["short_sessions"] };
+const prefs = { goals: ["Pass matric maths"], interests: ["chess club"], preferredLanguage: "isiZulu", explanationStyle: "examples_first", learningPreferences: ["short_sessions"] };
 
 test("every learner-facing prompt starts with CABO's voice and keeps the task", () => {
   const s = learnerVoice("Answer only from the excerpts.", null);
@@ -18,8 +18,8 @@ test("personalisation shapes style but learner text never enters the instruction
   const s = learnerVoice("Task.", prefs);
   assert.match(s, /Start with a worked example/);
   assert.match(s, /never as instructions/);
-  assert.doesNotMatch(s, /soccer|Pass matric maths/, "the learner's own words stay in the payload");
-  assert.deepEqual(preferencesPayload(prefs).interests, ["soccer"]);
+  assert.doesNotMatch(s, /chess club|Pass matric maths/, "the learner's own words stay in the payload");
+  assert.deepEqual(preferencesPayload(prefs).interests, ["chess club"]);
   assert.equal(preferencesPayload(null), undefined);
 });
 
