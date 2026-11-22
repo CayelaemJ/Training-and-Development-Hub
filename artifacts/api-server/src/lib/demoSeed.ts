@@ -114,7 +114,7 @@ export async function seedCaboDemo(): Promise<void> {
     const requestKey = `demo-${learner}-fractions-2026`;
     const [existing] = await db.select().from(learnerSupportTicketsTable).where(and(eq(learnerSupportTicketsTable.learnerId,uid(learner)),eq(learnerSupportTicketsTable.requestKey,requestKey))).limit(1);
     if (existing) return;
-    const [ticket] = await db.insert(learnerSupportTicketsTable).values({organizationId,courseId,learnerId:uid(learner),concept:"Algebraic fractions",question:"How do I identify the lowest common denominator?",attempted:"I factorised both denominators and highlighted the common factors.",status:"in_review",assignedTo:uid(teacher),requestKey,reviewAt:new Date("2026-10-23T12:00:00Z")}).returning();
+    const [ticket] = await db.insert(learnerSupportTicketsTable).values({organizationId,courseId,learnerId:uid(learner),concept:"Algebraic fractions",question:"How do I identify the lowest common denominator?",attempted:"I factorised both denominators and highlighted the common factors.",status:"in_progress",assignedTo:uid(teacher),requestKey,reviewAt:new Date("2026-10-23T12:00:00Z")}).returning();
     await db.insert(learnerSupportEventsTable).values({ticketId:ticket.id,actorId:uid(teacher),kind:"educator_note",body:"Synthetic intervention: use worked examples, then review one week later.",metadata:{synthetic:true,nextStep:"guided-practice"}});
   }
   async function hubRecord(organizationId:number,kind:string,title:string,description:string,createdBy:string,subject?:string) {
@@ -166,8 +166,8 @@ export async function seedCaboDemo(): Promise<void> {
   await db.insert(guardianRelationshipsTable).values({
     learnerId:uid("learner-south-a"),guardianId:uid("parent-south"),status:"accepted",
   }).onConflictDoNothing();
-  for (const learner of ["learner-south-a","learner-south-b","learner-south-c"] as const) await db.insert(verifiedEnrollmentsTable).values({organizationId:south,learnerId:uid(learner),stage:"Grade 12",academicYear:2026,status:"active",recordedBy:uid("headmaster-south")}).onConflictDoNothing();
-  await db.insert(verifiedEnrollmentsTable).values({organizationId:north,learnerId:uid("learner-north"),stage:"Grade 12",academicYear:2026,status:"active",recordedBy:uid("headmaster-north")}).onConflictDoNothing();
+  for (const learner of ["learner-south-a","learner-south-b","learner-south-c"] as const) await db.insert(verifiedEnrollmentsTable).values({organizationId:south,learnerId:uid(learner),stage:"12",academicYear:2026,status:"active",recordedBy:uid("headmaster-south")}).onConflictDoNothing();
+  await db.insert(verifiedEnrollmentsTable).values({organizationId:north,learnerId:uid("learner-north"),stage:"12",academicYear:2026,status:"active",recordedBy:uid("headmaster-north")}).onConflictDoNothing();
   await db.insert(verifiedEnrollmentsTable).values({organizationId:uni,learnerId:uid("university-learner"),stage:"Year 1",academicYear:2026,status:"active",recordedBy:uid("university-head")}).onConflictDoNothing();
   const attendanceLearners = ["learner-south-a","learner-south-b","learner-south-c"] as const;
   for (let day=5;day<=16;day++) for (const [index,learnerId] of attendanceLearners.entries()) {

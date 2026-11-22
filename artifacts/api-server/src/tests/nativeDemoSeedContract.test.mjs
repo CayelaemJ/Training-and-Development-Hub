@@ -34,6 +34,9 @@ test("role demo covers enrolment, attendance, intervention and connected hub fea
   assert.match(seed, /talent_skill/);
   assert.match(seed, /onConflictDoNothing/);
   assert.match(seed, /Never overwrite manual test results/);
+  assert.match(seed, /status:"in_progress"/);
+  assert.doesNotMatch(seed, /status:"in_review"/);
+  assert.match(seed, /stage:"12"/);
 });
 test("isolated test deploy refuses to push a schema to an unmarked existing database", () => {
   assert.match(guard, /tables\.rows\.length === 0/);
