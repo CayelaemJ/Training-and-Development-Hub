@@ -1,11 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq, desc, count, avg, gt, sql } from "drizzle-orm";
+import { and, eq, desc, count, gt, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, usersTable, organizationsTable, organizationMembersTable, organizationInvitationsTable, learnerGroupsTable, learnerGroupMembersTable, examAssignmentsTable, assignmentSubmissionsTable, writtenExamsTable, writtenExamAttemptsTable, assessorOverridesTable } from "@workspace/db";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
 import { auditSuperadmin } from "../lib/platformAudit";
 import { normalizeInvitationEmail, isInvitableRole, mayInvite, uniformInvitationResponse, mayRespondToInvitation, isInvitationDecision, verifiedInviteeEmail } from "../lib/organizationInvitationPolicy";
 import { getSession, getSessionId } from "../lib/auth";
+import { effectiveMarks, averageEffectivePercentage } from "../lib/assessorOverridePolicy";
 const router: IRouter=Router();
 const num=z.coerce.number().int().positive();
 function me(req:Request,res:Response):string|null {if (!req.isAuthenticated()){res.status(401).json({error:"Sign in required"});return null;} return req.user!.id;}
@@ -181,19 +182,41 @@ router.get("/my-assignments",async(req,res)=>{
  .where(eq(learnerGroupMembersTable.userId,id));
  res.json(rows);
 });
+// Effective marks = latest assessor override per question, else the AI mark.
+// AI marks on the attempt are never modified; overrides stay an audit trail.
+async function organizationSubmissions(orgId:number){
+ const rows=await db.select({id:assignmentSubmissionsTable.id,assignmentId:assignmentSubmissionsTable.assignmentId,userId:assignmentSubmissionsTable.userId,attemptId:assignmentSubmissionsTable.attemptId,percentage:writtenExamAttemptsTable.percentage,awardedMarks:writtenExamAttemptsTable.awardedMarks,maxMarks:writtenExamAttemptsTable.maxMarks,feedback:writtenExamAttemptsTable.feedback,answers:writtenExamAttemptsTable.answers}).from(assignmentSubmissionsTable).innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId)).innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId)).where(eq(examAssignmentsTable.organizationId,orgId));
+ // One tenant-scoped query for every override in this organization.
+ const overrides=rows.length?await db.select({id:assessorOverridesTable.id,submissionId:assessorOverridesTable.submissionId,questionIndex:assessorOverridesTable.questionIndex,awardedMarks:assessorOverridesTable.awardedMarks,assessorId:assessorOverridesTable.assessorId,reason:assessorOverridesTable.reason,createdAt:assessorOverridesTable.createdAt}).from(assessorOverridesTable)
+  .innerJoin(assignmentSubmissionsTable,eq(assignmentSubmissionsTable.id,assessorOverridesTable.submissionId))
+  .innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId))
+  .where(eq(examAssignmentsTable.organizationId,orgId)):[];
+ const bySubmission=new Map<number,typeof overrides>();
+ for(const o of overrides){const list=bySubmission.get(o.submissionId)??[];list.push(o);bySubmission.set(o.submissionId,list);}
+ return rows.map(row=>{
+  const result=effectiveMarks(row.feedback,bySubmission.get(row.id)??[]);
+  return {...row,effectiveAwardedMarks:result.effectiveAwardedMarks,effectivePercentage:result.effectivePercentage,overriddenQuestions:result.overriddenQuestions,
+   reviewStatus:result.overriddenQuestions>0?"assessor_adjusted" as const:"ai_provisional" as const,
+   effectiveQuestions:result.questions.map(q=>({questionIndex:q.questionIndex,effectiveMarks:q.effectiveMarks,overridden:q.overridden}))};
+ });
+}
 router.get("/organizations/:orgId/dashboard",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
  if(!await guard(req,res,oid.data,managers))return;
  const [members]=await db.select({value:count()}).from(organizationMembersTable).where(eq(organizationMembersTable.organizationId,oid.data));
  const [groups]=await db.select({value:count()}).from(learnerGroupsTable).where(eq(learnerGroupsTable.organizationId,oid.data));
  const [assignments]=await db.select({value:count()}).from(examAssignmentsTable).where(eq(examAssignmentsTable.organizationId,oid.data));
- const [submissions]=await db.select({value:count(),mean:avg(writtenExamAttemptsTable.percentage)}).from(assignmentSubmissionsTable).innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId)).innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId)).where(eq(examAssignmentsTable.organizationId,oid.data));
- res.json({members:members.value,groups:groups.value,assignments:assignments.value,submissions:submissions.value,averageAiScore:submissions.mean===null?null:Number(submissions.mean)});
+ const submissions=await organizationSubmissions(oid.data);
+ const ai=submissions.length?Math.round(submissions.reduce((n,x)=>n+x.percentage,0)/submissions.length*10)/10:null;
+ res.setHeader("Cache-Control","private, no-store");
+ res.json({members:members.value,groups:groups.value,assignments:assignments.value,submissions:submissions.length,averageAiScore:ai,
+  averageEffectiveScore:averageEffectivePercentage(submissions),assessorAdjustedSubmissions:submissions.filter(x=>x.reviewStatus==="assessor_adjusted").length});
 });
 router.get("/organizations/:orgId/submissions",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId);if(!oid.success){res.sendStatus(400);return;}
  if(!await guard(req,res,oid.data,managers))return;
- res.json(await db.select({id:assignmentSubmissionsTable.id,assignmentId:assignmentSubmissionsTable.assignmentId,userId:assignmentSubmissionsTable.userId,attemptId:assignmentSubmissionsTable.attemptId,percentage:writtenExamAttemptsTable.percentage,awardedMarks:writtenExamAttemptsTable.awardedMarks,maxMarks:writtenExamAttemptsTable.maxMarks,feedback:writtenExamAttemptsTable.feedback,answers:writtenExamAttemptsTable.answers}).from(assignmentSubmissionsTable).innerJoin(examAssignmentsTable,eq(examAssignmentsTable.id,assignmentSubmissionsTable.assignmentId)).innerJoin(writtenExamAttemptsTable,eq(writtenExamAttemptsTable.id,assignmentSubmissionsTable.attemptId)).where(eq(examAssignmentsTable.organizationId,oid.data)));
+ res.setHeader("Cache-Control","private, no-store");
+ res.json(await organizationSubmissions(oid.data));
 });
 router.post("/organizations/:orgId/submissions/:submissionId/overrides",async(req,res)=>{
  const oid=num.safeParse(req.params.orgId),sid=num.safeParse(req.params.submissionId);
