@@ -150,7 +150,7 @@ try {
     assert.equal((await call("admin-1", "/organizations/2/opportunities/2/applications")).status, 403);
     const own = await call("owner-2", "/organizations/2/opportunities/2/applications");
     assert.equal(own.status, 200);
-    assert.deepEqual(Object.keys(own.data[0]).sort(), ["candidateId", "createdAt", "id", "status", "statement"]);
+    assert.deepEqual(Object.keys(own.data[0]).sort(), ["candidateId", "createdAt", "id", "statement", "status"]);
   });
   await check("applications stay closed while the safeguards flag is off", async () => {
     delete process.env.ENABLE_CAREER_APPLICATIONS_PILOT;
