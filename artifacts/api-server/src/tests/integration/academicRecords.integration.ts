@@ -46,7 +46,7 @@ INSERT INTO organization_members(organization_id,user_id,role) VALUES
  (2,'owner-2','owner'),(2,'teacher-2','teacher'),(2,'learner-2','learner');
 INSERT INTO academic_courses(id,organization_id,name,code,level) VALUES (1,1,'Mathematics','MATH7','Grade 7'),(2,2,'Mathematics','MATH7','Grade 7');
 INSERT INTO academic_periods(id,organization_id,name,year) VALUES (1,1,'Term 1',2026),(2,2,'Term 1',2026);
-INSERT INTO course_enrollments(course_id,user_id) VALUES (1,'learner-1'),(1,'learner-1b'),(2,'learner-2');
+INSERT INTO academic_enrollments(course_id,user_id) VALUES (1,'learner-1'),(1,'learner-1b'),(2,'learner-2');
 INSERT INTO course_staff_assignments(organization_id,course_id,staff_id,assigned_by) VALUES (1,1,'teacher-1','owner-1'),(2,2,'teacher-2','owner-2');
 INSERT INTO academic_assessments(id,organization_id,course_id,period_id,title,category,max_marks,weight,created_by) VALUES
  (1,1,1,1,'Fractions test','test',100,50,'teacher-1'),(2,1,1,1,'Decimals test','test',100,50,'teacher-1'),
