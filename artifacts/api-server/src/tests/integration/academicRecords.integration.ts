@@ -14,7 +14,13 @@ import { engine } from "./supportTestDb";
 
 const kit = createRequire(process.cwd() + "/lib/db/package.json")("drizzle-kit/api");
 const statements: string[] = await kit.generateMigration(kit.generateDrizzleJson({}), kit.generateDrizzleJson(schema as Record<string, unknown>));
-for (const statement of statements) await engine.exec(statement);
+// drizzle-kit emits foreign keys before indexes, but a composite foreign key
+// (e.g. ml_eval -> ml_model_versions(id, organization_id)) needs its unique
+// index to exist first. Apply tables, then indexes, then foreign keys.
+const isForeignKey = (s: string) => /FOREIGN KEY/i.test(s);
+const isIndex = (s: string) => /^\s*CREATE\s+(UNIQUE\s+)?INDEX/i.test(s);
+const ordered = [...statements.filter(s => !isForeignKey(s) && !isIndex(s)), ...statements.filter(isIndex), ...statements.filter(isForeignKey)];
+for (const statement of ordered) await engine.exec(statement);
 console.log(`# schema: ${statements.length} statements generated from lib/db/src/schema`);
 
 // School 1 and school 2. teacher-1 teaches Mathematics at school 1; teacher-1b
