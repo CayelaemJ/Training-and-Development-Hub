@@ -2254,6 +2254,11 @@ private fun RoleContent(
             }
             when (role) {
                 "parent" -> {
+                    item { Text("How your child is doing", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                    if (data.childProgress.isEmpty()) item { NativeCard("No progress to show yet", "Progress appears once a school has verified you as a guardian and published results for an actively enrolled child.") }
+                    items(data.childProgress, key = { "child-progress:${it.learnerId}:${it.organizationId}" }) { progress ->
+                        ChildProgressCard(progress)
+                    }
                     item { Text("School-verified progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                     if (data.parentReportNotice.isNotBlank()) item { Text(data.parentReportNotice, style = MaterialTheme.typography.bodySmall) }
                     if (data.parentReports.isEmpty()) item { NativeCard("No verified reports", "Only a school-verified guardian of an actively enrolled learner can view academic progress.") }

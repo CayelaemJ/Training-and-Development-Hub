@@ -1171,3 +1171,62 @@ class NativeSchoolProgressionConfirmationTest {
             .assertIsDisplayed()
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidChildProgressTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    private fun sample(): org.json.JSONObject = org.json.JSONObject("""
+        {"learnerId":"cabo-fixture-learner-south-a","learnerName":"Lerato Mahlobo","organizationId":12,
+         "organization":"[DEMO] Ubuntu Future","grade":"Grade 12","year":2026,"visibility":"verified_guardian","official":false,
+         "overall":{"current":72.5,"previous":68.0,"change":4.5,"trend":"improving","terms":[{"period":"Term 1","percentage":68.0},{"period":"Term 2","percentage":72.5}]},
+         "outlook":{"status":"watch","reasons":["one or more subjects need watching"]},
+         "subjects":[{"subject":"Mathematics","current":82,"change":2,"trend":"steady","outlook":{"status":"on_track","reason":""},
+                      "standing":{"available":true,"cohortSize":6,"classAverage":70,"band":"top_quarter","differenceFromAverage":12}},
+                     {"subject":"Physical Sciences","current":55,"change":-7,"trend":"declining","outlook":{"status":"watch","reason":"Result dropped"},
+                      "standing":{"available":false,"reason":"Shown only when at least 5 learners have results"}}],
+         "highlights":{"strongest":["Mathematics"],"mostImproved":[],"focusAreas":[{"subject":"Physical Sciences","status":"watch","reason":"Result dropped"}]},
+         "attendance":{"recordedDays":40,"rate":92.5,"trend":"steady"},
+         "recentResults":[{"subject":"Mathematics","assessment":"Test 2","percentage":140}],
+         "method":{"notAPrediction":"Not a forecast."}}
+    """.trimIndent())
+
+    @Test
+    fun parsesTheServerProjectionAndClampsUntrustedValues() {
+        val progress = parseChildProgress(sample())!!
+        assertEquals("watch", progress.outlookStatus)
+        assertEquals(2, progress.subjects.size)
+        assertEquals(70, progress.subjects[0].standing.classAverage)
+        assertEquals(false, progress.subjects[1].standing.available)
+        assertEquals(null, progress.subjects[1].standing.classAverage)
+        assertEquals(100.0, progress.recentResults.single().percentage, 0.0)
+        assertEquals("Not a forecast.", progress.method)
+    }
+
+    @Test
+    fun rejectsResponsesThatAreNotForAVerifiedGuardian() {
+        assertEquals(null, parseChildProgress(sample().put("visibility", "public")))
+        assertEquals(null, parseChildProgress(sample().put("organizationId", 0)))
+        assertEquals(null, parseChildProgress(sample().put("learnerId", "")))
+        assertEquals(null, parseChildProgress(sample().apply { remove("outlook") }))
+        val unknown = parseChildProgress(sample().put("outlook", org.json.JSONObject().put("status", "excellent")))!!
+        assertEquals("not_enough_data", unknown.outlookStatus)
+    }
+
+    @Test
+    fun cardShowsOutlookClassAverageAndPrivacyNote() {
+        compose.setContent { MaterialTheme { ChildProgressCard(parseChildProgress(sample())!!) } }
+        compose.onNodeWithText("Outlook: Worth watching").assertIsDisplayed()
+        compose.onNodeWithText("Class average 70% · Top quarter of the class").assertExists()
+        compose.onNodeWithText("Shown only when at least 5 learners have results").assertExists()
+        compose.onNodeWithText("Not a forecast.").assertExists()
+    }
+
+    @Test
+    fun offlineParentDemoIncludesSyntheticProgress() {
+        val demo = NativeDemoData.parent().childProgress.single()
+        assertEquals("synthetic-learner-7301", demo.learnerId)
+        assertEquals(true, demo.method.startsWith("Demo records only"))
+    }
+}

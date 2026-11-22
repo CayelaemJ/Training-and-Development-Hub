@@ -156,7 +156,8 @@ internal object NativeDemoData {
                     official = false
                 )
             ),
-            parentReportNotice = "Synthetic school-verified preview · not an official report card"
+            parentReportNotice = "Synthetic school-verified preview · not an official report card",
+            childProgress = listOf(demoChildProgress(year))
         )
     }
 
@@ -200,3 +201,38 @@ internal object NativeDemoData {
         return MaterialPage(id, title, text, offset, if (offset == 0) 1 else null)
     }
 }
+
+/** Synthetic parent progress for the offline demo; mirrors the server projection. */
+internal fun demoChildProgress(year: Int) = ChildProgress(
+    learnerId = "synthetic-learner-7301",
+    learnerName = "Ari Sample",
+    organizationId = NativeDemoData.DEMO_ORGANIZATION_ID,
+    organization = "Cabo Valley Learning Centre",
+    grade = "Form 2",
+    year = year,
+    outlookStatus = "watch",
+    outlookReasons = listOf("one or more subjects need watching"),
+    overallCurrent = 74.7,
+    overallChange = 3.4,
+    overallTrend = "improving",
+    terms = listOf(ChildProgressTerm("Term 1", 71.3), ChildProgressTerm("Term 2", 74.7)),
+    attendanceRate = 94.0,
+    attendanceDays = 50,
+    attendanceTrend = "steady",
+    subjects = listOf(
+        ChildProgressSubject("English", 81.0, 4.0, "improving", "on_track", "",
+            ChildProgressStanding(true, 72, "top_quarter", 9, "")),
+        ChildProgressSubject("Integrated Science", 75.0, 1.0, "steady", "on_track", "",
+            ChildProgressStanding(true, 70, "upper_middle", 5, "")),
+        ChildProgressSubject("Mathematics", 54.0, -6.0, "declining", "watch", "Result dropped noticeably since last term",
+            ChildProgressStanding(false, null, null, null, "Shown only when at least 5 learners have results, to protect classmates' privacy.")),
+    ),
+    strongest = listOf("English", "Integrated Science"),
+    mostImproved = listOf("English"),
+    focusAreas = listOf(ChildProgressFocus("Mathematics", "watch", "Result dropped noticeably since last term")),
+    recentResults = listOf(
+        ChildProgressResult("Mathematics", "Fractions test", 54.0),
+        ChildProgressResult("English", "Essay", 81.0),
+    ),
+    method = "Demo records only. The outlook describes published results so far. It is not a forecast or an official assessment.",
+)
