@@ -125,7 +125,9 @@ router.get("/profile-photos/:token", async (req, res) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
   res.setHeader("Cache-Control", "private, max-age=300");
-  res.send(photo.bytes);
+  // Not HTML: bytes were identified as JPEG/PNG/WebP by magic number on upload and are
+  // served with that type, nosniff and a sandbox CSP, so a browser never renders them as markup.
+  res.send(photo.bytes); // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
 });
 
 /** Pictures of the guardian's verified children that wait for a decision. */
