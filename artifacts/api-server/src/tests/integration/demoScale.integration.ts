@@ -11,6 +11,8 @@ import { seedCaboDemoAtScale } from "../../lib/demoSeedScale";
 await createSchemaFromDrizzle();
 await engine.exec(`DROP TABLE class_chat_mutes, class_chat_reports, class_chat_messages, class_chat_channels, accountability_case_events, accountability_cases CASCADE`);
 await engine.exec(readFileSync("lib/db/migrations/20261123_accountability_and_class_chat.sql", "utf8"));
+// Columns the base demo seed writes that exist only through reviewed migrations.
+await engine.exec(readFileSync("lib/db/migrations/20261021_material_reading.sql", "utf8"));
 Object.assign(process.env, { CABO_ENVIRONMENT: "testing", CABO_TEST_DATABASE_ISOLATED: "true", ENABLE_CABO_DEMO_SEED: "true" });
 
 async function counts() {
