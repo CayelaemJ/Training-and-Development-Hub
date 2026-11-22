@@ -320,6 +320,66 @@ export async function seedCaboDemo(): Promise<void> {
       ],
     },
     {
+      learner: "learner-south-b",
+      key: "grade12-fractions",
+      title: "[DEMO] Grade 12 Fractions - Worked Examples",
+      text: [
+        "CABO DEMO MATERIAL. Synthetic teaching material for an educator-led support case.",
+        "To combine algebraic fractions, factorise the denominators and find their least common denominator.",
+        "Example: 1/x + 1/(2x) = 2/(2x) + 1/(2x) = 3/(2x), provided x is not zero.",
+        "Check for excluded values that would make any original denominator equal zero.",
+        "A learner should explain the steps and ask a teacher to review uncertain solutions.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "Simplify 1/x + 1/(2x) for x not equal to zero.",
+         options: ["2/(3x)","3/(2x)","1/(3x)","3x/2"],correctOption: 1,
+         explanation: "Use 2x as the common denominator: 2/(2x)+1/(2x)=3/(2x)."},
+        {prompt: "Which x value is excluded from 1/x?",
+         options: ["1","-1","0","2"],correctOption: 2,
+         explanation: "Division by zero is undefined."},
+      ],
+    },
+    {
+      learner: "learner-south-c",
+      key: "grade12-science",
+      title: "[DEMO] Grade 12 Science - Motion Notes",
+      text: [
+        "CABO DEMO MATERIAL. Fictional Physical Sciences revision, not an official examination.",
+        "Average speed is total distance divided by elapsed time.",
+        "Acceleration is the change in velocity divided by elapsed time.",
+        "A force can change an object's velocity. Always state the units and the assumptions.",
+        "Example: moving 100 metres in 20 seconds gives an average speed of 5 metres per second.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "What is the average speed for 100 m in 20 s?",
+         options: ["2 m/s","5 m/s","20 m/s","2000 m/s"],correctOption: 1,
+         explanation: "Speed = distance/time = 100/20 = 5 metres per second."},
+        {prompt: "Which unit is commonly used for acceleration?",
+         options: ["m/s²","kg","m²","N/m"],correctOption: 0,
+         explanation: "Acceleration is change in velocity per unit time, measured in m/s²."},
+      ],
+    },
+    {
+      learner: "university-learner",
+      key: "typescript-basics",
+      title: "[DEMO] First-year TypeScript - Practice Notes",
+      text: [
+        "CABO DEMO MATERIAL. Fictional introductory programming resource.",
+        "TypeScript adds static type checking to JavaScript source code.",
+        "A variable declared as const cannot be reassigned after initialisation.",
+        "A function can declare parameter and return types, such as function double(x:number):number.",
+        "Static checks help catch certain errors before execution but do not replace tests.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "Which TypeScript annotation represents a number?",
+         options: ["number","integerOnly","digits","numericValue"],correctOption: 0,
+         explanation: "TypeScript uses the primitive type name number."},
+        {prompt: "Does static type checking replace automated runtime tests?",
+         options: ["Always","Only for browser code","No","Only for numbers"],correctOption: 2,
+         explanation: "Type checks and runtime tests find different classes of defects."},
+      ],
+    },
+    {
       learner: "learner-north",
       key: "english-analysis",
       title: "[DEMO] English Text Analysis - Practice Notes",
@@ -377,5 +437,5 @@ export async function seedCaboDemo(): Promise<void> {
     }
   }
 
-  console.info("CABO synthetic fixtures ready: 4 organisations, 14 identities, 5 courses, 11 assessments, 78 attendance rows, 10 learner-journey entries, 8 milestones, 5 school-stage observations, 1 intervention, 5 hub records, 2 native learner quizzes");
+  console.info("CABO synthetic fixtures ready: 4 organisations, 14 identities, 5 courses, 11 assessments, 78 attendance rows, 10 learner-journey entries, 8 milestones, 5 school-stage observations, 1 intervention, 5 hub records, 5 synthetic learner quizzes");
 }
