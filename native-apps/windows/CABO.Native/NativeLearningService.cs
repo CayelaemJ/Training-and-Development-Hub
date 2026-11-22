@@ -34,7 +34,8 @@ public record NativeDashboard(
     IReadOnlyList<string> Quizzes,
     IReadOnlyList<string> Organizations,
     IReadOnlyList<NativeQuizSummary> QuizEntries,
-    IReadOnlyList<string> LearnerReports
+    IReadOnlyList<string> LearnerReports,
+    IReadOnlyList<string> ChildProgress
 );
 
 // Windows uses a loopback RFC8252 authorization-code handoff with PKCE.
@@ -330,6 +331,7 @@ public sealed class NativeLearningService
         var organizations = new List<string>();
         var quizEntries = new List<NativeQuizSummary>();
         var learnerReports = new List<string>();
+        var childProgress = new List<string>();
         if (role == "superadmin") {
             // Audited, privileged endpoint; never assume role solely from UI state.
             using var registry = await FetchAsync("api/platform/overview", cancellation);
@@ -338,6 +340,42 @@ public sealed class NativeLearningService
                 organizations.AddRange(names.EnumerateArray().Take(100)
                     .Select(v => v.TryGetProperty("name", out var n) ? n.GetString() : null)
                     .Where(v => !string.IsNullOrWhiteSpace(v))!);
+        } else if (role == "parent") {
+            // Children and progress are released only to a school-verified
+            // guardian; the server re-checks every request.
+            try {
+                using var children = await FetchAsync("api/guardian/children", cancellation);
+                if (children.RootElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var child in children.RootElement.EnumerateArray().Take(6)) {
+                        if (child.ValueKind != JsonValueKind.Object ||
+                            !child.TryGetProperty("learnerId", out var lid) || lid.ValueKind != JsonValueKind.String ||
+                            !child.TryGetProperty("organizationId", out var oid) || oid.ValueKind != JsonValueKind.Number ||
+                            !child.TryGetProperty("academicYear", out var yr) || yr.ValueKind != JsonValueKind.Number) continue;
+                        var learnerId = lid.GetString() ?? "";
+                        var organizationId = oid.GetInt32();
+                        var academicYear = yr.GetInt32();
+                        if (learnerId.Length == 0 || learnerId.Length > 160 || organizationId <= 0 ||
+                            academicYear < 2020 || academicYear > 2200) continue;
+                        try {
+                            using var progress = await FetchAsync(
+                                $"api/guardian/progress/{Uri.EscapeDataString(learnerId)}?organizationId={organizationId}&year={academicYear}",
+                                cancellation);
+                            var lines = NativeChildProgress.Format(progress.RootElement);
+                            if (lines.Count == 0) continue;
+                            if (childProgress.Count > 0) childProgress.Add("");
+                            childProgress.AddRange(lines);
+                        } catch (UnauthorizedAccessException) {
+                            throw;
+                        } catch (Exception) {
+                            // A child without published results is skipped, never shown as 0%.
+                        }
+                    }
+                }
+            } catch (UnauthorizedAccessException) {
+                throw;
+            } catch (Exception) {
+                // Progress is optional; the rest of the dashboard still loads.
+            }
         } else if (role == "learner") {
             // Learner ID always comes from the bearer token: the device never
             // passes another person's ID to the self-report endpoint.
@@ -403,7 +441,7 @@ public sealed class NativeLearningService
                 }
             }
         }
-        return new NativeDashboard(role, summary, materials, materialEntries, quizzes, organizations, quizEntries, learnerReports);
+        return new NativeDashboard(role, summary, materials, materialEntries, quizzes, organizations, quizEntries, learnerReports, childProgress);
     }
 
     public async Task SignOutAsync(CancellationToken cancellation)

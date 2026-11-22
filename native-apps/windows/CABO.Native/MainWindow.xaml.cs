@@ -107,6 +107,7 @@ public sealed partial class MainWindow : Window
             RoleLabel.Text = "My CABO role: " + data.Role;
             OverviewItems.ItemsSource = data.Summary;
             LearnerReportItems.ItemsSource = data.LearnerReports;
+            ChildProgressItems.ItemsSource = data.ChildProgress;
             materialEntries = data.MaterialEntries.ToList();
             MaterialItems.ItemsSource = materialEntries.Select(x => x.Title).ToList();
             quizEntries = data.QuizEntries.ToList();
@@ -131,6 +132,7 @@ public sealed partial class MainWindow : Window
         RoleLabel.Text = "Not signed in";
         OverviewItems.ItemsSource = null;
         LearnerReportItems.ItemsSource = null;
+        ChildProgressItems.ItemsSource = null;
         MaterialItems.ItemsSource = null;
         materialEntries.Clear();
         ClearMaterial();
