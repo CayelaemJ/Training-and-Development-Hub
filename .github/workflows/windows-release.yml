@@ -1,0 +1,74 @@
+name: CABO Windows release (draft only)
+# Builds, tests and packages a versioned Windows installer, then prepares a
+# DRAFT GitHub release. Nothing is published publicly: a maintainer must review
+# the draft, confirm signing and device testing, and publish it manually.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (MAJOR.MINOR.PATCH)'
+        required: true
+        type: string
+      create_draft:
+        description: 'Create a draft GitHub release with the installer attached'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'windows-v*.*.*'
+permissions:
+  contents: read
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.v.outputs.value }}
+    steps:
+      - id: v
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          v="${INPUT_VERSION:-${REF_NAME#windows-v}}"
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Invalid version '$v'"; exit 1; fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/native-windows-verify.yml
+    with:
+      version: ${{ needs.version.outputs.value }}
+      retention-days: 30
+    secrets:
+      WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+
+  draft-release:
+    needs: [version, build]
+    if: github.event_name == 'push' || inputs.create_draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: CABO-Windows-installer-${{ needs.version.outputs.value }}
+          path: release
+      - name: Create or update DRAFT release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.value }}
+        run: |
+          tag="windows-v$VERSION"
+          status="$(cat release/SIGNING_STATUS.txt)"
+          notes="$(cat release/RELEASE_NOTES.md)"
+          body="$(printf '%s\n\n**Signing:** %s\n\nDraft prepared by CI. Do not publish until signing, school-device testing and privacy approval are recorded.\n' "$notes" "$status")"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" release/*.exe release/*.zip release/SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$tag" release/*.exe release/*.zip release/SHA256SUMS.txt \
+              --repo "$GITHUB_REPOSITORY" --draft --prerelease --target "$GITHUB_SHA" \
+              --title "CABO Learning Hub for Windows $VERSION" --notes "$body"
+          fi

@@ -4,14 +4,45 @@ on:
     paths:
       - 'native-apps/windows/**'
       - 'scripts/package-windows-debug.ps1'
+      - 'scripts/build-windows-release.ps1'
+      - 'scripts/windows-installer-smoke.ps1'
+      - '.github/workflows/native-windows-verify.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'native-apps/windows/**'
+      - 'scripts/build-windows-release.ps1'
+      - 'scripts/windows-installer-smoke.ps1'
       - '.github/workflows/native-windows-verify.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: 'MAJOR.MINOR.PATCH for the build'
+        required: true
+        type: string
+      retention-days:
+        required: false
+        type: number
+        default: 14
+    secrets:
+      WINDOWS_CERT_PFX_BASE64:
+        required: false
+      WINDOWS_CERT_PASSWORD:
+        required: false
 permissions:
   contents: read
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}-${{ inputs.version || 'ci' }}
+  cancel-in-progress: true
 jobs:
   windows-build:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      CABO_VERSION: ${{ inputs.version || format('1.1.{0}', github.run_number) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
@@ -20,15 +51,91 @@ jobs:
       # WinUI 3 desktop resource packaging targets require Visual Studio's
       # MSBuild, not the standalone dotnet SDK's incomplete AppxPackage tasks.
       - uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+
+      - name: Validate version
+        shell: pwsh
+        run: |
+          if ($env:CABO_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid version '$env:CABO_VERSION'" }
+          Write-Output "Building CABO Learning Hub $env:CABO_VERSION"
+
+      - name: Unit, authentication, API, permission and security tests
+        shell: pwsh
+        run: >
+          dotnet test native-apps/windows/CABO.Native.Tests/CABO.Native.Tests.csproj -c Release
+          --logger "trx;LogFileName=windows-tests.trx" --logger "console;verbosity=normal"
+          --results-directory native-apps/windows/artifacts/test-results
+
+      - name: Dependency vulnerability scan (fails on any known vulnerable package)
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($p in 'native-apps/windows/CABO.Native.Core/CABO.Native.Core.csproj',
+                         'native-apps/windows/CABO.Native.Tests/CABO.Native.Tests.csproj') {
+            $report = dotnet list $p package --vulnerable --include-transitive 2>&1 | Out-String
+            Write-Output $report
+            if ($LASTEXITCODE -ne 0) { throw "Vulnerability scan could not run for $p" }
+            if ($report -match 'has the following vulnerable packages') { $failed = $true }
+          }
+          msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -t:Restore -p:Platform=x64 -verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { throw 'Restore for the WinUI app failed' }
+          $report = dotnet list native-apps/windows/CABO.Native/CABO.Native.csproj package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Output $report
+          if ($LASTEXITCODE -ne 0) { throw 'Vulnerability scan could not run for the WinUI app (a skipped scan is not a pass)' }
+          if ($report -match 'has the following vulnerable packages') { $failed = $true }
+          if ($failed) { throw 'Vulnerable NuGet packages found' }
+
       - name: Compile isolated test-only Windows variant (never archived)
         shell: pwsh
         run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=true -verbosity:minimal
+
       - name: Rebuild standard Windows client with demo sign-in disabled
         shell: pwsh
         run: msbuild native-apps/windows/CABO.Native/CABO.Native.csproj -t:Rebuild -restore -p:Configuration=Debug -p:Platform=x64 -p:CaboIsolatedTestBuild=false -verbosity:minimal
+
       - name: Package non-test-only Windows debug directory
         shell: pwsh
         run: ./scripts/package-windows-debug.ps1
+
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ }
+          if (-not $iscc) { choco install innosetup --no-progress -y; if ($LASTEXITCODE -ne 0) { throw 'Inno Setup install failed' } }
+
+      - name: Publish release build and create installer
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: ./scripts/build-windows-release.ps1 -Version $env:CABO_VERSION -Arch x64
+
+      - name: Verify generated artifacts
+        shell: pwsh
+        run: |
+          $out = 'native-apps/windows/artifacts/release'
+          foreach ($f in "CABO-LearningHub-Setup-$env:CABO_VERSION-x64.exe", "CABO-LearningHub-$env:CABO_VERSION-x64-portable.zip",
+                         'SHA256SUMS.txt', 'SIGNING_STATUS.txt', 'RELEASE_NOTES.md') {
+            $path = Join-Path $out $f
+            if (-not (Test-Path $path)) { throw "Missing artifact $f" }
+            Write-Output ("{0,-55} {1,12:N0} bytes" -f $f, (Get-Item $path).Length)
+          }
+          Get-Content (Join-Path $out 'SIGNING_STATUS.txt')
+          $sig = Get-AuthenticodeSignature (Join-Path $out "CABO-LearningHub-Setup-$env:CABO_VERSION-x64.exe")
+          Write-Output "Installer Authenticode status: $($sig.Status)"
+
+      - name: Installer smoke test (install, launch, reinstall, uninstall)
+        shell: pwsh
+        run: ./scripts/windows-installer-smoke.ps1 -Installer "native-apps/windows/artifacts/release/CABO-LearningHub-Setup-$env:CABO_VERSION-x64.exe" -Version $env:CABO_VERSION
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CABO-Windows-test-results
+          path: native-apps/windows/artifacts/test-results
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Upload Windows DEBUG artifact (not signed or certified)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -36,6 +143,15 @@ jobs:
           path: native-apps/windows/artifacts/CABO-Windows-DEBUG-no-test-login.zip
           retention-days: 2
           if-no-files-found: error
+
+      - name: Upload Windows installer and portable build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CABO-Windows-installer-${{ env.CABO_VERSION }}
+          path: native-apps/windows/artifacts/release
+          retention-days: ${{ inputs.retention-days || 14 }}
+          if-no-files-found: error
+
       - name: Validation boundary
         shell: pwsh
-        run: Write-Output 'Build validation only; no signing, physical Windows lab run, MSIX, or native authentication verified.'
+        run: Write-Output 'CI verifies build, unit tests, packaging and a silent install/launch/uninstall on a hosted runner. It does not verify live OIDC sign-in, school devices, accessibility with assistive technology, or production signing unless SIGNING_STATUS says SIGNED.'
