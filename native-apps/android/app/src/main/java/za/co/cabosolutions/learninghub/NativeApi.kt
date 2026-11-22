@@ -1589,6 +1589,19 @@ internal class NativeApi(private val context: Context) {
             MaterialPage(id, obj.getString("title"), obj.getString("text"), offset, next)
         }
 
+    // Grounded tutor for a material owned by the signed-in account. The server
+    // decides access, retrieves passages, calls the configured AI provider and
+    // rate-limits requests; the app only sends the question.
+    suspend fun askMaterial(id: Int, question: String): MaterialAnswer =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            require(id > 0)
+            val clean = NativeMaterialTutor.validatedQuestion(question)
+                ?: throw IllegalArgumentException("Invalid tutor question")
+            val response = request("/api/materials/$id/ask", JSONObject().put("question", clean),
+                auth = true, timeoutMs = 60000)
+            NativeMaterialTutor.parseAnswer(response, id)
+        }
+
     suspend fun generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String): WrittenExam =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             require(materialId > 0 && questionCount in 1..10 && difficulty in setOf("beginner", "intermediate", "advanced"))
