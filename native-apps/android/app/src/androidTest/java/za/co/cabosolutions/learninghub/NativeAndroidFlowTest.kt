@@ -1248,3 +1248,42 @@ class NativeAndroidStudyTutorTest {
         compose.onNodeWithTag("tutor-no-materials").assertIsDisplayed()
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidDevelopmentPlanTest {
+    @get:Rule
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun sportsPlanIsDraftedAndLabelledForReview() {
+        var sent: DevelopmentPlanRequest? = null
+        compose.setContent {
+            MaterialTheme {
+                NativeDevelopmentPlanScreen(draft = { request ->
+                    sent = request
+                    DevelopmentPlan("Netball passing plan", "A draft to improve passing accuracy.",
+                        listOf(DevelopmentRecommendation("sport", "Improve chest-pass accuracy",
+                            listOf("Warm up gently.", "Pass against a wall."), "Count clean passes", 3)),
+                        "A coach should review this plan before use.", fromTemplate = false, warning = null)
+                }, close = {})
+            }
+        }
+        compose.onNodeWithTag("plan-activity").performTextInput("Netball")
+        compose.onNodeWithTag("plan-goal").performTextInput("Improve my passing")
+        compose.onNodeWithTag("plan-generate").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 5000) { compose.onAllNodesWithText("Netball passing plan").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals("sport", sent?.observations?.single()?.area)
+        compose.onNodeWithText("AI draft · needs review").assertIsDisplayed()
+    }
+
+    @Test
+    fun invalidPlanInputIsNotSent() {
+        var called = false
+        compose.setContent {
+            MaterialTheme { NativeDevelopmentPlanScreen(draft = { called = true; error("must not be called") }, close = {}) }
+        }
+        compose.onNodeWithTag("plan-generate").performScrollTo().performClick()
+        compose.onNodeWithTag("plan-message").assertIsDisplayed()
+        assertEquals(false, called)
+    }
+}

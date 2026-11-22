@@ -68,6 +68,10 @@ Learners with study materials can open **Learn → Study tutor** and ask questio
 
 A short safeguarding phrase list catches questions that suggest a learner may be unsafe. Those questions are **not** sent to the AI; the learner is pointed to a trusted adult, Childline (116 in South Africa) and the in-app teacher support request. This is a safety net, not a classifier, and does not replace school safeguarding procedures.
 
+## Sports and development plans
+
+**Learn → Plan sports & activity practice** drafts a short practice plan for sport, academic, creative, leadership or other activities from what the learner types. It uses the existing `POST /api/development-plans/draft` route: the server runs Groq or, if the AI is unavailable, a deterministic starter template, and always returns an unverified draft. The app labels which one it is, keeps the plan in memory only and states that a coach, teacher or guardian must review it. This is planning support, not a sports achievement record; the backend has no achievements store yet.
+
 ## Release builds
 
 ```sh

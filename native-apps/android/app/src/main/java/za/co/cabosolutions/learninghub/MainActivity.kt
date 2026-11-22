@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
     private var selectedLearnerPassport by mutableStateOf(false)
     private var selectedAdmissions by mutableStateOf(false)
     private var selectedTutor by mutableStateOf(false)
+    private var selectedDevelopmentPlan by mutableStateOf(false)
     private var learnerPassport by mutableStateOf<LearnerPassport?>(null)
     private var learnerPassportBusy by mutableStateOf(false)
     private var learnerPassportMessage by mutableStateOf<String?>(null)
@@ -139,13 +140,14 @@ class MainActivity : ComponentActivity() {
                 onSurfaceVariant = Color(0xFF68736B), outline = Color(0xFFDDD7C8)
             )
             MaterialTheme(colorScheme = caboColors) {
-                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedAdmissions || selectedTutor || selectedEducationCommand || selectedSchoolIntelligenceOrganization != null || selectedSchoolProgressionOrganization != null) {
+                BackHandler(enabled = selectedUploadUri != null || creatingSupportRequest || selectedSupportTicket != null || selectedQuiz != null || selectedMaterial != null || selectedWrittenExams || selectedLearnerPassport || selectedAdmissions || selectedTutor || selectedDevelopmentPlan || selectedEducationCommand || selectedSchoolIntelligenceOrganization != null || selectedSchoolProgressionOrganization != null) {
                     when {
                         selectedUploadUri != null -> closeMaterialUpload()
                         selectedSchoolProgressionOrganization != null -> closeSchoolProgression()
                         selectedSchoolIntelligenceOrganization != null -> closeSchoolIntelligence()
                         selectedEducationCommand -> closeEducationCommand()
                         selectedTutor -> selectedTutor = false
+                        selectedDevelopmentPlan -> selectedDevelopmentPlan = false
                         selectedAdmissions -> selectedAdmissions = false
                         selectedLearnerPassport -> closeLearnerPassport()
                         creatingSupportRequest -> creatingSupportRequest = false
@@ -312,6 +314,20 @@ class MainActivity : ComponentActivity() {
                         },
                         close = { closeLearnerPassport() }
                     )
+                    selectedDevelopmentPlan -> NativeDevelopmentPlanScreen(
+                        draft = { request ->
+                            if (demoActive) DevelopmentPlan("Demo ${request.observations.first().activity} plan",
+                                "Synthetic demo plan for: ${request.goal.take(120)}. Talk it through with your coach.",
+                                listOf(DevelopmentRecommendation(request.observations.first().area,
+                                    "Practise one focus skill a little at a time",
+                                    listOf("Agree one small target with your coach.", "Practise it in short sessions and rest between them."),
+                                    "Note what felt easier each week", minOf(3, request.periodWeeks))),
+                                "Synthetic demo only. A coach or teacher must review any real plan.", fromTemplate = true, warning = null)
+                            else api.draftDevelopmentPlan(request)
+                        },
+                        isDemo = demoActive,
+                        close = { selectedDevelopmentPlan = false }
+                    )
                     selectedTutor -> NativeTutorScreen(
                         materials = screen?.materialEntries.orEmpty(),
                         ask = { materialId, question ->
@@ -411,6 +427,7 @@ class MainActivity : ComponentActivity() {
                         openPassport = { openLearnerPassport() },
                         openAdmissions = { if (!demoActive && screen?.portal?.role == "learner") selectedAdmissions = true },
                         openTutor = { selectedTutor = true },
+                        openDevelopmentPlan = { selectedDevelopmentPlan = true },
                         openEducationCommand = { openEducationCommand() },
                         openSchoolIntelligence = { org, name -> openSchoolIntelligence(org, name) },
                         openSchoolProgression = { org, name -> openSchoolProgression(org, name) },
@@ -1501,6 +1518,7 @@ internal fun NativeHome(
     openPassport: () -> Unit = {},
     openAdmissions: () -> Unit = {},
     openTutor: () -> Unit = {},
+    openDevelopmentPlan: () -> Unit = {},
     openEducationCommand: () -> Unit = {},
     openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> },
     openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
@@ -1689,7 +1707,7 @@ internal fun NativeHome(
                                 pickMaterial = pickMaterial, openSupportDraft = openSupportDraft,
                                 sendSupportDraft = sendSupportDraft, deleteSupportDraft = deleteSupportDraft,
                                 learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
-                                openAdmissions = openAdmissions, openTutor = openTutor,
+                                openAdmissions = openAdmissions, openTutor = openTutor, openDevelopmentPlan = openDevelopmentPlan,
                                 openEducationCommand = { openEducationCommand() },
                                 openSchoolIntelligence = openSchoolIntelligence,
                                 openSchoolProgression = openSchoolProgression
@@ -1712,7 +1730,7 @@ internal fun NativeHome(
                             openSupportDraft = openSupportDraft, sendSupportDraft = sendSupportDraft,
                             deleteSupportDraft = deleteSupportDraft,
                             learnerJourneyAction = learnerJourneyAction, openPassport = openPassport,
-                            openAdmissions = openAdmissions, openTutor = openTutor,
+                            openAdmissions = openAdmissions, openTutor = openTutor, openDevelopmentPlan = openDevelopmentPlan,
                             openEducationCommand = { openEducationCommand() },
                             openSchoolIntelligence = openSchoolIntelligence,
                             openSchoolProgression = openSchoolProgression
@@ -2127,6 +2145,7 @@ private fun RoleContent(
     openPassport: () -> Unit,
     openAdmissions: () -> Unit,
     openTutor: () -> Unit = {},
+    openDevelopmentPlan: () -> Unit = {},
     openEducationCommand: () -> Unit = {},
     openSchoolIntelligence: (Int, String) -> Unit = { _, _ -> },
     openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
@@ -2247,6 +2266,12 @@ private fun RoleContent(
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-study-tutor")) {
                                 Text("Ask a question about your material")
                             }
+                        }
+                    }
+                    item {
+                        OutlinedButton(onClick = openDevelopmentPlan, enabled = !busy,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-development-plan")) {
+                            Text("Plan sports & activity practice")
                         }
                     }
                     item { Text("Written exams", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
