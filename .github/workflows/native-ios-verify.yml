@@ -7,6 +7,7 @@ on:
       - 'native-apps/SELF_HOSTED_CHECKS.md'
       - '.github/workflows/native-android-debug.yml'
       - '.github/workflows/native-ios-verify.yml'
+      - 'scripts/select-ios-xcode.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,8 +17,16 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Select installed Xcode
-        run: xcodebuild -version
+      - name: Select Xcode 26 or newer and verify the iOS SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          developer_dir="$(python3 scripts/select-ios-xcode.py)"
+          export DEVELOPER_DIR="$developer_dir"
+          xcodebuild -version
+          sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          [[ "${sdk_version%%.*}" -ge 26 ]] || { echo "::error::The iOS 26 SDK or newer is required."; exit 1; }
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
       - name: Install XcodeGen
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then
@@ -26,6 +35,18 @@ jobs:
       - name: Generate Xcode project from source
         working-directory: native-apps/ios
         run: xcodegen generate
+      - name: Compile the iOS device release without signing
+        working-directory: native-apps/ios
+        run: |
+          xcodebuild \
+            -project CABOLearningHub.xcodeproj \
+            -scheme CABOLearningHub \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/CABODeviceDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
       - name: Compile iPhone simulator app without signing
         working-directory: native-apps/ios
         run: |
@@ -68,4 +89,4 @@ jobs:
           retention-days: 2
           if-no-files-found: error
       - name: Explain validation scope
-        run: echo 'Simulator compilation only. Physical iPhone sign-in, Keychain, notifications and store signing require a separate device test.'
+        run: echo 'Unsigned device compilation and simulator tests only. Physical iPhone sign-in, Keychain, notifications and store signing require a separate device test.'
