@@ -4,7 +4,7 @@ import { BookOpen, BrainCircuit, GraduationCap, HeartHandshake, Landmark, Shield
 
 // A guided tour of everything the CABO Learning Hub can do, written so a
 // presenter can walk through it top to bottom. "Try it as" names a fictional
-// demo account (usernames only; demo passwords are never shown here).
+// demo account by username only; sign-in secrets are never shown here.
 type Stop = { title: string; what: string; href: string; as?: string };
 type Section = { id: string; icon: typeof BookOpen; title: string; intro: string; stops: Stop[] };
 
