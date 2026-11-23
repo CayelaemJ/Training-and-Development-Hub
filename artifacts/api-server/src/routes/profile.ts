@@ -7,7 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   db, usersTable, organizationMembersTable, guardianRelationshipsTable,
-  userProfilesTable, userAppearanceTable, profilePhotosTable,
+  userProfilesTable, userAppearanceTable, profilePhotosTable, institutionSetupTable,
 } from "@workspace/db";
 import { COLORS, MAX_PHOTO_BYTES, cleanText, initials, mayViewPhoto, photoNeedsGuardian, sniffImage } from "../lib/profilePolicy";
 
@@ -128,6 +128,26 @@ router.get("/profile-photos/:token", async (req, res) => {
   // Not HTML: bytes were identified as JPEG/PNG/WebP by magic number on upload and are
   // served with that type, nosniff and a sandbox CSP, so a browser never renders them as markup.
   res.send(photo.bytes); // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
+});
+
+/** Returns the country code of the first institution the user belongs to.
+ *  Used by the AI Credits page to pick the right currency. */
+router.get("/me/institution-country", async (req, res) => {
+  const userId = signedIn(req, res); if (!userId) return;
+  try {
+    const [row] = await db
+      .select({ countryCode: institutionSetupTable.countryCode })
+      .from(organizationMembersTable)
+      .innerJoin(
+        institutionSetupTable,
+        eq(institutionSetupTable.organizationId, organizationMembersTable.organizationId),
+      )
+      .where(eq(organizationMembersTable.userId, userId))
+      .limit(1);
+    res.json({ countryCode: row?.countryCode ?? null });
+  } catch {
+    res.json({ countryCode: null });
+  }
 });
 
 /** Pictures of the guardian's verified children that wait for a decision. */

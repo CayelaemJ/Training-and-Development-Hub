@@ -203,7 +203,9 @@ export default function AiCreditsPage() {
   const [fetchError, setFetchError] = useState("");
   const [loading, setLoading] = useState(true);
   const [paidBanner, setPaidBanner] = useState(false);
-  const [currency] = useState<"ZAR" | "BWP">("ZAR"); // future: detect from school country
+  // Auto-detect currency from the user's institution country (ZA→ZAR, BW→BWP).
+  // Falls back to ZAR if the org has no country set.
+  const [currency, setCurrency] = useState<"ZAR" | "BWP">("ZAR");
 
   const refresh = useCallback(() => {
     api<MeData>("/ai-credits/me")
@@ -212,6 +214,10 @@ export default function AiCreditsPage() {
   }, []);
 
   useEffect(() => {
+    // Auto-detect currency from institution country
+    api<{ countryCode?: string | null }>("/me/institution-country")
+      .then(r => { if (r.countryCode === "BW") setCurrency("BWP"); })
+      .catch(() => { /* non-critical; keep default ZAR */ });
     // Check if returning from a Paystack payment
     const params = new URLSearchParams(window.location.search);
     if (params.get("paid") === "1") {
