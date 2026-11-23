@@ -62,6 +62,14 @@ android {
         }
     }
     buildTypes {
+        create("demo") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".demo"
+            versionNameSuffix = "-demo"
+            matchingFallbacks += listOf("debug")
+            buildConfigField("boolean", "ENABLE_TEST_LOGIN", "false")
+            buildConfigField("boolean", "ENABLE_DEMO_MODE", "true")
+        }
         getByName("release") {
             isDebuggable = false
             // R8 shrinking stays off until it is tested on devices with keep rules.

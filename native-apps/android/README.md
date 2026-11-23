@@ -21,17 +21,13 @@ The internal demo opens a locally simulated CABO workspace without a login or ba
 - Parent: review the synthetic progress preview, respond to a sample family invitation, and manage an explicitly synthetic email preference that stays local to the device.
 - All demo changes are shared across role switches during the session, so the walkthrough follows a real flow instead of unrelated static screens.
 
-Every record is fictional. Demo actions stay in memory on the device and never write to CABO. The interface follows CABO's existing CABO Solutions wordmark, product naming, warm-paper background and green/orange/gold web palette. The demo is enabled only when a non-pilot API origin is explicitly supplied at build time:
+Every record is fictional. Demo actions stay in memory on the device and never write to CABO. The interface follows CABO's existing CABO Solutions wordmark, product naming, warm-paper background and green/orange/gold web palette. Build the standalone offline demo with:
 
 ```sh
-./gradlew :app:assembleDebug \
-  -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
-  -PcaboEnableDemoMode=true
+./gradlew :app:assembleDemo
 ```
 
-For the Cloudflare deployment, replace the origin with the deployed Worker/API HTTPS hostname; keep the route and authentication contract unchanged.
-
-The default build never exposes demo mode. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
+Open **CABO Learning Hub Demo** after installing `app/build/outputs/apk/demo/app-demo.apk`. Its separate package can coexist with the connected app. This showcase covers the child, teacher and parent learning/support flows currently implemented in the native app; it does not claim feature parity with every administration and reporting page in the CABO web app.
 
 The Android app is implemented with native Kotlin and Jetpack Compose screens. It does not embed or redirect to the web application. The current native prototype covers selected learner, parent and educator workflows only; it is not full feature parity. Track the remaining native work in [../FEATURE_PARITY.md](../FEATURE_PARITY.md).
 
@@ -47,7 +43,7 @@ To build the separate credential-based test login, use only synthetic test accou
 
 Enter test credentials in the app when prompted. Do not add credentials to Gradle files, source code, screenshots, or commits. The resulting debug APK is for testing only and is not signed for a store release.
 
-The CI APK combines offline demo mode with the isolated test-login control, so the demo can be explored even when the preview backend is unavailable. See [TEST_BUILDS.md](TEST_BUILDS.md) for artifact and test-scope details.
+The CI demo APK opens the sample workspace without a network connection or test credentials. See [TEST_BUILDS.md](TEST_BUILDS.md) for download and installation details.
 
 ## Authenticated material upload
 

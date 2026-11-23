@@ -7,6 +7,11 @@ on:
       - 'native-apps/SELF_HOSTED_CHECKS.md'
       - '.github/workflows/native-android-debug.yml'
       - '.github/workflows/native-ios-verify.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'native-apps/android/**'
+      - '.github/workflows/native-android-debug.yml'
   workflow_dispatch:
 jobs:
   android-tests:
@@ -61,7 +66,21 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: true
           working-directory: native-apps/android
-          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: >-
+            ./gradlew :app:connectedDebugAndroidTest :app:assembleDemo --no-daemon --stacktrace
+            && bash verify-demo-apk.sh app/build/outputs/apk/demo/app-demo.apk
+      - name: Package verified Android demo APK
+        working-directory: native-apps/android
+        run: |
+          mkdir -p app/build/ci-artifacts
+          cp app/build/outputs/apk/demo/app-demo.apk app/build/ci-artifacts/cabo-learning-hub-demo.apk
+      - name: Upload verified Android demo APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CABO-Android-Demo-APK
+          path: native-apps/android/app/build/ci-artifacts/cabo-learning-hub-demo.apk
+          retention-days: 14
+          if-no-files-found: error
   android-build:
     runs-on: ${{ fromJSON(vars.CABO_ANDROID_RUNNER_LABELS || '["ubuntu-latest"]') }}
     permissions:
@@ -85,26 +104,11 @@ jobs:
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
           mkdir -p app/build/ci-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-debug.apk
-      - name: Build isolated Render APK with offline demo mode
-        working-directory: native-apps/android
-        run: |
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace \
-            -PcaboApiOrigin=https://cabo-learning-native-isolated-preview.onrender.com \
-            -PcaboEnableTestLogin=true \
-            -PcaboEnableDemoMode=true
-          cp app/build/outputs/apk/debug/app-debug.apk app/build/ci-artifacts/cabo-native-android-demo-debug.apk
       - name: Upload standard Android debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: CABO-native-Android-DEBUG-test-only
           path: native-apps/android/app/build/ci-artifacts/cabo-native-android-debug.apk
-          retention-days: 3
-          if-no-files-found: error
-      - name: Upload Android offline-demo APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: CABO-native-Android-DEMO-DEBUG-test-only
-          path: native-apps/android/app/build/ci-artifacts/cabo-native-android-demo-debug.apk
           retention-days: 3
           if-no-files-found: error
   android-release:
@@ -184,9 +188,7 @@ jobs:
           path: native-apps/android/app/build/ci-release/
           retention-days: 7
           if-no-files-found: error
-# Both APKs use a generated DEBUG signing key and are internal test builds.
-# The demo APK embeds only the isolated Render origin and compile-time demo/test-login toggles,
-# never a username, password or server-side secret. Demo fixtures are fictional and local-only.
-# Never redistribute either APK as a school or production app.
+# The debug and demo APKs use generated debug signing keys for internal testing.
+# The demo APK uses fictional fixtures and has no Internet permission.
 # The release job never publishes to Google Play. Unsigned outputs must be signed before any distribution;
 # signing material is read only from repository secrets and the decoded keystore is deleted after use.

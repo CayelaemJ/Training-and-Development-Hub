@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <application android:label="@string/cabo_demo_app_name" tools:replace="android:label">
+        <!-- Keep the launcher entry. Browser callbacks and shortcuts belong to the connected app. -->
+        <activity android:name=".MainActivity" android:exported="true"
+            android:launchMode="singleTop" tools:node="replace">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

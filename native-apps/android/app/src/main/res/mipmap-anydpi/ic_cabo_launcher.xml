@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <!-- The CABO favicon used by the web application. -->
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M12,0H52C58.63,0 64,5.37 64,12V52C64,58.63 58.63,64 52,64H12C5.37,64 0,58.63 0,52V12C0,5.37 5.37,0 12,0Z" />
+    <path
+        android:fillColor="#C4673A"
+        android:pathData="M17,18H48V26H26V38H48V46H17Z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M17,50H48"
+        android:strokeColor="#C9A84C"
+        android:strokeLineCap="square"
+        android:strokeWidth="3" />
+</vector>
