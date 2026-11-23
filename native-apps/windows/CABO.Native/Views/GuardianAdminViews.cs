@@ -58,6 +58,15 @@ public sealed partial class MainWindow
         var data = await service.GuardianReportsAsync(token);
         var items = new List<UIElement>();
         if (data.Guidance.Length > 0) items.Add(Ui.Body(data.Guidance, secondary: true));
+
+        var progress = await service.GuardianChildProgressAsync(token);
+        if (progress.Count > 0)
+        {
+            items.Add(Ui.Heading("How your child is doing", 2));
+            items.Add(Ui.Body("Shown only for children a school has verified you for. Published results only; the outlook is not a forecast.", secondary: true));
+            foreach (var lines in progress)
+                items.Add(Ui.Card(lines.Select(line => (UIElement)Ui.Body(line)).ToArray()));
+        }
         if (data.Reports.Count == 0)
         {
             items.Add(Ui.Empty("No verified progress is available yet. Reports appear once the school has verified your link and published marks."));

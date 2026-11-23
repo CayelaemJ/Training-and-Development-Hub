@@ -309,6 +309,13 @@ struct NativeHomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
+        title("How your child is doing")
+        if session.childProgress.isEmpty {
+            infoTile("No progress to show yet", "Progress appears once a school has verified you as a guardian and published results for an actively enrolled child.", system: "chart.line.uptrend.xyaxis")
+        }
+        ForEach(session.childProgress) { progress in
+            NativeChildProgressCard(progress: progress)
+        }
         title("School-verified progress")
         if !session.guardianReportNotice.isEmpty {
             Text(session.guardianReportNotice)

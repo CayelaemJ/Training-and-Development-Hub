@@ -417,6 +417,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var assessmentWorkspaces: [NativeAssessmentWorkspace] = []
     @Published var guardianGuidance = ""
     @Published var guardianReports: [NativeGuardianReport] = []
+    @Published var childProgress: [NativeChildProgress] = []
     @Published var guardianReportNotice = ""
     @Published var issuedReports: [NativeIssuedSchoolReport] = []
     @Published var issuedReportIntegrity: [String: NativeReportIntegrityCheck] = [:]
@@ -681,6 +682,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextExamManagementWorkspaces: [NativeExamManagementWorkspace] = []
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
+            var nextChildProgress: [NativeChildProgress] = []
             var nextGuardianReportNotice = ""
             var nextIssuedReports: [NativeIssuedSchoolReport] = []
             var nextSupportCourses: [NativeSupportCourse] = []
@@ -718,6 +720,21 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     if keychainToken() == nil { throw error }
                     nextGuardianReportNotice = "Verified academic reports are unavailable. Check your connection or ask the school."
                 }
+                if let childrenData = try? await request("api/guardian/children"),
+                   let children = try? JSONDecoder().decode([NativeChildSummary].self, from: childrenData) {
+                    let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
+                    for child in children.prefix(6) {
+                        guard child.organizationId > 0, (2020...2200).contains(child.academicYear),
+                              child.learnerId.count <= 160,
+                              let learnerPath = child.learnerId.addingPercentEncoding(withAllowedCharacters: safe),
+                              !learnerPath.isEmpty else { continue }
+                        if let data = try? await request("api/guardian/progress/\(learnerPath)?organizationId=\(child.organizationId)&year=\(child.academicYear)"),
+                           let progress = NativeChildProgress.decodeVerified(data) {
+                            nextChildProgress.append(progress)
+                        }
+                    }
+                }
+                if keychainToken() == nil { throw NSError(domain: "CABO", code: 401) }
                 var issuedReportScopes = Set<String>()
                 for report in nextGuardianReports {
                     let scope = "\(report.learnerId):\(report.organizationId)"
@@ -925,6 +942,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             assessmentWorkspaces = nextAssessmentWorkspaces
             guardianGuidance = nextGuidance
             guardianReports = nextGuardianReports
+            childProgress = nextChildProgress
             guardianReportNotice = nextGuardianReportNotice
             issuedReports = Dictionary(nextIssuedReports.map { ($0.key, $0) },
                 uniquingKeysWith: { first, _ in first }).values.sorted { $0.academicYear > $1.academicYear }
@@ -2149,7 +2167,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         guardians = []; notificationPreferences = NativeNotificationPreferences.unavailable
         guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []
         schoolOperations = []; assessmentWorkspaces = []
-        guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""
+        guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; childProgress = []
         issuedReports = []; issuedReportIntegrity = [:]
         staffSchools = []; adminOrganizations = []
         journey = []; journeyIdentity = NativeJourneyIdentity(displayName: "")
@@ -2176,7 +2194,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             !canManageExamAssignments, guardians.isEmpty, notificationPreferences.schools.isEmpty,
             guardianReviewWorkspaces.isEmpty, reportIssuanceWorkspaces.isEmpty,
             schoolOperations.isEmpty, assessmentWorkspaces.isEmpty,
-            guardianGuidance.isEmpty, guardianReports.isEmpty, guardianReportNotice.isEmpty,
+            guardianGuidance.isEmpty, guardianReports.isEmpty, guardianReportNotice.isEmpty, childProgress.isEmpty,
             issuedReports.isEmpty, issuedReportIntegrity.isEmpty,
             staffSchools.isEmpty, adminOrganizations.isEmpty,
             journey.isEmpty, journeyIdentity.displayName.isEmpty,
