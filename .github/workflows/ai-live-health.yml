@@ -1,0 +1,34 @@
+name: AI live health (pilot)
+# Makes one real AI call through the pilot's /api/healthz/ai endpoint and
+# fails if the answer is not healthy. The endpoint sends only a fixed synthetic
+# prompt and caches its result for 10 minutes, so this costs at most one tiny
+# model call per run. No secrets are needed or used here.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ai-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check AI health on the pilot
+        env:
+          URL: https://cabo-learning-hub-pilot.onrender.com/api/healthz/ai
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The free pilot sleeps when idle; allow time for a cold start.
+          for attempt in 1 2 3 4; do
+            code=$(curl -sS -o body.json -w '%{http_code}' --max-time 120 "$URL" || echo 000)
+            echo "attempt $attempt: HTTP $code"
+            if [ "$code" != "000" ] && [ "$code" != "502" ] && [ "$code" != "504" ]; then break; fi
+            sleep 20
+          done
+          cat body.json || true
+          echo
+          status=$(python3 -c 'import json;print(json.load(open("body.json")).get("status","unknown"))' 2>/dev/null || echo unknown)
+          echo "AI status: $status" >> "$GITHUB_STEP_SUMMARY"
+          test "$status" = "healthy"
