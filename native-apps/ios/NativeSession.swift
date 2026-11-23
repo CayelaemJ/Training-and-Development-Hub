@@ -417,6 +417,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var assessmentWorkspaces: [NativeAssessmentWorkspace] = []
     @Published var guardianGuidance = ""
     @Published var guardianReports: [NativeGuardianReport] = []
+    @Published var childProgress: [NativeChildProgress] = []
     @Published var guardianReportNotice = ""
     @Published var issuedReports: [NativeIssuedSchoolReport] = []
     @Published var issuedReportIntegrity: [String: NativeReportIntegrityCheck] = [:]
@@ -574,7 +575,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""
             lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
-            guardianReports = []; learnerReports = []; guardianGuidance = ""
+            guardianReports = []; childProgress = []; learnerReports = []; guardianGuidance = ""
             admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
             status = "Session expired. Sign in again."
             throw NSError(domain: "CABO", code: 401)
@@ -682,6 +683,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             var nextExamManagementWorkspaces: [NativeExamManagementWorkspace] = []
             var nextGuidance = ""
             var nextGuardianReports: [NativeGuardianReport] = []
+            var nextChildProgress: [NativeChildProgress] = []
             var nextGuardianReportNotice = ""
             var nextIssuedReports: [NativeIssuedSchoolReport] = []
             var nextSupportCourses: [NativeSupportCourse] = []
@@ -719,6 +721,21 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
                     if keychainToken() == nil { throw error }
                     nextGuardianReportNotice = "Verified academic reports are unavailable. Check your connection or ask the school."
                 }
+                if let childrenData = try? await request("api/guardian/children"),
+                   let children = try? JSONDecoder().decode([NativeChildSummary].self, from: childrenData) {
+                    let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
+                    for child in children.prefix(6) {
+                        guard child.organizationId > 0, (2020...2200).contains(child.academicYear),
+                              child.learnerId.count <= 160,
+                              let learnerPath = child.learnerId.addingPercentEncoding(withAllowedCharacters: safe),
+                              !learnerPath.isEmpty else { continue }
+                        if let data = try? await request("api/guardian/progress/\(learnerPath)?organizationId=\(child.organizationId)&year=\(child.academicYear)"),
+                           let progress = NativeChildProgress.decodeVerified(data) {
+                            nextChildProgress.append(progress)
+                        }
+                    }
+                }
+                if keychainToken() == nil { throw NSError(domain: "CABO", code: 401) }
                 var issuedReportScopes = Set<String>()
                 for report in nextGuardianReports {
                     let scope = "\(report.learnerId):\(report.organizationId)"
@@ -926,6 +943,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             assessmentWorkspaces = nextAssessmentWorkspaces
             guardianGuidance = nextGuidance
             guardianReports = nextGuardianReports
+            childProgress = nextChildProgress
             guardianReportNotice = nextGuardianReportNotice
             issuedReports = Dictionary(nextIssuedReports.map { ($0.key, $0) },
                 uniquingKeysWith: { first, _ in first }).values.sorted { $0.academicYear > $1.academicYear }
@@ -955,7 +973,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
         learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""; learnerPassportBusy = false
         lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
-            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; childProgress = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
             admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
             journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
             supportDrafts = loadSupportDrafts()
@@ -2118,7 +2136,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         clearSupportStorage()
         clearToken()
         role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
-        guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
+        guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; childProgress = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
         admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
         journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
         status = "Signed out on this device."
