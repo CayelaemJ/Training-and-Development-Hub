@@ -94,7 +94,7 @@ export function identifyCountryScopedSchoolRoute(
       return {kind:"invalid"};
     return {kind:"scoped",orgId:Number(direct[1])};
   }
-  if (/^\/(?:reports\/me|guardian\/reports\/[^/]+|guardian\/issued-reports\/[^/]+)$/.test(routePath)) {
+  if (/^\/(?:reports\/me|guardian\/reports\/[^/]+|guardian\/issued-reports\/[^/]+|guardian\/progress\/[^/]+)$/.test(routePath)) {
     const val=typeof queryOrgId==="string"?queryOrgId:"";
     if (!/^[1-9][0-9]*$/.test(val)||!Number.isSafeInteger(Number(val)))
       return {kind:"invalid"};
@@ -103,7 +103,7 @@ export function identifyCountryScopedSchoolRoute(
   // These personal records have no trustworthy institution selector. Until the
   // authorised per-school scoping design is implemented they must not be
   // released under the strict country pilot gate.
-  if (/^\/(?:institution-records(?:\/|$)|guardian-relationships(?:\/|$)|learner-journey(?:\/|$)|native\/mobile\/parent(?:\/|$)|my-assignments\/?$|learner-passport(?:\/|$)|school\/attendance\/me\/?$|school-stages\/me\/?$|report-issuance\/(?:me\/?$|[1-9][0-9]*\/integrity\/?$)|guardian\/issued-reports(?:\/|$)|assignments(?:\/|$)|written-exams(?:\/|$)|quizzes(?:\/|$)|materials(?:\/|$)|storage(?:\/|$)|admissions\/applications(?:\/|$)|development-plans(?:\/|$)|education-command(?:\/|$)|potential(?:\/|$)|passport(?:\/|$)|career(?:\/|$)|opportunities(?:\/|$)|platform(?:\/|$))/.test(routePath))
+  if (/^\/(?:institution-records(?:\/|$)|guardian-relationships(?:\/|$)|guardian\/children\/?$|learner-journey(?:\/|$)|native\/mobile\/parent(?:\/|$)|my-assignments\/?$|learner-passport(?:\/|$)|school\/attendance\/me\/?$|school-stages\/me\/?$|report-issuance\/(?:me\/?$|[1-9][0-9]*\/integrity\/?$)|guardian\/issued-reports(?:\/|$)|assignments(?:\/|$)|written-exams(?:\/|$)|quizzes(?:\/|$)|materials(?:\/|$)|storage(?:\/|$)|admissions\/applications(?:\/|$)|development-plans(?:\/|$)|education-command(?:\/|$)|potential(?:\/|$)|passport(?:\/|$)|career(?:\/|$)|opportunities(?:\/|$)|platform(?:\/|$))/.test(routePath))
     return {kind:"unscoped_sensitive"};
   return {kind:"not_scoped"};
 }

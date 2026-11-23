@@ -31,6 +31,7 @@ import reportCardsRouter from "./reportCards";
 import demoShowcaseRouter from "./demoShowcase";
 import demoStatusRouter from "./demoStatus";
 import guardianVerificationRouter from "./guardianVerification";
+import guardianProgressRouter from "./guardianProgress";
 import notificationPreferencesRouter from "./notificationPreferences";
 import reportIssuanceRouter from "./reportIssuance";
 import attendanceSyncRouter from "./attendanceSync";
@@ -44,12 +45,18 @@ import admissionEvidenceRouter from "./admissionEvidence";
 import lifelongPassportRouter from "./lifelongPassport";
 import passportTrustRouter from "./passportTrustRoutes";
 import learnerAiProfileRouter from "./learnerAiProfile";
+import accountabilityRouter from "./accountability";
+import classChatRouter from "./classChat";
+import privacyRouter from "./privacy";
+import profileRouter from "./profile";
+import aiCreditsRouter from "./aiCredits";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(educationFrameworksRouter);
 router.use(learnerSupportRouter);
+router.use(aiCreditsRouter);
 router.use(workerInsightsRouter);
 
 router.use(authRouter);
@@ -79,6 +86,7 @@ router.use(demoShowcaseRouter);
 router.use(demoStatusRouter);
 router.use(demoAdmissionsInboxRouter);
 router.use(guardianVerificationRouter);
+router.use(guardianProgressRouter);
 router.use(notificationPreferencesRouter);
 router.use(reportIssuanceRouter);
 router.use(attendanceSyncRouter);
@@ -91,5 +99,9 @@ router.use(admissionEvidenceRouter);
 router.use(lifelongPassportRouter);
 router.use(passportTrustRouter);
 router.use(learnerAiProfileRouter);
+router.use(accountabilityRouter);
+router.use(classChatRouter);
+router.use(privacyRouter);
+router.use(profileRouter);
 
 export default router;

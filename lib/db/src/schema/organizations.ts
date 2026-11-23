@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex, varchar, real } from "drizzle-orm/pg-core";
 import { usersTable } from "./auth";
 import { writtenExamsTable, writtenExamAttemptsTable } from "./writtenExams";
@@ -14,6 +15,24 @@ export const organizationMembersTable = pgTable("organization_members",{
  role: varchar("role",{length:24}).notNull(),
  joinedAt: timestamp("joined_at",{withTimezone:true}).notNull().defaultNow()
 },t=>[primaryKey({columns:[t.organizationId,t.userId]}),index("org_members_user_idx").on(t.userId)]);
+// Consent-based membership: a manager invites an email; a membership row is
+// only created when that account holder accepts. Reviewed SQL migration:
+// lib/db/migrations/20261122_organization_invitations.sql (also adds CHECKs).
+export const organizationInvitationsTable = pgTable("organization_invitations",{
+ id: serial("id").primaryKey(),
+ organizationId: integer("organization_id").notNull().references(()=>organizationsTable.id,{onDelete:"cascade"}),
+ email: varchar("email",{length:320}).notNull(),
+ role: varchar("role",{length:24}).notNull(),
+ invitedBy: varchar("invited_by").notNull().references(()=>usersTable.id,{onDelete:"cascade"}),
+ status: varchar("status",{length:16}).notNull().default("pending"),
+ createdAt: timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
+ expiresAt: timestamp("expires_at",{withTimezone:true}).notNull().default(sql`now() + interval '14 days'`),
+ respondedAt: timestamp("responded_at",{withTimezone:true}),
+ respondedBy: varchar("responded_by").references(()=>usersTable.id,{onDelete:"set null"})
+},t=>[
+ uniqueIndex("organization_invitations_open_idx").on(t.organizationId,t.email).where(sql.raw("status = 'pending'")),
+ index("organization_invitations_email_idx").on(t.email).where(sql.raw("status = 'pending'"))
+]);
 export const learnerGroupsTable = pgTable("learner_groups",{
  id: serial("id").primaryKey(),
  organizationId: integer("organization_id").notNull().references(()=>organizationsTable.id,{onDelete:"cascade"}),

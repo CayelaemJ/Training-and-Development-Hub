@@ -1,5 +1,8 @@
 // Synthetic API/database acceptance for the private lifelong passport.
 // Uses the same route and Drizzle schema as the application, with PGlite.
+// Short-circuit AI credit enforcement so withAiCredits() bypasses the
+// ai_subscriptions / ai_credit_ledger tables (not present in this test DB).
+process.env.CABO_AI_CREDITS_ENFORCED = "false";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import express from "express";

@@ -4,11 +4,11 @@ import { isRecentVerifiedMfa } from "./mfaAssurance";
  * Explicit adult/guardian opt-in, never based on a browser boolean alone.
  * Missing provider evidence, wrong role, old SSO or child account -> deny.
  */
-export type PreferenceKind="guardian_review_requested"|"learner_support_updated";
+export type PreferenceKind="guardian_review_requested"|"learner_support_updated"|"results_published";
 export type PreferenceActor="verified_guardian"|"assigned_educator";
 
 export function isPreferenceKindAllowed(actor:PreferenceActor,kind:PreferenceKind):boolean{
-  return (actor==="verified_guardian"&&kind==="guardian_review_requested") ||
+  return (actor==="verified_guardian"&&(kind==="guardian_review_requested"||kind==="results_published")) ||
     (actor==="assigned_educator"&&kind==="learner_support_updated");
 }
 
