@@ -117,8 +117,8 @@ export async function verifyNativePilotSignIn() {
       assert.equal((await post("/api/native/token", request)).status, 400, clientId);
       const read = await call(`${resource}/${id}`, { headers });
       assert.equal(read.status, 200, clientId);
-      const record = z.object({ id: z.number() }).parse(await read.json());
-      assert.equal(record.id, id, clientId);
+      const { ticket } = z.object({ ticket: z.object({ id: z.number() }) }).parse(await read.json());
+      assert.equal(ticket.id, id, clientId);
       assert.equal((await call("/api/organizations/2/support", { headers })).status, 403, clientId);
       assert.equal((await post("/api/native/logout", {}, headers)).status, 204, clientId);
       assert.equal((await call(`${resource}/${id}`, { headers })).status, 401, clientId);
