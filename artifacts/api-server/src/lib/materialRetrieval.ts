@@ -3,6 +3,17 @@ const STOP_WORDS = new Set("a an and are as at be by can did do for from how i i
 
 export type RetrievedPassage = { text: string; score: number };
 
+/** Learner context used for interest-aware passage boosting (optional). */
+export type LearnerRetrievalContext = {
+  /** Short interest labels from the learner's AI profile (e.g. "soccer", "music"). */
+  interests?: string[];
+  /** Short goal phrases (e.g. "pass matric", "become an engineer"). */
+  goals?: string[];
+  /** Penalty factor applied to passages whose readability is well above the query complexity.
+   *  Range 0–1; 0 = never penalise, 1 = fully penalise long-word-heavy passages. */
+  complexityPenalty?: number;
+} | null;
+
 /**
  * Light, language-neutral stemming so "factorising", "factorise" and
  * "factorised" match, and British/American spellings meet. Deliberately
@@ -47,17 +58,56 @@ export function chunkMaterial(text: string, chunkSize = 1200, overlap = 160): st
   return chunks;
 }
 
+/**
+ * Build an expanded query by mixing the original query with learner context
+ * terms so that passages touching those interests score higher.
+ * Interest terms are down-weighted (×0.4) so they refine rather than replace
+ * the topic match.
+ */
+function expandQueryWithContext(query: string, context: LearnerRetrievalContext): { queryTerms: string[]; interestTerms: string[] } {
+  const queryTerms = [...new Set(terms(query))];
+  if (!context) return { queryTerms, interestTerms: [] };
+  const rawContext = [
+    ...(context.interests ?? []),
+    ...(context.goals ?? []),
+  ].join(" ");
+  const interestTerms = [...new Set(terms(rawContext))].filter((t) => !queryTerms.includes(t));
+  return { queryTerms, interestTerms };
+}
+
 /** Lightweight BM25 ranking runs locally and keeps prompts limited to four passages. */
 export function retrieveMaterialPassages(
   text: string,
   query: string,
   options: { maxPassages?: number; maxContextChars?: number } = {},
 ): RetrievedPassage[] {
+  return retrieveMaterialPassagesForLearner(text, query, null, options);
+}
+
+/**
+ * Interest-aware BM25 retrieval.
+ *
+ * Works identically to `retrieveMaterialPassages` when `context` is null, but
+ * when learner interests and goals are present they are used to give a small
+ * additive boost to passages whose language overlaps those terms.  This keeps
+ * curriculum-relevant passages first while surfacing ones that connect to the
+ * learner's world.
+ *
+ * The boost is capped at 20 % of the base BM25 score so that a highly
+ * interest-relevant but off-topic passage cannot displace a genuinely
+ * curriculum-relevant one.
+ */
+export function retrieveMaterialPassagesForLearner(
+  text: string,
+  query: string,
+  context: LearnerRetrievalContext,
+  options: { maxPassages?: number; maxContextChars?: number } = {},
+): RetrievedPassage[] {
   const passages = chunkMaterial(text);
   if (!passages.length) return [];
   const maxPassages = Math.min(4, Math.max(1, options.maxPassages ?? 4));
   const maxContextChars = Math.min(4800, Math.max(400, options.maxContextChars ?? 4800));
-  const queryTerms = [...new Set(terms(query))];
+  const { queryTerms, interestTerms } = expandQueryWithContext(query, context ?? null);
   // A request for a summary has no topic words to match: give the model
   // passages spread evenly through the material instead of nothing.
   if (!queryTerms.length || BROAD.test(query)) {
@@ -94,6 +144,23 @@ export function retrieveMaterialPassages(
       const df = documentFrequency.get(term) ?? 0;
       const inverseFrequency = Math.log(1 + (passages.length - df + 0.5) / (df + 0.5));
       score += inverseFrequency * (frequency * 2.2) / (frequency + 1.2 * (0.25 + 0.75 * row.length / averageLength));
+    }
+    // Interest-aware boost: add up to 20 % of the base score for passages that
+    // overlap the learner's interests and goals.  Capped so topic relevance
+    // always dominates.
+    if (interestTerms.length && score > 0) {
+      let interestScore = 0;
+      for (const term of interestTerms) {
+        const frequency = frequencies.get(term) ?? 0;
+        if (!frequency) continue;
+        const df = documentFrequency.get(term) ?? 0;
+        const inverseFrequency = Math.log(1 + (passages.length - df + 0.5) / (df + 0.5));
+        interestScore += inverseFrequency * (frequency * 1.5) / (frequency + 1.2 * (0.25 + 0.75 * row.length / averageLength));
+      }
+      // Normalise to a 0–0.2 fraction of base score so it only breaks ties.
+      const maxInterestBoost = score * 0.2;
+      const normaliser = interestTerms.length * Math.log(1 + passages.length * 0.5) || 1;
+      score += Math.min(maxInterestBoost, (interestScore / normaliser) * maxInterestBoost);
     }
     return { text: passage, score, index };
   }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score || a.index - b.index);

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db, learnerAiProfilesTable } from "@workspace/db";
+import { db, learnerAiProfilesTable, userProfilesTable } from "@workspace/db";
 import { learnerAiPersonalizationContext } from "./learnerAiProfilePolicy";
 import type { LearnerPersonalization } from "./caboVoice";
 
@@ -14,7 +14,23 @@ export async function learnerPersonalization(userId: string): Promise<LearnerPer
       explanationStyle: learnerAiProfilesTable.explanationStyle,
       learningPreferences: learnerAiProfilesTable.learningPreferences,
     }).from(learnerAiProfilesTable).where(eq(learnerAiProfilesTable.userId, userId)).limit(1);
-    return learnerAiPersonalizationContext(profile ?? null) as LearnerPersonalization;
+
+    const context = learnerAiPersonalizationContext(profile ?? null) as LearnerPersonalization;
+    if (!context) return null;
+
+    // Enrich with display name from the user profile table (never fails the request).
+    try {
+      const [userProfile] = await db.select({
+        displayName: userProfilesTable.displayName,
+      }).from(userProfilesTable).where(eq(userProfilesTable.userId, userId)).limit(1);
+      if (userProfile?.displayName?.trim()) {
+        context.displayName = userProfile.displayName.trim();
+      }
+    } catch {
+      // Display name is non-critical — proceed without it.
+    }
+
+    return context;
   } catch {
     return null;
   }
