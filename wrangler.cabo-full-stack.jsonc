@@ -1,0 +1,19 @@
+{
+  "$schema":"node_modules/wrangler/config-schema.json",
+  "name":"cabo-learning-full-stack",
+  "main":"cloudflare/full-stack/worker.mjs",
+  "compatibility_date":"2026-10-29",
+  "compatibility_flags":["nodejs_compat"],
+  "workers_dev":false,
+  "vars":{
+    "CABO_LEARNING_BACKEND_ENABLED":"false",
+    "CABO_LEARNING_HOST":"",
+    "CABO_CHILD_DATA_REVIEW_COMPLETE":"false",
+    "CABO_MFA_E2E_VERIFIED":"false",
+    "CABO_TENANT_ISOLATION_E2E_VERIFIED":"false",
+    "CABO_OIDC_ORIGIN_VERIFIED":"false"
+  },
+  "containers":[{"class_name":"LearningHubFullStack","image":"./Dockerfile.cloudflare","max_instances":1}],
+  "durable_objects":{"bindings":[{"name":"CABO_LEARNING_CONTAINER","class_name":"LearningHubFullStack"}]},
+  "migrations":[{"tag":"cabo-full-stack-v1","new_sqlite_classes":["LearningHubFullStack"]}]
+}
