@@ -2,14 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
-  nativeAuthEnabled, nativeRedirect, validPkceChallenge, validPkceVerifier,
+  isolatedDemoBrowserLoginEnabled, nativeAuthEnabled, nativeDemoReturnTo, nativeRedirect, validPkceChallenge, validPkceVerifier,
   validState, validCode, randomNativeCode, codeDigest, verifyPkce
 } from "../lib/nativeAuthPolicy.ts";
 
 const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
 const challenge = createHash("sha256").update(verifier).digest("base64url");
 
-test("native auth is disabled unless explicitly opted in", () => {
+test("ordinary native auth requires opt-in", () => {
   assert.equal(nativeAuthEnabled({}), false);
   assert.equal(nativeAuthEnabled({ CABO_NATIVE_AUTH_ENABLED: "false" }), false);
   assert.equal(nativeAuthEnabled({ CABO_NATIVE_AUTH_ENABLED: "true" }), true);
@@ -37,4 +37,39 @@ test("codes are unpredictable, hash-only server-side and fixed length", () => {
   assert.notEqual(codeDigest(one), one);
   assert.equal(codeDigest(one).length, 64);
   assert.equal(validCode("hello"), false);
+});
+
+const demoEnv = {
+  CABO_ENVIRONMENT: "testing",
+  CABO_TEST_DATABASE_ISOLATED: "true",
+  ENABLE_CABO_TEST_LOGIN: "true",
+};
+
+test("browser demo handoff requires an isolated testing database and enabled web sign-in", () => {
+  assert.equal(isolatedDemoBrowserLoginEnabled(demoEnv), true);
+  assert.equal(nativeAuthEnabled(demoEnv), true);
+  assert.equal(nativeAuthEnabled({ ...demoEnv, CABO_NATIVE_AUTH_ENABLED: "false" }), false);
+  for (const key of Object.keys(demoEnv)) {
+    const env = { ...demoEnv, [key]: undefined };
+    assert.equal(isolatedDemoBrowserLoginEnabled(env), false);
+    assert.equal(nativeAuthEnabled(env), false);
+  }
+});
+
+test("demo return path preserves only a valid registered-client PKCE request", () => {
+  const state = "K".repeat(43);
+  for (const client of ["cabo-android", "cabo-windows", "cabo-ios"]) {
+    const path = `/api/native/authorize?client_id=${client}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
+    assert.equal(nativeDemoReturnTo(path), path);
+    for (const invalid of [
+      "https://example.test" + path,
+      "//example.test" + path,
+      path + "&redirect_uri=https%3A%2F%2Fexample.test",
+      path + "&client_id=cabo-android",
+      path + "#fragment",
+      path.replace(client, "unknown-client"),
+      path.replace(state, "short"),
+      path.replace("S256", "plain"),
+    ]) assert.equal(nativeDemoReturnTo(invalid), null, invalid);
+  }
 });

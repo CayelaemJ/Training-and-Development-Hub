@@ -63,8 +63,8 @@ router.post("/native/test-login", async (req, res) => {
                          expires_in: NATIVE_SESSION_SECONDS });
 });
 
-// Browser phase: authenticate with the existing OIDC identity provider in
-// system browser, then create a short-lived code bound to PKCE S256.
+// Browser phase: use the existing browser session (OIDC or an isolated
+// demo account), then create a short-lived code bound to PKCE S256.
 router.get("/native/authorize", async (req, res) => {
   if (!nativeAuthEnabled(process.env)) { res.sendStatus(404); return; }
   const redirect = nativeRedirect(req.query.client_id);

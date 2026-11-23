@@ -4,6 +4,7 @@ import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { testPasswordLengthAcceptable } from '../lib/nativeTestLoginPolicy';
+import { isolatedDemoBrowserLoginEnabled, nativeAuthEnabled, nativeDemoReturnTo } from '../lib/nativeAuthPolicy';
 import {configuredPrincipals} from '../lib/testPrincipals';
 import { oidcRequestOrigin, safeReturnPath } from '../lib/originPolicy';
 import { trustedMfaFromOidcClaims } from '../lib/mfaAssurance';
@@ -75,7 +76,7 @@ async function upsertUser(claims: Record<string, unknown>) {
 // Its verifier is supplied as a salted scrypt hash via Render secrets, never source code.
 const failures = new Map<string,{count:number;until:number}>();
 router.post('/test-login', async (req:Request,res:Response) => {
- if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'||process.env.CABO_TEST_DATABASE_ISOLATED!=='true'){res.status(404).json({error:'Demo sign-in is not switched on for this server.'});return;}
+ if(!isolatedDemoBrowserLoginEnabled(process.env)){res.status(404).json({error:'Demo sign-in is not switched on for this server.'});return;}
  const key=req.ip??'unknown';const rate=failures.get(key);
  if(rate&&rate.count>=6&&rate.until>Date.now()){res.status(429).json({error:'Too many attempts; try again later'});return;}
  const username=typeof req.body?.username==='string'?req.body.username:'';
@@ -93,10 +94,13 @@ router.post('/test-login', async (req:Request,res:Response) => {
  const profile=fixture?{id:fixture.userId,email:fixture.email,firstName:fixture.firstName,lastName:fixture.lastName}:{id:'cabo-isolated-test-learner',firstName:'CABO',lastName:'Tester'};
  const [account]=await db.insert(usersTable).values(profile).onConflictDoUpdate({target:usersTable.id,set:{firstName:profile.firstName,lastName:profile.lastName}}).returning();
  const sid=await createSession({user:{id:account.id,email:account.email,firstName:account.firstName,lastName:account.lastName,profileImageUrl:account.profileImageUrl},access_token:'test-local'});
- setSessionCookie(res,sid);res.json({ok:true});
+ setSessionCookie(res,sid);
+ const redirectTo = nativeAuthEnabled(process.env) ? nativeDemoReturnTo(req.body?.nativeReturnTo) : null;
+ res.setHeader('Cache-Control', 'no-store');
+ res.json(redirectTo ? { ok: true, redirectTo } : { ok: true });
 });
 router.post('/test-logout',async(req:Request,res:Response)=>{
- if(process.env.ENABLE_CABO_TEST_LOGIN!=='true'||(process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME)!=='testing'||process.env.CABO_TEST_DATABASE_ISOLATED!=='true'){res.sendStatus(404);return;}
+ if(!isolatedDemoBrowserLoginEnabled(process.env)){res.sendStatus(404);return;}
  await clearSession(res,getSessionId(req));res.json({ok:true});
 });
 router.get('/auth/user', (req: Request, res: Response) => {
@@ -108,9 +112,16 @@ router.get('/auth/user', (req: Request, res: Response) => {
 });
 
 router.get('/login', async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
   const origin = getOrigin(req);
   if (!origin) { res.status(400).json({ error: 'Unrecognised sign-in host' }); return; }
+  if (isolatedDemoBrowserLoginEnabled(process.env)) {
+    const returnTo = nativeAuthEnabled(process.env) ? nativeDemoReturnTo(req.query.returnTo) : null;
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.redirect(returnTo ? '/?' + new URLSearchParams({ nativeReturnTo: returnTo }) : '/');
+    return;
+  }
+  const config = await getOidcConfig();
   const callbackUrl = origin + '/api/callback';
 
   const returnTo = safeReturnPath(req.query.returnTo);
