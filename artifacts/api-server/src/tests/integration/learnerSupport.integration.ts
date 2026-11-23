@@ -7,6 +7,7 @@ import express from "express";
 import router from "../../routes/learnerSupport";
 import frameworkRouter from "../../routes/educationFrameworks";
 import { engine } from "./supportTestDb";
+import { verifyNativePilotSignIn } from "./nativePilotSignIn";
 process.env.ENABLE_LEARNER_SUCCESS_LOOP = "true";
 await engine.exec(`CREATE TABLE users(id varchar PRIMARY KEY,first_name varchar,last_name varchar); CREATE TABLE organizations(id integer PRIMARY KEY);
 CREATE TABLE organization_members(organization_id integer,user_id varchar,role varchar,joined_at timestamptz DEFAULT now());
@@ -338,6 +339,7 @@ try {
   const passportPage = await call("child-a", "/learner-passport/me");
   assert.equal(passportPage.data.items.length, 100);
   assert.ok(passportPage.data.nextCursor);
+  await verifyNativePilotSignIn();
   console.log(
     "PASS: HTTP authentication, school isolation, course authorization, Botswana framework version, idempotency, optimistic concurrency, complete 42→72 success loop, evidence gating, learner acknowledgement, private passport, DNA review and reopening. Migration replay passed.",
   );
