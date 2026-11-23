@@ -1,0 +1,9 @@
+{
+  "name":"cabo-learning-cloudflare-full-stack",
+  "type":"module",
+  "private":true,
+  "devDependencies":{
+    "@cloudflare/containers":"^0.3.0",
+    "wrangler":"^4.0.0"
+  }
+}
