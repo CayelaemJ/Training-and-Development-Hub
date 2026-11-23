@@ -264,7 +264,7 @@ export default function LearnerSuccessPage() {
   };
   const [downloadError, setDownloadError] = useState("");
   return (
-    <main className="mx-auto max-w-6xl space-y-6 pb-16">
+    <div className="mx-auto max-w-6xl space-y-6 pb-16">
       <header className="rounded-2xl border bg-card p-6 sm:p-8">
         <p className="eyebrow">CABO · Learning, support, progress</p>
         <h1 className="font-display text-3xl sm:text-4xl">
@@ -894,7 +894,7 @@ export default function LearnerSuccessPage() {
           </p>
         </section>
       )}
-    </main>
+    </div>
   );
 }
 

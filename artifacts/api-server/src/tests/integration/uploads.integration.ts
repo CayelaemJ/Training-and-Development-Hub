@@ -11,6 +11,10 @@ import { createCanvas } from "@napi-rs/canvas";
 import { fixtureFiles, pdfFixture } from "./uploadFixtures";
 process.env.CABO_ENVIRONMENT = "testing";
 process.env.ENABLE_MATERIAL_READING = "true";
+// Disable AI credit enforcement so withAiCredits short-circuits without
+// querying ai_subscriptions / ai_credit_ledger (this test suite covers
+// uploads and quiz generation, not credit accounting).
+process.env.CABO_AI_CREDITS_ENFORCED = "false";
 await engine.exec(`CREATE TABLE upload_intents(object_path text PRIMARY KEY,user_id varchar,file_name varchar,content_type varchar,size_bytes integer,created_at timestamptz DEFAULT now());
 CREATE TABLE study_materials(id serial PRIMARY KEY,user_id varchar,title varchar,file_name varchar,content_type varchar,size_bytes integer,object_path text UNIQUE,character_count integer,created_at timestamptz DEFAULT now());
 CREATE TABLE material_upload_blobs(object_path text PRIMARY KEY,user_id varchar,bytes bytea,created_at timestamptz DEFAULT now());

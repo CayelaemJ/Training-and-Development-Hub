@@ -23,12 +23,17 @@ const server=app.listen(port, "0.0.0.0", (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  import("./lib/accountabilityService").then(({ startAccountabilitySweep }) => startAccountabilitySweep())
+    .catch(err => logger.error({ errorType: err?.name || "Error" }, "Accountability sweep did not start"));
+  import("./lib/outboxDispatcher").then(({ startOutboxDispatcher }) => startOutboxDispatcher())
+    .catch(err => logger.error({ errorType: err?.name || "Error" }, "Notification dispatcher did not start"));
   if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === "testing" && process.env.CABO_GROQ_SMOKE_TEST === "true") {
     import("./lib/groqSmokeTest").then(({ groqSmokeTest }) => groqSmokeTest())
       .catch(err => logger.error({ errorType: err?.name || "Error" }, "CABO Groq smoke test FAILED"));
   }
   if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) === "testing" && process.env.ENABLE_CABO_DEMO_SEED === "true") {
     import("./lib/demoSeed").then(({ seedCaboDemo }) => seedCaboDemo())
+      .then(() => process.env.CABO_DEMO_SCALE === "false" ? undefined : import("./lib/demoSeedScale").then(({ seedCaboDemoAtScale }) => seedCaboDemoAtScale()))
       .catch(err => logger.error({ err }, "CABO demo fixture seeding failed"));
   }
 });

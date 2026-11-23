@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
 import { auditSuperadmin } from "../lib/platformAudit";
 import { z } from "zod/v4";
+import { queueResultNotices } from "../lib/resultNotices";
 import { db, academicSettingsTable,academicCoursesTable, academicPeriodsTable,courseEnrollmentsTable,academicAssessmentsTable,academicGradesTable,academicGradeEventsTable,organizationMembersTable,usersTable,courseStaffAssignmentsTable } from "@workspace/db";
 const router:IRouter=Router();
 const id=z.coerce.number().int().positive();
@@ -103,6 +104,8 @@ router.put("/organizations/:orgId/academic/assessments/:assessmentId/grades/:lea
     .onConflictDoUpdate({target:[academicGradesTable.assessmentId,academicGradesTable.learnerId],set:{marks:input.data.marks,status:input.data.status,feedback:input.data.feedback,reviewedBy:req.user!.id,updatedAt:new Date()}}).returning();
   await tx.insert(academicGradeEventsTable).values({gradeId:grade.id,changedBy:req.user!.id,oldMarks:old?.marks??null,newMarks:grade.marks,oldStatus:old?.status??null,newStatus:grade.status,reason:input.data.reason});return grade;
  });res.json(row);
+ // Opted-in, school-verified guardians get one "new results" notice per day.
+ if(row.status==="published")void queueResultNotices(org.data,row.id,row.learnerId).catch(()=>undefined);
 });
 async function reportRows(orgId:number){
  return db.select({courseId:academicCoursesTable.id,courseName:academicCoursesTable.name,level:academicCoursesTable.level,learnerId:academicGradesTable.learnerId,assessmentId:academicAssessmentsTable.id,assessmentTitle:academicAssessmentsTable.title,periodId:academicPeriodsTable.id,periodName:academicPeriodsTable.name,year:academicPeriodsTable.year,weight:academicAssessmentsTable.weight,marks:academicGradesTable.marks,maxMarks:academicAssessmentsTable.maxMarks})

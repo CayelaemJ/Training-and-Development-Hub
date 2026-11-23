@@ -8,7 +8,7 @@
 // 5+ characters; the server enforces the same rule (lib/testPasswordPolicy.ts).
 import { randomBytes, scryptSync } from "node:crypto";
 
-// Mirrors the 14 fictional identities created by lib/demoSeed.ts.
+// Mirrors the 19 fictional identities created by lib/demoSeed.ts.
 const DEMO_FIXTURES = [
   ["headmaster-south", "Nomsa", "Dube"],
   ["teacher-south", "Thabo", "Maseko"],
@@ -24,6 +24,12 @@ const DEMO_FIXTURES = [
   ["company-head", "Karabo", "Pillay"],
   ["headmaster-north", "Musa", "Mabena"],
   ["learner-north", "Sihle", "Naidoo"],
+  // Large-dataset demo accounts (lib/demoSeedScale.ts).
+  ["teacher-gradehead", "Refilwe", "Ntuli"],
+  ["headmaster-bw", "Kgosi", "Gaolathe"],
+  ["teacher-bw", "Onalenna", "Seretse"],
+  ["learner-bw", "Masego", "Ramotswe"],
+  ["parent-bw", "Lorato", "Ramotswe"],
 ];
 
 const shortAllowed = process.env.CABO_DEMO_SHORT_PASSWORDS === "true";
