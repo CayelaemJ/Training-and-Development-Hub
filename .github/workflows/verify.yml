@@ -30,6 +30,7 @@ jobs:
       - run: node scripts/test-academic-records.mjs
       - run: node scripts/test-school-operations.mjs
       - run: node scripts/test-guardian-progress.mjs
+      - run: node scripts/test-passport-shares.mjs
       - run: node scripts/test-accountability-chat.mjs
       - run: node scripts/test-demo-scale.mjs
       - run: node scripts/test-ai-credits.mjs
