@@ -53,6 +53,13 @@ app.use("/api/internal/qstash/material-preview", express.json({
     (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
   },
 }));
+// Paystack signs the exact bytes it sends, so keep them for verification.
+app.use("/api/ai-credits/webhooks/paystack", express.json({
+  limit: "64kb",
+  verify(req, _res, body) {
+    (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(body);
+  },
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);

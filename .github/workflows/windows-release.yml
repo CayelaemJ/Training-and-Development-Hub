@@ -42,8 +42,8 @@ jobs:
       version: ${{ needs.version.outputs.value }}
       retention-days: 30
     secrets:
-      WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
-      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      CABO_WINDOWS_CERT_BASE64: ${{ secrets.CABO_WINDOWS_CERT_BASE64 }}
+      CABO_WINDOWS_CERT_PASSWORD: ${{ secrets.CABO_WINDOWS_CERT_PASSWORD }}
 
   draft-release:
     needs: [version, build]

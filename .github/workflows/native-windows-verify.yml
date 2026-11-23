@@ -26,9 +26,9 @@ on:
         type: number
         default: 14
     secrets:
-      WINDOWS_CERT_PFX_BASE64:
+      CABO_WINDOWS_CERT_BASE64:
         required: false
-      WINDOWS_CERT_PASSWORD:
+      CABO_WINDOWS_CERT_PASSWORD:
         required: false
 permissions:
   contents: read
@@ -105,8 +105,8 @@ jobs:
       - name: Publish release build and create installer
         shell: pwsh
         env:
-          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
-          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.CABO_WINDOWS_CERT_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.CABO_WINDOWS_CERT_PASSWORD }}
         run: ./scripts/build-windows-release.ps1 -Version $env:CABO_VERSION -Arch x64
 
       - name: Verify generated artifacts

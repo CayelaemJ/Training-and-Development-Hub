@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcuts and Google Assistant / Gemini "open feature" actions.
+     They only OPEN a part of the app; nothing is read or sent until the
+     person is signed in and the server authorises it. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <capability android:name="actions.intent.OPEN_APP_FEATURE">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="za.co.cabosolutions.learninghub" android:targetClass="za.co.cabosolutions.learninghub.MainActivity">
+      <url-template android:value="cabo-learninghub-android://open/{feature}" />
+      <parameter android:name="feature" android:key="feature" />
+    </intent>
+  </capability>
+  <shortcut android:shortcutId="cabo_learn" android:enabled="true" android:icon="@drawable/ic_cabo_app_icon" android:shortcutShortLabel="@string/shortcut_learn_short" android:shortcutLongLabel="@string/shortcut_learn_long">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="za.co.cabosolutions.learninghub" android:targetClass="za.co.cabosolutions.learninghub.MainActivity" android:data="cabo-learninghub-android://open/learn" />
+    <capability-binding android:key="actions.intent.OPEN_APP_FEATURE"><parameter-binding android:key="feature" android:value="@array/feature_learn" /></capability-binding>
+  </shortcut>
+  <shortcut android:shortcutId="cabo_progress" android:enabled="true" android:icon="@drawable/ic_cabo_app_icon" android:shortcutShortLabel="@string/shortcut_progress_short" android:shortcutLongLabel="@string/shortcut_progress_long">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="za.co.cabosolutions.learninghub" android:targetClass="za.co.cabosolutions.learninghub.MainActivity" android:data="cabo-learninghub-android://open/progress" />
+    <capability-binding android:key="actions.intent.OPEN_APP_FEATURE"><parameter-binding android:key="feature" android:value="@array/feature_progress" /></capability-binding>
+  </shortcut>
+  <shortcut android:shortcutId="cabo_support" android:enabled="true" android:icon="@drawable/ic_cabo_app_icon" android:shortcutShortLabel="@string/shortcut_support_short" android:shortcutLongLabel="@string/shortcut_support_long">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="za.co.cabosolutions.learninghub" android:targetClass="za.co.cabosolutions.learninghub.MainActivity" android:data="cabo-learninghub-android://open/support" />
+    <capability-binding android:key="actions.intent.OPEN_APP_FEATURE"><parameter-binding android:key="feature" android:value="@array/feature_support" /></capability-binding>
+  </shortcut>
+</shortcuts>

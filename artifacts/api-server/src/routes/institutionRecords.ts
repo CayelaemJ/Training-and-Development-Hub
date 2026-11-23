@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { isPlatformSuperadmin } from "../lib/portalAccess";
 import { auditSuperadmin } from "../lib/platformAudit";
 import { db, educationFrameworkVersionsTable, usersTable, organizationsTable, organizationMembersTable, verifiedEnrollmentsTable, schoolTransfersTable, guardianRelationshipsTable } from "@workspace/db";
+import { learnerGuardianInvitesEnabled, learnerTransferRequestsEnabled, uniformGuardianRequestResponse } from "../lib/learnerInitiatedRequestPolicy";
 const router:IRouter=Router();
 const id=z.coerce.number().int().positive();
 const legacyStages=["RR","R","1","2","3","4","5","6","7","8","9","10","11","12","university","college","training"];
@@ -81,6 +82,8 @@ router.get("/organizations/:orgId/verified-enrollments",async(req,res)=>{
  res.json(rows);
 });
 router.post("/institution-records/transfers",async(req,res)=>{
+ // Disabled in the client since 2026-10-26; the server must match (see learnerInitiatedRequestPolicy).
+ if(!learnerTransferRequestsEnabled(process.env)){res.sendStatus(404);return}
  const user=current(req,res);if(!user)return;
  const body=z.object({fromEnrollmentId:z.number().int().positive(),toOrganizationId:z.number().int().positive(),reason:z.string().max(2000).default("")}).safeParse(req.body);
  if(!body.success){res.sendStatus(400);return}
@@ -112,13 +115,15 @@ router.post("/organizations/:orgId/transfers/:transferId/decision",async(req,res
  res.json(updated);
 });
 router.post("/guardian-relationships",async(req,res)=>{
+ // Disabled in the client since 2026-10-26; the server must match (see learnerInitiatedRequestPolicy).
+ if(!learnerGuardianInvitesEnabled(process.env)){res.sendStatus(404);return}
  const user=current(req,res);if(!user)return;const body=z.object({guardianEmail:z.email()}).safeParse(req.body);
  if(!body.success){res.sendStatus(400);return}
  const [guardian]=await db.select({id:usersTable.id}).from(usersTable).where(eq(usersTable.email,body.data.guardianEmail)).limit(1);
- if(!guardian||guardian.id===user){res.status(400).json({error:"Provide an existing different account"});return}
- const [r]=await db.insert(guardianRelationshipsTable).values({learnerId:user,guardianId:guardian.id}).onConflictDoNothing().returning();
- if(!r){res.status(409).json({error:"Already requested"});return}
- res.status(201).json({id:r.id,status:r.status});
+ // Same 202 for unknown, self and duplicate requests: no account-existence oracle.
+ if(guardian&&guardian.id!==user)await db.insert(guardianRelationshipsTable).values({learnerId:user,guardianId:guardian.id}).onConflictDoNothing();
+ res.setHeader("Cache-Control","no-store");
+ res.status(202).json(uniformGuardianRequestResponse());
 });
 router.get("/guardian-relationships/incoming",async(req,res)=>{
  const user=current(req,res);if(!user)return;
