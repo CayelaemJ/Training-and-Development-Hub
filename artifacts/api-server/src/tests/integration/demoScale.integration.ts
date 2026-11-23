@@ -36,8 +36,9 @@ try {
   await seedCaboDemoAtScale();
   const first = await counts();
   console.log(`# first run (${Math.round((Date.now() - started) / 1000)} s):`, JSON.stringify(first));
-  assert.ok(first.users >= 430 && first.users <= 480, `about 450 people, got ${first.users}`);
-  assert.ok(first.learners >= 320, `learners ${first.learners}`);
+  // ~450 learners across four institutions, plus their staff and guardians.
+  assert.ok(first.users >= 560 && first.users <= 680, `about 600 people in total, got ${first.users}`);
+  assert.ok(first.learners >= 430, `about 450 learners, got ${first.learners}`);
   assert.ok(first.grades > 10000);
   assert.ok(first.attendance > 9000);
   assert.ok(first.verifiedGuardians >= 70);
