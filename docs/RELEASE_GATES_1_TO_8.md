@@ -42,3 +42,19 @@ Sign-off requires POPIA lawful-basis and child-processing legal assessments, ind
 
 ## Presentation truth-in-advertising
 Demonstration features should be identified as synthetic pilots. Government integration, certified learner records, psychometric tests, university applications and verified employer integrations must not be represented as live without evidence and contracts.
+
+## Public distribution evidence
+
+The APK and simulator bundles used in the pilot are test artifacts. A store-eligible build still needs a separate acceptance review. Record the release commit, distribution channel, evidence link, reviewer, and approval date for each applicable item.
+
+| Area | Evidence needed before public release |
+| --- | --- |
+| Shared backend | Identify the production Render service and Neon database. Verify real sign-in, reviewer access and learner/staff/guardian permissions end to end. Demonstrate that synthetic reviewer accounts cannot reach real school records. Test backup recovery, service monitoring and rollback. |
+| Google Play | API 36 Android build, signed release AAB and Play App Signing, 16 KB native-library compatibility verified on the release artifact, and physical Android 16 and minimum-device acceptance. Complete Play App Access, Data safety, target audience/content rating, privacy policy and applicable closed testing. |
+| Apple App Store | Xcode 26 or newer with iOS 26 SDK or newer, signed device archive, App Store Connect record, physical-device and TestFlight checks, review notes and usable reviewer accounts, privacy labels, age rating, export declaration and required listing URLs/screenshots. Verify privacy-manifest accuracy against the build and backend. |
+| Web and Windows | Public privacy/support links, signed-in browser and Windows acceptance, keyboard and screen-reader checks, and signed Windows packages verified on clean devices. Review public download and support paths. |
+| Identity and deletion | Document who may create accounts and who operates school-managed identities. When store account-deletion rules apply, verify the in-app request path and Google Play's external web path. Test identity verification, session revocation, data removal, legally required retention and the user's status notification. The current web Privacy Rights screen explains rights and does not by itself demonstrate a completed deletion workflow. |
+| Children and school data | Confirm launch countries and declared ages, responsible parties and operators, lawful processing and guardian authority, school/provider agreements, retention and rights handling, breach response and cross-border transfers. Confirm Google Families applicability and Apple age-rating/Kids Category implications. Obtain qualified review before using real learner data. |
+| AI and messaging | Trace what prompts, document contents and identifiers leave CABO. Where applicable, disclose and obtain explicit permission before third-party AI sharing, test abuse handling and in-app reporting, and verify moderation/escalation and provider retention. Keep features outside the approved data and moderation scope off the public release. |
+
+References for review: [Google Play target API](https://support.google.com/googleplay/android-developer/answer/11926878), [Families](https://support.google.com/googleplay/android-developer/answer/9893335), [account deletion](https://support.google.com/googleplay/android-developer/answer/13327111), [AI-generated content](https://support.google.com/googleplay/android-developer/answer/13985936), [Apple submission requirements](https://developer.apple.com/news/upcoming-requirements/), [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [South African Information Regulator guidance](https://inforegulator.org.za/guidance-notes/), and [Botswana government privacy guidance](https://bpsc.gov.bw/index.php/privacy-notice).

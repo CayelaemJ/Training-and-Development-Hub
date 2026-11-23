@@ -29,11 +29,11 @@ require(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$").matches(caboVersion
 }
 android {
     namespace = "za.co.cabosolutions.learninghub"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "za.co.cabosolutions.learninghub"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 36
         versionCode = caboVersionCode
         versionName = caboVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

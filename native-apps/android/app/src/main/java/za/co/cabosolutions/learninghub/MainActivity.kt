@@ -1655,7 +1655,7 @@ internal fun NativeHome(
                             label = { Text(label) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color(0xFFC4673A),
-                                selectedTextColor = Color(0xFFC4673A),
+                                selectedTextColor = Color(0xFF8D4024),
                                 indicatorColor = Color(0xFFF3E6DA)
                             )
                         )

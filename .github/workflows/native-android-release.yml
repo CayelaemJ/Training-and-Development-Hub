@@ -69,10 +69,23 @@ jobs:
           [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "::error::Invalid version name"; exit 1; }
           ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace \
             -PcaboVersionCode="$VERSION_CODE" -PcaboVersionName="$VERSION_NAME"
+          apk=$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)
+          aab=app/build/outputs/bundle/release/app-release.aab
+          test -s "$apk" && test -s "$aab"
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK is required}}"
+          zipalign=$(find "$sdk/build-tools" -type f -name zipalign | sort -V | tail -n 1)
+          test -n "$zipalign"
+          "$zipalign" -c -P 16 4 "$apk"
+          python3 verify-release-alignment.py "$apk" "$aab"
+          if [[ "$SIGNED" == "true" ]]; then
+            "${zipalign%/*}/apksigner" verify "$apk"
+            LC_ALL=C jarsigner -verify "$aab" > "$RUNNER_TEMP/cabo-aab-signature.txt"
+            grep -Fxq 'jar verified.' "$RUNNER_TEMP/cabo-aab-signature.txt"
+          fi
           mkdir -p app/build/ci-artifacts
           label=$([ "$SIGNED" = "true" ] && echo signed || echo UNSIGNED-do-not-distribute)
-          cp app/build/outputs/apk/release/*.apk "app/build/ci-artifacts/cabo-android-$VERSION_NAME-$label.apk"
-          cp app/build/outputs/bundle/release/*.aab "app/build/ci-artifacts/cabo-android-$VERSION_NAME-$label.aab"
+          cp "$apk" "app/build/ci-artifacts/cabo-android-$VERSION_NAME-$label.apk"
+          cp "$aab" "app/build/ci-artifacts/cabo-android-$VERSION_NAME-$label.aab"
           (cd app/build/ci-artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
       - name: Remove signing key from runner
         if: always()
