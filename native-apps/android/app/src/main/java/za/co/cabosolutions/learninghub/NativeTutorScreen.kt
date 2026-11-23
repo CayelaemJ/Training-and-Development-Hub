@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -34,6 +35,7 @@ internal fun NativeTutorScreen(
     close: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
     var materialId by remember(materials) { mutableStateOf(materials.firstOrNull()?.id ?: 0) }
     var materialMenu by remember { mutableStateOf(false) }
@@ -52,6 +54,7 @@ internal fun NativeTutorScreen(
             TutorQuestionCheck.NeedsTrustedAdult -> { inputMessage = null; showTrustedAdult = true; question = "" }
             is TutorQuestionCheck.Ready -> {
                 val target = materialId
+                focusManager.clearFocus()
                 inputMessage = null
                 question = ""
                 busy = true
@@ -73,13 +76,13 @@ internal fun NativeTutorScreen(
 
     Scaffold(topBar = {
         Surface(color = MaterialTheme.colorScheme.primaryContainer) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = { job?.cancel(); close() }, modifier = Modifier.testTag("tutor-back")) { Text("Back") }
                 Text("Study tutor", style = MaterialTheme.typography.titleLarge)
             }
         }
     }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().padding(horizontal = 16.dp)) {
             Text(
                 if (isDemo) "Synthetic demo only · sample answers are written on this device and nothing is sent to CABO."
                 else "Ask about one of your own study materials. Answers come only from that material and quote where they found it. Check important answers with your teacher.",
