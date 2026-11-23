@@ -5,7 +5,8 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-type Org = { id: number; name: string; role: string };
+// member:false = listed only through a platform administrator's audited view.
+type Org = { id: number; name: string; role: string; member?: boolean };
 type Outcome = { baseline: number; followup: number; improvementPp: number };
 type Ticket = {
   id: number;
@@ -108,9 +109,13 @@ export default function LearnerSuccessPage() {
     queryKey: ["support-orgs"],
     queryFn: () => api<Org[]>("/organizations"),
   });
+  // The success loop is per school and needs membership, so only offer
+  // schools this account belongs to.
+  const memberOrgs = (orgs.data ?? []).filter((o) => o.member !== false);
+  const noSchool = orgs.isSuccess && memberOrgs.length === 0;
   useEffect(() => {
-    if (!org && orgs.data?.length) setOrg(String(orgs.data[0].id));
-  }, [orgs.data, org]);
+    if (!org && memberOrgs.length) setOrg(String(memberOrgs[0].id));
+  }, [memberOrgs, org]);
   const prefix = "/organizations/" + org + "/support";
   const options = useQuery({
     queryKey: ["support-options", org],
@@ -312,7 +317,15 @@ export default function LearnerSuccessPage() {
           </button>
         </p>
       )}
-      {["support", "accountability", "framework"].includes(tab) && (
+      {noSchool && ["support", "accountability", "framework"].includes(tab) && (
+        <p role="status" className="rounded-lg border p-4 text-sm">
+          The Learner Success Loop works inside a school, and this account is not a member of one
+          {(orgs.data?.length ?? 0) > 0 ? " (a platform view lists schools but cannot open their learners' help requests)" : ""}.
+          Sign in as a learner, teacher or school administrator to see help requests, follow-ups and
+          accountability. Learning DNA and the passport tabs show your own records.
+        </p>
+      )}
+      {!noSchool && ["support", "accountability", "framework"].includes(tab) && (
         <label className="block text-sm">
           School
           <select
@@ -326,7 +339,7 @@ export default function LearnerSuccessPage() {
             }}
           >
             <option value="">Choose school</option>
-            {orgs.data?.map((o) => (
+            {memberOrgs.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
               </option>

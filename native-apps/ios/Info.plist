@@ -15,6 +15,8 @@
   <key>CABO_API_ORIGIN</key><string>$(CABO_API_ORIGIN)</string>
   <key>CABO_ENABLE_TEST_LOGIN</key><false/>
   <key>LSRequiresIPhoneOS</key><true/>
+  <!-- Uses only HTTPS/TLS and system hashing, which are exempt from export documentation. -->
+  <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>

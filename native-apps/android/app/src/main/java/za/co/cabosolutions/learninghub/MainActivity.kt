@@ -106,6 +106,13 @@ class MainActivity : ComponentActivity() {
     private var studyUnconfirmed by mutableStateOf(false)
     private var submissionKey by mutableStateOf("")
     private var studyMessage by mutableStateOf<String?>(null)
+    // Grounded tutor state. In memory for the current sign-in only.
+    private var tutorQuestion by mutableStateOf("")
+    private var tutorBusy by mutableStateOf(false)
+    private var tutorMessage by mutableStateOf<String?>(null)
+    private var tutorHistory by mutableStateOf<Map<Int, List<TutorExchange>>>(emptyMap())
+    // Increases on every account change so a late tutor reply is discarded.
+    private var accountGeneration = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -364,7 +371,17 @@ class MainActivity : ComponentActivity() {
                     selectedMaterial != null -> NativeMaterialScreen(
                         summary = selectedMaterial!!, content = studyText,
                         nextOffset = nextPage, busy = studyBusy, message = studyMessage,
-                        next = { readNextPage() }, close = { closeStudy() }
+                        next = { readNextPage() }, close = { closeStudy() },
+                        tutor = MaterialTutorState(
+                            available = !demoActive,
+                            unavailableReason = if (demoActive)
+                                "The tutor needs a connected CABO account. Demo materials are not sent to the AI service."
+                            else "Sign in with a CABO account to ask about your own materials.",
+                            question = tutorQuestion, busy = tutorBusy, message = tutorMessage,
+                            history = tutorHistory[selectedMaterial!!.id].orEmpty()
+                        ),
+                        setTutorQuestion = { if (!tutorBusy) tutorQuestion = it },
+                        askTutor = { askTutor() }
                     )
                     else -> NativeHome(
                         requestedSection = requestedSection,
@@ -471,6 +488,7 @@ class MainActivity : ComponentActivity() {
         val secret = testPassword
         testPassword = ""
         busy = true
+        resetTutor()
         lifecycleScope.launch {
             try {
                 status = api.testLogin(account, secret)
@@ -482,6 +500,7 @@ class MainActivity : ComponentActivity() {
     private fun startDemo() {
         if (!BuildConfig.ENABLE_DEMO_MODE || busy || supportBusy || studyBusy) return
         NativeDemoSession.reset()
+        resetTutor()
         demoActive = true
         demoRole = "learner"
         screen = NativeDemoData.learner()
@@ -788,6 +807,7 @@ class MainActivity : ComponentActivity() {
     private fun handleCallback(callback: Intent) {
         if (busy) return
         busy = true
+        resetTutor()
         lifecycleScope.launch {
             status = api.complete(callback)
             busy = false
@@ -809,6 +829,7 @@ class MainActivity : ComponentActivity() {
                 status = "Connected securely as ${screen?.portal?.role ?: "CABO user"}"
             } catch (_: Exception) {
                 screen = null
+                if (!api.hasSession()) resetTutor()
                 status = if (api.hasSession())
                     "Could not load your learning records. Check your connection and retry."
                 else "Session expired. Sign in again."
@@ -1177,8 +1198,46 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Clears tutor history for an account change (sign-out, new sign-in, expiry). */
+    private fun resetTutor() {
+        accountGeneration += 1
+        tutorHistory = emptyMap()
+        tutorQuestion = ""
+        tutorMessage = null
+        tutorBusy = false
+    }
+
+    private fun askTutor() {
+        val material = selectedMaterial ?: return
+        if (demoActive || tutorBusy || !api.hasSession()) return
+        val question = NativeMaterialTutor.validatedQuestion(tutorQuestion) ?: run {
+            tutorMessage = "Ask a question between 5 and 2,000 characters."
+            return
+        }
+        val generation = accountGeneration
+        tutorBusy = true
+        tutorMessage = null
+        lifecycleScope.launch {
+            try {
+                val answer = api.askMaterialInReader(material.id, question)
+                if (generation != accountGeneration || !api.hasSession()) throw TutorAccountChangedException()
+                val exchange = NativeMaterialTutor.exchange(question, answer)
+                tutorHistory = tutorHistory + (material.id to
+                    NativeMaterialTutor.appending(exchange, tutorHistory[material.id].orEmpty()))
+                tutorQuestion = ""
+            } catch (error: Exception) {
+                if (generation == accountGeneration) tutorMessage = NativeMaterialTutor.message(error)
+                if (!api.hasSession()) resetTutor()
+            } finally {
+                if (generation == accountGeneration) tutorBusy = false
+            }
+        }
+    }
+
     private fun closeStudy() {
-        if (studyBusy) return
+        if (studyBusy || tutorBusy) return
+        tutorQuestion = ""
+        tutorMessage = null
         selectedQuiz = null
         selectedMaterial = null
         activeQuiz = null
@@ -1200,6 +1259,7 @@ class MainActivity : ComponentActivity() {
                 api.clearSupportDrafts()
                 api.signOut()
             }
+            resetTutor()
             supportDrafts = emptyList()
             supportCourseOptions = emptyList()
             selectedSupportDraft = null
