@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import cookieParser from "cookie-parser";
 import express from "express";
+import { z } from "zod";
 import { NATIVE_CLIENTS } from "../../lib/nativeAuthPolicy";
 import { authMiddleware } from "../../middlewares/authMiddleware";
 import authRouter from "../../routes/auth";
@@ -79,7 +80,7 @@ export async function verifyNativePilotSignIn() {
       attempted: "I tried adding the denominators.", requestKey: randomUUID(),
     }, webHeaders);
     assert.equal(created.status, 201);
-    const { id } = await created.json();
+    const { id } = z.object({ id: z.number().int().positive() }).parse(await created.json());
 
     for (const [clientId, callback] of Object.entries(NATIVE_CLIENTS)) {
       const verifier = randomBytes(48).toString("base64url");
@@ -100,7 +101,7 @@ export async function verifyNativePilotSignIn() {
 
       const signedIn = await post("/api/test-login", { username, password, nativeReturnTo });
       assert.equal(signedIn.status, 200);
-      const { redirectTo } = await signedIn.json();
+      const { redirectTo } = z.object({ redirectTo: z.string() }).parse(await signedIn.json());
       assert.equal(redirectTo, authorize);
       const approved = await call(redirectTo, { headers: { Cookie: continuationCookie(signedIn) } });
       assert.equal(approved.status, 302);
@@ -111,12 +112,13 @@ export async function verifyNativePilotSignIn() {
       const request = { client_id: clientId, code: handoff.searchParams.get("code"), code_verifier: verifier };
       const issued = await post("/api/native/token", request);
       assert.equal(issued.status, 200, clientId);
-      const { access_token } = await issued.json();
+      const { access_token } = z.object({ access_token: z.string().min(1) }).parse(await issued.json());
       const headers = { Authorization: "Bearer " + access_token };
       assert.equal((await post("/api/native/token", request)).status, 400, clientId);
       const read = await call(`${resource}/${id}`, { headers });
       assert.equal(read.status, 200, clientId);
-      assert.equal((await read.json()).id, id, clientId);
+      const record = z.object({ id: z.number() }).parse(await read.json());
+      assert.equal(record.id, id, clientId);
       assert.equal((await call("/api/organizations/2/support", { headers })).status, 403, clientId);
       assert.equal((await post("/api/native/logout", {}, headers)).status, 204, clientId);
       assert.equal((await call(`${resource}/${id}`, { headers })).status, 401, clientId);
