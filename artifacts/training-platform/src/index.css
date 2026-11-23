@@ -1200,8 +1200,8 @@ html.cabo-reduce-motion *, html.cabo-reduce-motion *::before, html.cabo-reduce-m
 .cabo-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 /* ---- Quick jump (Ctrl K), theme toggle, celebration, tour ---- */
-.quick-jump-trigger { display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid hsl(var(--border));border-radius:9px;background:hsl(var(--background));color:hsl(var(--muted-foreground));font-size:13px;cursor:pointer; }
-.quick-jump-trigger kbd { font:inherit;font-size:11px;padding:1px 5px;border:1px solid hsl(var(--border));border-radius:5px; }
+.quick-jump-trigger { display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid hsl(var(--border));border-radius:9px;background:hsl(var(--background));color:hsl(var(--foreground));font-size:13px;cursor:pointer; }
+.quick-jump-trigger kbd { font:inherit;font-size:11px;padding:1px 5px;border:1px solid hsl(var(--border));border-radius:5px;color:hsl(var(--foreground)); }
 .quick-jump-trigger:focus-visible, .theme-toggle:focus-visible { outline:2px solid hsl(var(--ring));outline-offset:2px; }
 .quick-jump-backdrop { position:fixed;inset:0;z-index:60;background:rgba(15,20,25,.38);display:flex;justify-content:center;align-items:flex-start;padding-top:12vh; }
 .quick-jump { width:min(560px,92vw);background:hsl(var(--background));color:hsl(var(--foreground));border:1px solid hsl(var(--border));border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.25);overflow:hidden; }
