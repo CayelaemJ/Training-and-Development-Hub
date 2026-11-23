@@ -24,6 +24,7 @@ try {
     packages: "external",
     outfile,
     alias: {
+      "@workspace/api-zod": path.join(root, "lib/api-zod/src/index.ts"),
       "@workspace/db": path.join(
         root,
         "artifacts/api-server/src/tests/integration/supportTestDb.ts",
