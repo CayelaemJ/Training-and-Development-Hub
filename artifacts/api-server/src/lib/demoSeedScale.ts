@@ -11,7 +11,7 @@ import { openCase } from "./accountabilityService";
 /**
  * Demo dataset at school scale: about 450 fictional people across a South
  * African secondary school, a Botswana senior school, an independent school
- * and a university, with every subject, three terms of published results,
+ * and a TVET college, with every subject, three terms of published results,
  * six weeks of attendance, verified guardians, class chats and accountability
  * cases. Deterministic (seeded random numbers) and idempotent: rerunning adds
  * nothing that already exists and never overwrites edited results.
@@ -123,6 +123,12 @@ const BW_STREAMS: [string, string][][] = [
   [["PHY", "Physics"], ["CHE", "Chemistry"], ["BIO", "Biology"]],
   [["ACC", "Accounting"], ["BUS", "Business Studies"], ["COM", "Computer Studies"]],
   [["HIS", "History"], ["GEO", "Geography"], ["DEV", "Development Studies"]],
+];
+/** TVET N4–N6 engineering / business programmes */
+const TVET_CORE: [string, string][] = [["ENG", "Engineering Communication (N4)"], ["ENG_SC", "Engineering Science (N4)"], ["MAT", "Mathematics (N4)"]];
+const TVET_STREAMS: [string, string][][] = [
+  [["MEC", "Mechanotechnology (N4)"], ["ELC", "Electrotechnology (N4)"], ["ENG_D", "Engineering Drawing (N4)"]],
+  [["ACC", "Financial Accounting (N4)"], ["BUS", "Entrepreneurship & Business Management (N4)"], ["COM", "Computer Practice (N4)"]],
 ];
 const TERMS: [string, string][] = [["Term 1 — Demo", "2026-01-14"], ["Term 2 — Demo", "2026-04-08"], ["Term 3 — Demo", "2026-07-21"]];
 
@@ -277,12 +283,18 @@ export async function seedCaboDemoAtScale(): Promise<void> {
     throw new Error("CABO demo fixtures require an isolated and explicitly enabled test database.");
   }
   const named = (key: string, firstName: string, lastName: string): Person => ({ key, firstName, lastName });
-  const za = makePeople("gen-za-learner", 183, 11);
-  const zaStaff = [named("teacher-gradehead", "Refilwe", "Ntuli"), ...makePeople("gen-za-teacher", 13, 12)];
-  const bw = makePeople("gen-bw-learner", 108, 21);
-  const bwStaff = [named("teacher-bw", "Onalenna", "Seretse"), ...makePeople("gen-bw-teacher", 9, 22)];
+  // Ubuntu Future: 226 learners across Gr 9–12 (64 + 61 + 61 + 40)
+  const za = makePeople("gen-za-learner", 226, 11);
+  const zaStaff = [named("teacher-gradehead", "Refilwe", "Ntuli"), ...makePeople("gen-za-teacher", 15, 12)];
+  // Kgalagadi: 162 learners across Form 3–5 (54 + 54 + 54)
+  const bw = makePeople("gen-bw-learner", 162, 21);
+  const bwStaff = [named("teacher-bw", "Onalenna", "Seretse"), ...makePeople("gen-bw-teacher", 11, 22)];
+  // Highveld: 35 learners (unchanged)
   const hv = makePeople("gen-hv-learner", 34, 31);
   const hvStaff = makePeople("gen-hv-teacher", 5, 32);
+  // Limpopo TVET: 25 students
+  const tvet = makePeople("gen-tvet-student", 24, 41);
+  const tvetStaff = [named("lecturer-tvet", "Busisiwe", "Zulu"), ...makePeople("gen-tvet-lecturer", 5, 42)];
   // The named demo learners join the large classes so their dashboards are full.
   const zaGrade12 = [named("learner-south-a", "Lerato", "Mahlobo"), named("learner-south-b", "Sipho", "Khumalo"), named("learner-south-c", "Anele", "Radebe"), ...za.slice(0, 61)];
   await ensureUsers([named("parent-bw", "Lorato", "Ramotswe")]);
@@ -290,14 +302,23 @@ export async function seedCaboDemoAtScale(): Promise<void> {
   results.push(await seedSchool({
     name: "Ubuntu Future Secondary School", existingOrgName: "Ubuntu Future Secondary School", country: "ZA", framework: "NSC", curriculum: "CAPS (NSC)", institutionType: "highschool",
     head: named("headmaster-south", "Nomsa", "Dube"), staff: [named("teacher-south", "Thabo", "Maseko"), named("assessor-south", "Palesa", "Mokoena"), ...zaStaff], seed: 101,
-    cohorts: [{ level: "Grade 12", learners: zaGrade12 }, { level: "Grade 11", learners: za.slice(61, 122) }, { level: "Grade 10", learners: za.slice(122) }],
-    core: ZA_CORE, streams: ZA_STREAMS, periods: TERMS, guardians: 45, existingParent: ["learner-south-a", "parent-south"],
+    cohorts: [
+      { level: "Grade 12", learners: zaGrade12 },
+      { level: "Grade 11", learners: za.slice(61, 122) },
+      { level: "Grade 10", learners: za.slice(122, 183) },
+      { level: "Grade 9", learners: za.slice(183) },
+    ],
+    core: ZA_CORE, streams: ZA_STREAMS, periods: TERMS, guardians: 55, existingParent: ["learner-south-a", "parent-south"],
   }));
   results.push(await seedSchool({
     name: "Kgalagadi Community Senior School", country: "BW", framework: "BGCSE", curriculum: "BGCSE", institutionType: "highschool",
     head: named("headmaster-bw", "Kgosi", "Gaolathe"), staff: bwStaff, seed: 202,
-    cohorts: [{ level: "Form 5", learners: [named("learner-bw", "Masego", "Ramotswe"), ...bw.slice(0, 54)] }, { level: "Form 4", learners: bw.slice(54) }],
-    core: BW_CORE, streams: BW_STREAMS, periods: TERMS, guardians: 25, existingParent: ["learner-bw", "parent-bw"],
+    cohorts: [
+      { level: "Form 5", learners: [named("learner-bw", "Masego", "Ramotswe"), ...bw.slice(0, 54)] },
+      { level: "Form 4", learners: bw.slice(54, 108) },
+      { level: "Form 3", learners: bw.slice(108) },
+    ],
+    core: BW_CORE, streams: BW_STREAMS, periods: TERMS, guardians: 35, existingParent: ["learner-bw", "parent-bw"],
   }));
   results.push(await seedSchool({
     name: "Highveld Independent Academy", existingOrgName: "Highveld Independent Academy", country: "ZA", framework: "IEB", curriculum: "IEB", institutionType: "independent",
@@ -307,6 +328,15 @@ export async function seedCaboDemoAtScale(): Promise<void> {
     streams: [[["PHY", "Physical Sciences"], ["LSC", "Life Sciences"], ["IT", "Information Technology"]], [["ACC", "Accounting"], ["ECO", "Economics"], ["DRA", "Dramatic Arts"]]],
     periods: TERMS, guardians: 5,
   }));
+  results.push(await seedSchool({
+    name: "Limpopo Technical & Vocational Education College", country: "ZA", framework: "NATED", curriculum: "TVET NATED (N4)", institutionType: "tvet",
+    head: named("principal-tvet", "Dimpho", "Sello"), staff: [named("lecturer-tvet", "Busisiwe", "Zulu"), ...tvetStaff], seed: 404,
+    cohorts: [
+      { level: "N4", learners: [named("learner-tvet", "Karabo", "Modise"), ...tvet.slice(0, 12)] },
+      { level: "N5", learners: tvet.slice(12) },
+    ],
+    core: TVET_CORE, streams: TVET_STREAMS, periods: TERMS, guardians: 8,
+  }));
   const total = results.reduce((n, x) => n + x.learners + x.staff + x.guardians, 0);
-  console.info(`CABO demo at scale ready: ${results.length} schools, ${total} people, ${results.reduce((n, x) => n + x.courses, 0)} subject classes, ${results.reduce((n, x) => n + x.grades, 0)} results, ${results.reduce((n, x) => n + x.attendance, 0)} attendance rows`);
+  console.info(`CABO demo at scale ready: ${results.length} institutions, ${total} people, ${results.reduce((n, x) => n + x.courses, 0)} subject classes, ${results.reduce((n, x) => n + x.grades, 0)} results, ${results.reduce((n, x) => n + x.attendance, 0)} attendance rows`);
 }
