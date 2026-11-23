@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { createHmac, randomUUID } from "node:crypto";
 import express from "express";
 import { engine } from "./supportTestDb";
-import { db, usersTable, organizationMembersTable } from "./supportTestDb";
+import { db, usersTable, organizationMembersTable, organizationsTable } from "./supportTestDb";
 import { createSchemaFromDrizzle } from "./schemaFromDrizzle";
 import { currentBalance, withAiCredits, grantCredits, AiCreditsExhaustedError, sendCreditsExhausted } from "../../lib/aiCredits";
 import aiCreditsRouter from "../../routes/aiCredits";
@@ -28,6 +28,15 @@ await db.insert(usersTable).values([
   { id: "u-teacher", email: "teacher@test.cabo", firstName: "Themba", lastName: "Nkosi" },
   { id: "u-broke",   email: "broke@test.cabo",   firstName: "Sipho",  lastName: "Molefe" },
 ]).onConflictDoNothing();
+
+// ---- Seed organization (required parent for organization_members FK) --------
+// Use raw SQL to force id=99 (serial column) and reference an already-seeded user as owner.
+await engine.exec(`
+  INSERT INTO organizations (id, name, owner_id, created_at)
+  VALUES (99, 'Test Org', 'u-learner', NOW())
+  ON CONFLICT (id) DO NOTHING
+`);
+console.log("# seeded test organization (id=99)");
 
 await db.insert(organizationMembersTable).values([
   { organizationId: 99, userId: "u-learner", role: "learner" },
