@@ -219,6 +219,7 @@ internal data class NativeLearning(
     val parentGuidance: String = "",
     val parentReports: List<GuardianAcademicReport> = emptyList(),
     val parentReportNotice: String = "",
+    val childProgress: List<ChildProgress> = emptyList(),
     val staff: List<StaffWorkspace> = emptyList(),
     val journey: List<String> = emptyList(),
     val journeyIdentity: LearnerJourneyIdentity = LearnerJourneyIdentity(),
@@ -906,10 +907,31 @@ internal class NativeApi(private val context: Context) {
                     emptyList()
                 }
             }.distinctBy { it.key }.take(100)
+            val childProgress = try {
+                val children = getArray("/api/guardian/children")
+                (0 until minOf(children.length(), 6)).mapNotNull { i ->
+                    val child = children.optJSONObject(i) ?: return@mapNotNull null
+                    val learnerId = child.optString("learnerId").trim()
+                    val organizationId = child.optInt("organizationId")
+                    val year = child.optInt("academicYear")
+                    if (learnerId.isEmpty() || learnerId.length > 160 || organizationId <= 0 || year !in 2020..2200) return@mapNotNull null
+                    try {
+                        parseChildProgress(request(
+                            "/api/guardian/progress/${Uri.encode(learnerId)}?organizationId=$organizationId&year=$year", auth = true))
+                    } catch (error: Exception) {
+                        if (!hasSession()) throw error
+                        null
+                    }
+                }
+            } catch (error: Exception) {
+                if (!hasSession()) throw error
+                emptyList()
+            }
             return@withContext NativeLearning(
                 NativePortal(role, summary, cards), emptyList(), emptyList(),
                 guardians = relationships, parentGuidance = response.optString("guidance"),
                 parentReports = reports, parentReportNotice = notice, issuedReports = issuedReports,
+                childProgress = childProgress,
                 notificationPreferences = notificationPreferences
             )
         }

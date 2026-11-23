@@ -1060,6 +1060,49 @@ public sealed partial class NativeLearningService : IDisposable
             new { decision = accept ? "accepted" : "declined" }, cancellation).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Progress for each child the school has verified this guardian for.
+    /// The server decides access (verified relationship, this school's latest
+    /// decision, active enrolment) and returns published results only; the
+    /// formatter also refuses any response not marked verified_guardian.
+    /// Returns one list of display lines per child; a child without published
+    /// results is skipped, never shown as 0%.
+    /// </summary>
+    public async Task<IReadOnlyList<IReadOnlyList<string>>> GuardianChildProgressAsync(CancellationToken cancellation)
+    {
+        var result = new List<IReadOnlyList<string>>();
+        JsonDocument children;
+        try { children = await GetAsync("api/guardian/children", cancellation).ConfigureAwait(false); }
+        catch (UnauthorizedAccessException) { throw; }
+        catch (Exception) when (!cancellation.IsCancellationRequested) { return result; } // optional section
+        using (children)
+        {
+            if (children.RootElement.ValueKind != JsonValueKind.Array) return result;
+            foreach (var child in children.RootElement.EnumerateArray().Take(6))
+            {
+                if (child.ValueKind != JsonValueKind.Object ||
+                    !child.TryGetProperty("learnerId", out var lid) || lid.ValueKind != JsonValueKind.String ||
+                    !child.TryGetProperty("organizationId", out var oid) || oid.ValueKind != JsonValueKind.Number ||
+                    !child.TryGetProperty("academicYear", out var yr) || yr.ValueKind != JsonValueKind.Number) continue;
+                var learnerId = lid.GetString() ?? "";
+                if (!oid.TryGetInt32(out var organizationId) || !yr.TryGetInt32(out var academicYear)) continue;
+                if (learnerId.Length == 0 || learnerId.Length > 160 || organizationId <= 0 ||
+                    academicYear < 2020 || academicYear > 2200) continue;
+                try
+                {
+                    using var progress = await GetAsync(
+                        $"api/guardian/progress/{Uri.EscapeDataString(learnerId)}?organizationId={organizationId}&year={academicYear}",
+                        cancellation).ConfigureAwait(false);
+                    var lines = NativeChildProgress.Format(progress.RootElement);
+                    if (lines.Count > 0) result.Add(lines);
+                }
+                catch (UnauthorizedAccessException) { throw; }
+                catch (Exception) when (!cancellation.IsCancellationRequested) { /* skip this child */ }
+            }
+        }
+        return result;
+    }
+
     public async Task<GuardianReports> GuardianReportsAsync(CancellationToken cancellation)
     {
         using var json = await GetAsync("api/native/mobile/parent/reports", cancellation).ConfigureAwait(false);
