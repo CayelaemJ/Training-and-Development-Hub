@@ -7,6 +7,7 @@ import {
   schoolAttendanceTable, schoolNoticesTable, guardianRelationshipsTable,
   studyMaterialsTable, quizzesTable, verifiedEnrollmentsTable,
   learnerSupportTicketsTable, learnerSupportEventsTable, hubRecordsTable,
+  learnerIdentitiesTable, learnerJourneysTable, learnerMilestonesTable, schoolStageProgressTable,
 } from "@workspace/db";
 
 // Fictional, non-identifying test data. No passwords, secrets, real school names or real learners.
@@ -127,6 +128,45 @@ export async function seedCaboDemo(): Promise<void> {
     }).onConflictDoNothing();
   }
 
+
+  // Each case-study record is traceable to a fictional learner account.
+  // These account-owned entries are self-reports, not official verified transcripts.
+  async function journey(person:string,organizationId:number,institutionName:string,stage:string,academicYear:number,note:string) {
+    const userId=uid(person);
+    const [existing]=await db.select({id:learnerJourneysTable.id}).from(learnerJourneysTable).where(and(
+      eq(learnerJourneysTable.userId,userId),eq(learnerJourneysTable.institutionName,institutionName),
+      eq(learnerJourneysTable.stage,stage),eq(learnerJourneysTable.academicYear,academicYear),
+    )).limit(1);
+    if(!existing)await db.insert(learnerJourneysTable).values({
+      userId,institutionId:organizationId,institutionName,stage,academicYear,
+      note:"[DEMO] "+note,source:"self_report",
+    });
+  }
+  async function milestone(person:string,title:string,kind:string,year:number,description:string) {
+    const userId=uid(person);
+    const [existing]=await db.select({id:learnerMilestonesTable.id}).from(learnerMilestonesTable).where(and(
+      eq(learnerMilestonesTable.userId,userId),eq(learnerMilestonesTable.title,title),
+      eq(learnerMilestonesTable.year,year),
+    )).limit(1);
+    if(!existing)await db.insert(learnerMilestonesTable).values({
+      userId,title,kind,year,description:"[DEMO] "+description,source:"self_report",
+    });
+  }
+  async function stageProgress(organizationId:number,person:string,domain:string,title:string,observation:string,nextStep:string,progress:string,recordedBy:string) {
+    const learnerId=uid(person);
+    const [existing]=await db.select({id:schoolStageProgressTable.id}).from(schoolStageProgressTable).where(and(
+      eq(schoolStageProgressTable.organizationId,organizationId),
+      eq(schoolStageProgressTable.learnerId,learnerId),
+      eq(schoolStageProgressTable.academicYear,2026),
+      eq(schoolStageProgressTable.title,title),
+    )).limit(1);
+    if(!existing)await db.insert(schoolStageProgressTable).values({
+      organizationId,learnerId,stage:"highschool",grade:"12",academicYear:2026,domain,title,
+      observation:"[DEMO] "+observation,nextStep:"[DEMO] "+nextStep,progress,
+      recordedBy:uid(recordedBy),
+    });
+  }
+
   const south = await org("Ubuntu Future Secondary School", "headmaster-south");
   const north = await org("Highveld Independent Academy", "headmaster-north");
   const uni = await org("Mzanzi Digital University", "university-head");
@@ -145,6 +185,8 @@ export async function seedCaboDemo(): Promise<void> {
   await group(south,"Grade 12A — Demo",["learner-south-a","learner-south-b","learner-south-c"]);
   await group(north,"Grade 12 — Demo",["learner-north"]);
   await group(uni,"First-year Software Development — Demo",["university-learner"]);
+  const southTerm1 = await period(south,"Term 1 — Demo");
+  const southTerm2 = await period(south,"Term 2 — Demo");
   const southTerm = await period(south,"Term 3 — Demo");
   const northTerm = await period(north,"Term 3 — Demo");
   const uniTerm = await period(uni,"Semester 2 — Demo");
@@ -153,6 +195,14 @@ export async function seedCaboDemo(): Promise<void> {
   const lifeOrientation = await course(south,"LIF12","Life Orientation","Grade 12","teacher-south",["learner-south-a","learner-south-b","learner-south-c"]);
   const english = await course(north,"ENG12","English Home Language","Grade 12","headmaster-north",["learner-north"]);
   const programming = await course(uni,"CS101","Programming Fundamentals","Year 1","university-teacher",["university-learner"]);
+  // The three periods illustrate observed change. It is never presented as proof
+  // that a CABO intervention caused a result, and no official progression is implied.
+  await assessment(south,maths,southTerm1,"Foundations diagnostic — Synthetic","teacher-south",[["learner-south-a",70],["learner-south-b",48],["learner-south-c",61]]);
+  await assessment(south,maths,southTerm2,"Midyear practice — Synthetic","teacher-south",[["learner-south-a",76],["learner-south-b",56],["learner-south-c",65]]);
+  await assessment(south,science,southTerm1,"Motion fundamentals — Synthetic","assessor-south",[["learner-south-a",65],["learner-south-b",76],["learner-south-c",60]]);
+  await assessment(south,science,southTerm2,"Forces and motion — Synthetic","assessor-south",[["learner-south-a",70],["learner-south-b",82],["learner-south-c",64]]);
+  await assessment(south,lifeOrientation,southTerm1,"Growth reflection — Synthetic","teacher-south",[["learner-south-a",74],["learner-south-b",66],["learner-south-c",74]]);
+  await assessment(south,lifeOrientation,southTerm2,"Learning plan — Synthetic","teacher-south",[["learner-south-a",80],["learner-south-b",71],["learner-south-c",78]]);
   await assessment(south,maths,southTerm,"Algebra Test — Synthetic","teacher-south",[["learner-south-a",82],["learner-south-b",64],["learner-south-c",71]]);
   await assessment(south,science,southTerm,"Mechanics Test — Synthetic","assessor-south",[["learner-south-a",74],["learner-south-b",88],["learner-south-c",69]]);
   await assessment(south,lifeOrientation,southTerm,"Study and career plan — Synthetic","teacher-south",[["learner-south-a",86],["learner-south-b",76],["learner-south-c",81]]);
@@ -174,6 +224,58 @@ export async function seedCaboDemo(): Promise<void> {
     const status = (learnerId==="learner-south-b"&&day===9)||(learnerId==="learner-south-c"&&day===14)?"absent":day===12&&index===0?"late":"present";
     await db.insert(schoolAttendanceTable).values({organizationId:south,learnerId:uid(learnerId),day:`2026-10-${String(day).padStart(2,"0")}`,status,note:"[DEMO] Synthetic attendance example",recordedBy:uid("headmaster-south")}).onConflictDoNothing();
   }
+
+  // Give learner dashboards populated learning stages and personal milestones.
+  // Do not derive a minor's identity, age, educational status or credentials from
+  // these fixtures; they are fictional self-reports in a disposable demo database.
+  for (const [person, organizationId, name, stage, year, note] of [
+    ["learner-south-a",south,"[DEMO] Ubuntu Future Secondary School","10",2024,"Practice reflection: adapted to secondary maths."],
+    ["learner-south-a",south,"[DEMO] Ubuntu Future Secondary School","11",2025,"Practice reflection: completed a science project."],
+    ["learner-south-a",south,"[DEMO] Ubuntu Future Secondary School","12",2026,"Current fictional school year, not a certified enrolment."],
+    ["learner-south-b",south,"[DEMO] Ubuntu Future Secondary School","10",2024,"Exploring preferred ways to learn."],
+    ["learner-south-b",south,"[DEMO] Ubuntu Future Secondary School","11",2025,"Requested extra practice for algebra."],
+    ["learner-south-b",south,"[DEMO] Ubuntu Future Secondary School","12",2026,"Learning evidence discussed with a teacher."],
+    ["learner-south-c",south,"[DEMO] Ubuntu Future Secondary School","11",2025,"Started documenting a robotics hobby."],
+    ["learner-south-c",south,"[DEMO] Ubuntu Future Secondary School","12",2026,"Developing a project portfolio."],
+    ["learner-north",north,"[DEMO] Highveld Independent Academy","12",2026,"Fictional IEB school study record."],
+    ["university-learner",uni,"[DEMO] Mzanzi Digital University","university",2026,"Fictional first-year programming pathway."],
+  ] as [string,number,string,string,number,string][]) {
+    await journey(person,organizationId,name,stage,year,note);
+  }
+  for (const [person,title,kind,year,description] of [
+    ["learner-south-a","[DEMO] Algebra revision plan","academic",2026,"Self-reported plan to practise equations with supporting notes; no official mark awarded."],
+    ["learner-south-a","[DEMO] Athletics participation","personal_growth",2026,"Fictional sport involvement for a portfolio example, not a verified achievement."],
+    ["learner-south-b","[DEMO] Algebra learning checkpoint","academic",2026,"Teacher-guided worked examples are planned; progress is for demonstration only."],
+    ["learner-south-b","[DEMO] Independent study habit","personal_growth",2025,"Fictional reflection on a weekly study schedule."],
+    ["learner-south-c","[DEMO] Robotics design notebook","project",2026,"Fictional project notes that require human evidence verification."],
+    ["learner-south-c","[DEMO] Science fair reflection","academic",2025,"Self-reported learning reflection, not a prize or accredited award."],
+    ["learner-north","[DEMO] Literary analysis portfolio","creative",2026,"Sample English writing reflection; no school certification."],
+    ["university-learner","[DEMO] TypeScript practice project","technical",2026,"Fictional course-related code learning reflection, not a qualification."],
+  ] as [string,string,string,number,string][]) await milestone(person,title,kind,year,description);
+  await db.insert(learnerIdentitiesTable).values({userId:uid("learner-south-a"),displayName:"Lerato [DEMO]"}).onConflictDoNothing();
+  await db.insert(learnerIdentitiesTable).values({userId:uid("learner-south-b"),displayName:"Sipho [DEMO]"}).onConflictDoNothing();
+  await db.insert(learnerIdentitiesTable).values({userId:uid("learner-south-c"),displayName:"Anele [DEMO]"}).onConflictDoNothing();
+  await stageProgress(south,"learner-south-a","assessment_readiness","[DEMO] Mathematics revision","Worked examples reviewed; observed Term 1–3 practice grades are synthetic.","Teacher to review the next problem set.","developing","headmaster-south");
+  await stageProgress(south,"learner-south-b","subject_mastery","[DEMO] Algebra support plan","Foundational topics need additional practice according to fictional assessment results.","Teacher to review worked fractions examples; do not infer causality.","needs_support","headmaster-south");
+  await stageProgress(south,"learner-south-b","study_skills","[DEMO] Weekly practice routine","Learner has a fictional individual learning plan.","Check practice notes with teacher.","developing","headmaster-south");
+  await stageProgress(south,"learner-south-c","practical_projects","[DEMO] Robotics reflection","Project evidence is self-reported and not institution verified.","Request an educator review of the portfolio.","observing","headmaster-south");
+  await stageProgress(north,"learner-north","assessment_readiness","[DEMO] English writing","Fictional practice outcomes recorded for IEB illustration.","Ask educator to review a draft analysis paragraph.","meeting_expectations","headmaster-north");
+
+  // More realistic attendance history without weekends or future dates.
+  for (let day=1;day<=18;day++) {
+    const date=new Date(Date.UTC(2026,8,day));
+    if (date.getUTCDay()===0||date.getUTCDay()===6) continue;
+    const dateText=`2026-09-${String(day).padStart(2,"0")}`;
+    for(const learner of ["learner-south-a","learner-south-b","learner-south-c"] as const) {
+      const status=(learner==="learner-south-b"&&day===8)?"absent":(learner==="learner-south-a"&&day===17)?"late":"present";
+      await db.insert(schoolAttendanceTable).values({
+        organizationId:south,learnerId:uid(learner),day:dateText,status,
+        note:"[DEMO] Synthetic September attendance for case-study walkthrough",
+        recordedBy:uid("headmaster-south"),
+      }).onConflictDoNothing();
+    }
+  }
+
   await supportCase(south,maths,"learner-south-b","teacher-south");
   for (const [kind,title,description,subject] of [
     ["academic_intervention","[DEMO] Algebra support cycle","Teacher-led practice and follow-up review; fictional and non-diagnostic.","learner-south-b"],
@@ -215,6 +317,66 @@ export async function seedCaboDemo(): Promise<void> {
         {prompt: "What is the best final check after solving a linear equation?",
          options: ["Round x to a whole number","Substitute x into the original equation","Change its sign","Ignore the constant"],
          correctOption: 1,explanation: "Substituting verifies that both sides are equal."},
+      ],
+    },
+    {
+      learner: "learner-south-b",
+      key: "grade12-fractions",
+      title: "[DEMO] Grade 12 Fractions - Worked Examples",
+      text: [
+        "CABO DEMO MATERIAL. Synthetic teaching material for an educator-led support case.",
+        "To combine algebraic fractions, factorise the denominators and find their least common denominator.",
+        "Example: 1/x + 1/(2x) = 2/(2x) + 1/(2x) = 3/(2x), provided x is not zero.",
+        "Check for excluded values that would make any original denominator equal zero.",
+        "A learner should explain the steps and ask a teacher to review uncertain solutions.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "Simplify 1/x + 1/(2x) for x not equal to zero.",
+         options: ["2/(3x)","3/(2x)","1/(3x)","3x/2"],correctOption: 1,
+         explanation: "Use 2x as the common denominator: 2/(2x)+1/(2x)=3/(2x)."},
+        {prompt: "Which x value is excluded from 1/x?",
+         options: ["1","-1","0","2"],correctOption: 2,
+         explanation: "Division by zero is undefined."},
+      ],
+    },
+    {
+      learner: "learner-south-c",
+      key: "grade12-science",
+      title: "[DEMO] Grade 12 Science - Motion Notes",
+      text: [
+        "CABO DEMO MATERIAL. Fictional Physical Sciences revision, not an official examination.",
+        "Average speed is total distance divided by elapsed time.",
+        "Acceleration is the change in velocity divided by elapsed time.",
+        "A force can change an object's velocity. Always state the units and the assumptions.",
+        "Example: moving 100 metres in 20 seconds gives an average speed of 5 metres per second.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "What is the average speed for 100 m in 20 s?",
+         options: ["2 m/s","5 m/s","20 m/s","2000 m/s"],correctOption: 1,
+         explanation: "Speed = distance/time = 100/20 = 5 metres per second."},
+        {prompt: "Which unit is commonly used for acceleration?",
+         options: ["m/s²","kg","m²","N/m"],correctOption: 0,
+         explanation: "Acceleration is change in velocity per unit time, measured in m/s²."},
+      ],
+    },
+    {
+      learner: "university-learner",
+      key: "typescript-basics",
+      title: "[DEMO] First-year TypeScript - Practice Notes",
+      text: [
+        "CABO DEMO MATERIAL. Fictional introductory programming resource.",
+        "TypeScript adds static type checking to JavaScript source code.",
+        "A variable declared as const cannot be reassigned after initialisation.",
+        "A function can declare parameter and return types, such as function double(x:number):number.",
+        "Static checks help catch certain errors before execution but do not replace tests.",
+      ].join("\n\n"),
+      questions: [
+        {prompt: "Which TypeScript annotation represents a number?",
+         options: ["number","integerOnly","digits","numericValue"],correctOption: 0,
+         explanation: "TypeScript uses the primitive type name number."},
+        {prompt: "Does static type checking replace automated runtime tests?",
+         options: ["Always","Only for browser code","No","Only for numbers"],correctOption: 2,
+         explanation: "Type checks and runtime tests find different classes of defects."},
       ],
     },
     {
@@ -275,5 +437,5 @@ export async function seedCaboDemo(): Promise<void> {
     }
   }
 
-  console.info("CABO synthetic fixtures ready: 4 organisations, 14 identities, 5 courses, 5 assessments, 36 attendance rows, 1 intervention, 5 hub records, 2 native learner quizzes");
+  console.info("CABO synthetic fixtures ready: 4 organisations, 14 identities, 5 courses, 11 assessments, 78 attendance rows, 10 learner-journey entries, 8 milestones, 5 school-stage observations, 1 intervention, 5 hub records, 5 synthetic learner quizzes");
 }
