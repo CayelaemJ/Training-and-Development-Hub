@@ -87,7 +87,8 @@ router.post("/ai-credits/checkout", async (req, res) => {
       callback_url: origin ? `${origin}/ai-credits?paid=1` : undefined, metadata: { cabo_user: userId, cabo_product: item.data } }),
     signal: AbortSignal.timeout(8000),
   }).catch(() => null);
-  const data = response ? await response.json().catch(() => null) : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = response ? await (response.json() as Promise<any>).catch(() => null) : null;
   const url = data?.data?.authorization_url;
   if (!response?.ok || typeof url !== "string" || !url.startsWith("https://checkout.paystack.com/")) {
     logger.warn({ status: response?.status ?? null }, "Paystack checkout not created");
@@ -115,7 +116,8 @@ router.post("/ai-credits/webhooks/paystack", async (req, res) => {
     const verify = await fetch(`${PAYSTACK}/transaction/verify/${encodeURIComponent(event.data.reference)}`, {
       headers: { Authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(8000),
     });
-    const tx = (await verify.json().catch(() => null))?.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tx = (await (verify.json() as Promise<any>).catch(() => null))?.data;
     if (!verify.ok || tx?.status !== "success") return;
     const userId = tx?.metadata?.cabo_user, item = product.safeParse(tx?.metadata?.cabo_product);
     if (typeof userId !== "string" || !item.success) return;
