@@ -447,6 +447,12 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     @Published var educationCommandNotice = ""
     @Published var supportCourses: [NativeSupportCourse] = []
     @Published var supportDrafts: [NativeSupportDraft] = []
+    /// Tutor questions and answers for this sign-in only, keyed by material.
+    /// Held in memory; never written to disk, Keychain or logs.
+    @Published var materialAnswers: [Int: [NativeTutorExchange]] = [:]
+    /// Increases whenever account state is reset, so a reply that arrives
+    /// after sign-out or an account switch is discarded instead of shown.
+    private(set) var accountGeneration = 0
 
     // Test-login is a build-time opt-in, never enabled by a server response.
     var testLoginAvailable: Bool {
@@ -569,14 +575,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         if code == 401 {
             clearSupportStorage()
             clearToken()
-            role = nil
-            summary = []; workspaces = []; materials = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; quizzes = []; quizSummaries = []
-            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []
-            learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""
-            lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
-            journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
-            guardianReports = []; childProgress = []; learnerReports = []; guardianGuidance = ""
-            admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
+            resetAccountState()
             status = "Session expired. Sign in again."
             throw NSError(domain: "CABO", code: 401)
         }
@@ -970,12 +969,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
             status = "Connected securely to CABO"
         } catch {
             if keychainToken() == nil { clearSupportStorage() }
-            role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
-        learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""; learnerPassportBusy = false
-        lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
-            guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; childProgress = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
-            admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
-            journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
+            resetAccountState()
             supportDrafts = loadSupportDrafts()
             supportCourses = loadSupportCourses()
             status = keychainToken() == nil
@@ -1450,6 +1444,25 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         let data = try await request("api/materials/\(id)/preview?offset=\(offset)")
         return try JSONDecoder().decode(NativeMaterialPage.self, from: data)
+    }
+
+    // Grounded tutor for a material owned by the signed-in account. The server
+    // decides access, retrieves passages, calls the configured AI provider and
+    // rate-limits requests; the app only sends the question.
+    @discardableResult
+    func askMaterial(id: Int, question: String) async throws -> NativeTutorExchange {
+        guard role != nil, id > 0 else { throw NSError(domain: "CABO", code: 403) }
+        guard let clean = NativeMaterialTutor.validatedQuestion(question) else {
+            throw NativeTutorError.invalidQuestion
+        }
+        let generation = accountGeneration
+        let body = try JSONSerialization.data(withJSONObject: ["question": clean])
+        let data = try await request("api/materials/\(id)/ask", method: "POST", body: body, timeoutInterval: 60)
+        let answer = try NativeMaterialTutor.decodeAnswer(data, expectedMaterialId: id)
+        guard generation == accountGeneration, role != nil else { throw NativeTutorError.accountChanged }
+        let exchange = NativeTutorExchange(id: UUID(), question: clean, answer: answer)
+        materialAnswers[id] = NativeMaterialTutor.appending(exchange, to: materialAnswers[id] ?? [])
+        return exchange
     }
 
     func generateWrittenExam(materialId: Int, questionCount: Int, difficulty: String) async throws -> NativeWrittenExam {
@@ -2135,14 +2148,64 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
         }
         clearSupportStorage()
         clearToken()
-        role = nil; summary = []; workspaces = []; materials = []; quizzes = []; quizSummaries = []; materialSummaries = []; writtenExams = []; writtenAssignments = []; examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
-        guardians = []; guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []; issuedReports = []; issuedReportIntegrity = [:]; staffSchools = []; adminOrganizations = []; journey = []; learnerHelp = []; guardianGuidance = ""; guardianReports = []; childProgress = []; guardianReportNotice = ""; learnerReports = []; learnerReportNotice = ""
-        admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []; admissionsNotice = ""
-        journeyIdentity = NativeJourneyIdentity(displayName: ""); journeyEntries = []; journeyMilestones = []
+        resetAccountState()
         status = "Signed out on this device."
-        learnerPassport = nil; learnerPassportJSON = nil; lifelongPassport = nil
-        learnerPassportNotice = ""; lifelongPassportNotice = ""; lifelongPassportBusy = false
         busy = false
+    }
+
+    /// Clears every account-scoped value held in memory. Called on sign-out,
+    /// on any 401, when a refresh fails, and before a new token is stored, so
+    /// one person's learner, family or school records can never remain on
+    /// screen for the next account on a shared device. When adding a new
+    /// @Published account field, reset it here; `accountStateIsEmpty` and the
+    /// unit tests check this.
+    func resetAccountState() {
+        role = nil; summary = []; workspaces = []
+        materials = []; materialSummaries = []; quizzes = []; quizSummaries = []
+        writtenExams = []; writtenAssignments = []
+        examManagementWorkspaces = []; canManageExamAssignments = false; examManagementBusy = false
+        guardians = []; notificationPreferences = NativeNotificationPreferences.unavailable
+        guardianReviewWorkspaces = []; reportIssuanceWorkspaces = []
+        schoolOperations = []; assessmentWorkspaces = []
+        guardianGuidance = ""; guardianReports = []; guardianReportNotice = ""; childProgress = []
+        issuedReports = []; issuedReportIntegrity = [:]
+        staffSchools = []; adminOrganizations = []
+        journey = []; journeyIdentity = NativeJourneyIdentity(displayName: "")
+        journeyEntries = []; journeyMilestones = []
+        learnerHelp = []; learnerReports = []; learnerReportNotice = ""
+        admissionInstitutions = []; admissionProgrammes = []; admissionApplications = []
+        admissionsBusy = false; admissionsNotice = ""
+        learnerPassport = nil; learnerPassportJSON = nil; learnerPassportNotice = ""; learnerPassportBusy = false
+        lifelongPassport = nil; lifelongPassportNotice = ""; lifelongPassportBusy = false
+        educationCommand = nil; educationCommandBusy = false; educationCommandNotice = ""
+        supportCourses = []; supportDrafts = []
+        materialAnswers = [:]
+        accountGeneration += 1
+    }
+
+    /// True when no account-scoped record is held in memory.
+    var accountStateIsEmpty: Bool {
+        // Kept as a typed array, not one long && chain, so the Swift type
+        // checker handles it quickly.
+        let empty: [Bool] = [
+            role == nil, summary.isEmpty, workspaces.isEmpty,
+            materials.isEmpty, materialSummaries.isEmpty, quizzes.isEmpty, quizSummaries.isEmpty,
+            writtenExams.isEmpty, writtenAssignments.isEmpty, examManagementWorkspaces.isEmpty,
+            !canManageExamAssignments, guardians.isEmpty, notificationPreferences.schools.isEmpty,
+            guardianReviewWorkspaces.isEmpty, reportIssuanceWorkspaces.isEmpty,
+            schoolOperations.isEmpty, assessmentWorkspaces.isEmpty,
+            guardianGuidance.isEmpty, guardianReports.isEmpty, guardianReportNotice.isEmpty, childProgress.isEmpty,
+            issuedReports.isEmpty, issuedReportIntegrity.isEmpty,
+            staffSchools.isEmpty, adminOrganizations.isEmpty,
+            journey.isEmpty, journeyIdentity.displayName.isEmpty,
+            journeyEntries.isEmpty, journeyMilestones.isEmpty,
+            learnerHelp.isEmpty, learnerReports.isEmpty, learnerReportNotice.isEmpty,
+            admissionInstitutions.isEmpty, admissionProgrammes.isEmpty, admissionApplications.isEmpty,
+            admissionsNotice.isEmpty, learnerPassport == nil, learnerPassportJSON == nil,
+            lifelongPassport == nil, educationCommand == nil,
+            supportCourses.isEmpty, supportDrafts.isEmpty, materialAnswers.isEmpty
+        ]
+        return !empty.contains(false)
     }
 
     private struct NativeResource: Decodable { let title: String }
@@ -2160,6 +2223,7 @@ final class NativeSession: NSObject, ObservableObject, ASWebAuthenticationPresen
     private func storeToken(_ token: String) throws {
         clearSupportStorage()
         clearToken()
+        resetAccountState()
         let attributes: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "za.co.cabosolutions.learninghub.native",
             kSecAttrAccount as String: "native_bearer",

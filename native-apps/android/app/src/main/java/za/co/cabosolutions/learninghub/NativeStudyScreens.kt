@@ -7,6 +7,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 
 // Actual CABO API quiz. Never renders a locally fabricated answer key or grade.
@@ -171,13 +175,16 @@ internal fun NativeMaterialScreen(
     busy: Boolean,
     message: String?,
     next: () -> Unit,
-    close: () -> Unit
+    close: () -> Unit,
+    tutor: MaterialTutorState = MaterialTutorState(),
+    setTutorQuestion: (String) -> Unit = {},
+    askTutor: () -> Unit = {}
 ) {
     Scaffold(topBar = {
         Surface(color = MaterialTheme.colorScheme.primaryContainer) {
             Row(Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = close, enabled = !busy) { Text("Back") }
+                OutlinedButton(onClick = close, enabled = !busy && !tutor.busy) { Text("Back") }
                 Text("CABO study material", style = MaterialTheme.typography.titleLarge)
             }
         }
@@ -197,6 +204,76 @@ internal fun NativeMaterialScreen(
             }
             if (content.isNotEmpty() && nextOffset == null) {
                 Text("End of available material.", style = MaterialTheme.typography.bodySmall)
+            }
+            HorizontalDivider()
+            NativeMaterialTutorSection(tutor, setTutorQuestion, askTutor)
+        }
+    }
+}
+
+// In-memory tutor state for the open material. History is cleared on sign-out
+// and account changes by MainActivity; nothing is written to storage.
+internal data class MaterialTutorState(
+    val available: Boolean = false,
+    val unavailableReason: String = "Sign in with a CABO account to ask about your own materials.",
+    val question: String = "",
+    val busy: Boolean = false,
+    val message: String? = null,
+    val history: List<TutorExchange> = emptyList()
+)
+
+@Composable
+internal fun NativeMaterialTutorSection(
+    tutor: MaterialTutorState,
+    setQuestion: (String) -> Unit,
+    ask: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Ask about this material", style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() })
+        Text(NativeMaterialTutor.GUIDANCE, style = MaterialTheme.typography.bodySmall)
+        if (!tutor.available) {
+            Text(tutor.unavailableReason, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            val limit = NativeMaterialTutor.QUESTION_LIMITS.last
+            OutlinedTextField(
+                value = tutor.question,
+                onValueChange = { setQuestion(it.take(limit)) },
+                label = { Text("Your question about this material") },
+                supportingText = { Text("${tutor.question.length}/$limit") },
+                enabled = !tutor.busy,
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = ask,
+                enabled = !tutor.busy && NativeMaterialTutor.validatedQuestion(tutor.question) != null,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) { Text(if (tutor.busy) "Asking…" else "Ask the tutor") }
+            if (tutor.busy) {
+                LinearProgressIndicator(Modifier.fillMaxWidth()
+                    .semantics { contentDescription = "The tutor is preparing an answer" })
+            }
+            tutor.message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            tutor.history.asReversed().forEach { exchange ->
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("You asked", style = MaterialTheme.typography.labelMedium)
+                        Text(exchange.question, style = MaterialTheme.typography.bodyMedium)
+                        Text("Tutor answer", style = MaterialTheme.typography.labelMedium)
+                        Text(exchange.answer.answer, style = MaterialTheme.typography.bodyLarge)
+                        Text("From your material", style = MaterialTheme.typography.labelMedium)
+                        exchange.answer.citations.forEachIndexed { index, citation ->
+                            Text("“${citation.excerpt}”",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
+                                modifier = Modifier.padding(start = 10.dp)
+                                    .semantics { contentDescription = "Quote ${index + 1} from your material: ${citation.excerpt}" })
+                        }
+                        Text("Check this answer against your notes. AI answers can be wrong.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }

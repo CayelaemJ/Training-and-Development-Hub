@@ -25,8 +25,12 @@ router.get("/organizations",async(req,res)=>{
  const id=me(req,res);if(!id)return;
  if(isPlatformSuperadmin(id)){
   const all=await db.select({id:organizationsTable.id,name:organizationsTable.name}).from(organizationsTable);
+  const own=await db.select({id:organizationMembersTable.organizationId,role:organizationMembersTable.role}).from(organizationMembersTable).where(eq(organizationMembersTable.userId,id));
+  const mine=new Map(own.map(m=>[m.id,m.role]));
   await auditSuperadmin(id,"organizations_list");
-  res.setHeader("Cache-Control","no-store");res.json(all.map(o=>({...o,role:"owner"})));return;
+  // member:false marks schools listed only through the audited platform view.
+  // School-scoped features (learner support, class chat) still require membership.
+  res.setHeader("Cache-Control","no-store");res.json(all.map(o=>({...o,role:mine.get(o.id)??"owner",member:mine.has(o.id)})));return;
  }
  const rows=await db.select({id:organizationsTable.id,name:organizationsTable.name,role:organizationMembersTable.role}).from(organizationMembersTable).innerJoin(organizationsTable,eq(organizationsTable.id,organizationMembersTable.organizationId)).where(eq(organizationMembersTable.userId,id));
  res.json(rows);
