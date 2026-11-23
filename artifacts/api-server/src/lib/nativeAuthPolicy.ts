@@ -12,8 +12,29 @@ export type NativeClientId = keyof typeof NATIVE_CLIENTS;
 export const NATIVE_CODE_SECONDS = 180;
 export const NATIVE_SESSION_SECONDS = 3600;
 
+export function isolatedDemoBrowserLoginEnabled(env: NodeJS.ProcessEnv): boolean {
+  return (env.CABO_ENVIRONMENT ?? env.RAILWAY_ENVIRONMENT_NAME) === "testing" &&
+    env.CABO_TEST_DATABASE_ISOLATED === "true" &&
+    env.ENABLE_CABO_TEST_LOGIN === "true";
+}
+
 export function nativeAuthEnabled(env: NodeJS.ProcessEnv): boolean {
-  return env.CABO_NATIVE_AUTH_ENABLED === "true";
+  return env.CABO_NATIVE_AUTH_ENABLED === "true" ||
+    (env.CABO_NATIVE_AUTH_ENABLED !== "false" && isolatedDemoBrowserLoginEnabled(env));
+}
+
+/** Only resume a well-formed request for an app with an existing pinned callback. */
+export function nativeDemoReturnTo(value: unknown): string | null {
+  const prefix = "/api/native/authorize?";
+  if (typeof value !== "string" || value.length > 512 || !value.startsWith(prefix) || value.includes("#")) {
+    return null;
+  }
+  const params = new URLSearchParams(value.slice(prefix.length));
+  const keys = ["client_id", "code_challenge", "code_challenge_method", "state"];
+  if (params.size !== keys.length || keys.some(key => params.getAll(key).length !== 1)) return null;
+  if (!nativeRedirect(params.get("client_id")) || !validPkceChallenge(params.get("code_challenge")) ||
+      !validState(params.get("state")) || params.get("code_challenge_method") !== "S256") return null;
+  return prefix + params.toString();
 }
 export function nativeRedirect(clientId: unknown): string | null {
   if (typeof clientId !== "string" || !Object.hasOwn(NATIVE_CLIENTS, clientId)) return null;

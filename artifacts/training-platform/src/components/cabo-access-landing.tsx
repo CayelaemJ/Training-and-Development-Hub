@@ -47,17 +47,19 @@ export default function CaboAccessLanding() {
     setSubmitting(true);
     setSignInError('');
     try {
+      const nativeReturnTo = new URLSearchParams(window.location.search).get('nativeReturnTo');
       const response = await fetch('/api/test-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), password, nativeReturnTo }),
       });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
         throw new Error(typeof result.error === 'string' ? result.error : 'Sign-in failed. Please try again.');
       }
-      window.location.assign('/');
+      const { redirectTo } = await response.json();
+      window.location.assign(typeof redirectTo === 'string' && redirectTo.startsWith('/api/native/authorize?') ? redirectTo : '/');
     } catch (error) {
       setSignInError(error instanceof Error ? error.message : 'Sign-in failed. Please try again.');
     } finally {
