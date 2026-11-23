@@ -42,7 +42,8 @@ try {
   assert.ok(first.grades > 10000);
   assert.ok(first.attendance > 9000);
   assert.ok(first.verifiedGuardians >= 70);
-  assert.equal(first.countries, 3);
+  // Four demo institutions with a ZA or BW country (three ZA, one BW).
+  assert.equal(first.countries, 4);
   assert.ok(first.cases >= 12);
   assert.ok(first.messages >= 30);
   const parent = (await engine.query(`SELECT r.status, e.decision FROM guardian_relationships r JOIN guardian_verification_events e ON e.relationship_id=r.id WHERE r.guardian_id='cabo-fixture-parent-south' AND r.learner_id='cabo-fixture-learner-south-a'`)).rows as any[];
