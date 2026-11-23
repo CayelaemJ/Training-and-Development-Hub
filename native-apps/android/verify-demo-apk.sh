@@ -16,9 +16,10 @@ if grep -Fq 'android.permission.INTERNET' <<< "$badging"; then
 fi
 
 adb install -r "$apk"
-launch=$(adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$package")
+# Use Android's launcher-category lookup, which does not require CATEGORY_DEFAULT.
+launch=$(adb shell monkey -p "$package" -c android.intent.category.LAUNCHER 1)
 printf '%s\n' "$launch"
-grep -Fq 'Status: ok' <<< "$launch"
+grep -Fq 'Events injected: 1' <<< "$launch"
 
 # Look for the role switcher in the UI of the installed APK, without signing in.
 for attempt in {1..10}; do
