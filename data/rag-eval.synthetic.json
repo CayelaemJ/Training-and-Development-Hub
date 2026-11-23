@@ -1,0 +1,8 @@
+{
+  "description": "Synthetic, non-identifying retrieval regression fixture. Replace and expand only with human-reviewed, licensed content; never add learner records.",
+  "thresholds": { "k": 3, "minimumRecall": 0.8, "maximumDuplicateRate": 0.1 },
+  "cases": [
+    { "tenantId": "school-red", "expectedDocIds": ["red-fractions"], "retrieved": [{ "docId": "red-fractions", "tenantId": "school-red", "cited": true }, { "docId": "red-equivalent", "tenantId": "school-red", "cited": true }] },
+    { "tenantId": "school-blue", "expectedDocIds": ["blue-photosynthesis", "blue-leaves"], "retrieved": [{ "docId": "blue-leaves", "tenantId": "school-blue", "cited": true }, { "docId": "blue-photosynthesis", "tenantId": "school-blue", "cited": true }] }
+  ]
+}
