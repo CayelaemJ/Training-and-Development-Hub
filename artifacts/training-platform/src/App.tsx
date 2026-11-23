@@ -46,6 +46,9 @@ import { QuickJump } from '@/components/quick-jump';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Celebrate } from '@/components/celebrate';
 import { Compass } from 'lucide-react';
+import PassportSharingPage from '@/pages/passport-sharing';
+import SharedPassportsPage from '@/pages/shared-passports';
+import { Share2, FileUser } from 'lucide-react';
 import { Avatar } from '@/components/avatar';
 import { ReadAloud, VoiceInput } from '@/components/speech';
 import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '@/lib/appearance';
@@ -69,19 +72,19 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 // Every signed-in person can raise a concern and see which privacy rules apply.
-const alwaysNav=['/tour','/me','/notification-preferences','/accountability','/privacy','/ai-credits','/accessibility'];
+const alwaysNav=['/tour','/passport-sharing','/me','/notification-preferences','/accountability','/privacy','/ai-credits','/accessibility'];
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey','/shared-passports'],
  national_director:['/','/education-command','/organizations','/governance'],
  provincial_director:['/','/education-command','/organizations','/governance'],
  district_director:['/','/education-command','/organizations','/governance'],
- group_executive:['/','/education-command','/organizations','/governance'],
+ group_executive:['/','/education-command','/organizations','/governance','/shared-passports'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
- deputy_headmaster:['/admissions','/class-chat','/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
+ headmaster:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams','/shared-passports'],
+ deputy_headmaster:['/admissions','/class-chat','/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records','/shared-passports'],
  department_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
  grade_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
- administrator:['/admissions','/class-chat','/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ administrator:['/admissions','/class-chat','/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance','/shared-passports'],
  teacher:['/class-chat','/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
  assessor:['/class-chat','/','/learner-success','/organizations','/written-exams'],
  parent:['/admissions','/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
@@ -91,6 +94,8 @@ const navItems = [
   { href: '/my-ai', label: 'My CABO AI profile', icon: BrainCircuit },
   { href: '/tour', label: 'Tour CABO', icon: Compass },
   { href: '/learner-success', label: 'Learner Success Loop', icon: Target },
+  { href: '/passport-sharing', label: 'Share my passport', icon: Share2 },
+  { href: '/shared-passports', label: 'Passports shared with us', icon: FileUser },
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
   { href: '/admissions', label: 'Admissions & transfers', icon: GraduationCap },
@@ -176,6 +181,8 @@ function Router() {
     <Route path="/ai-credits" component={AiCreditsPage} />
     <Route path="/accessibility" component={AccessibilityPage} />
     <Route path="/tour" component={TourPage} />
+    <Route path="/passport-sharing" component={PassportSharingPage} />
+    <Route path="/shared-passports" component={SharedPassportsPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
@@ -227,7 +234,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/admissions' ? 'Admissions & transfers' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location === '/tour' ? 'Tour CABO' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/admissions' ? 'Admissions & transfers' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location === '/tour' ? 'Tour CABO' : location === '/passport-sharing' ? 'Share my passport' : location === '/shared-passports' ? 'Passports shared with us' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   const [me,setMe] = useState<{profile:{initials:string;name:string;avatarStyle:'initials'|'pattern'|'photo';avatarColor:Appearance['accent']};appearance:Appearance;photo:{status:string;url:string}|null}|null>(null);
   useEffect(()=>{let live=true;fetch('/api/me/profile',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(!live||!d?.profile||!d?.appearance)return;setMe(d);applyAppearance({...DEFAULT_APPEARANCE,...d.appearance});}).catch(()=>undefined);return()=>{live=false};},[location==='/me']);

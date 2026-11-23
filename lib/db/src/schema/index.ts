@@ -66,3 +66,4 @@ export * from "./accountability";
 export * from "./classChat";
 export * from "./profiles";
 export * from "./aiCredits";
+export * from "./passportShares";

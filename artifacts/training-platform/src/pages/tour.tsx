@@ -13,6 +13,8 @@ const TEACHER = "cabo_teacher_south (Thabo, teacher)";
 const HEAD = "cabo_headmaster_south (Nomsa, headmaster)";
 const PARENT = "cabo_parent_south (Mpho, Lerato's parent)";
 const BW = "cabo_learner_bw (Masego, Botswana)";
+const UNI = "cabo_university_head (Dr Nandi, Mzanzi Digital University)";
+const EMPLOYER = "cabo_company_head (Karabo, Kwezi Skills & Training)";
 
 const SECTIONS: Section[] = [
   { id: "learn", icon: BookOpen, title: "Learn", intro: "A learner's day: study, practise, ask for help and see progress.", stops: [
@@ -39,6 +41,13 @@ const SECTIONS: Section[] = [
   { id: "family", icon: HeartHandshake, title: "Family", intro: "Parents see how their child is doing, once the school has verified them.", stops: [
     { title: "How your child is doing", what: "Term trends, strongest and focus subjects, attendance and a plain-language outlook. Class comparison only when at least 5 learners have results.", href: "/guardian-connect", as: PARENT },
     { title: "Result emails and photo approval", what: "Opt-in emails when results are published (no marks in the email), and approval of your child's profile picture.", href: "/notification-preferences", as: PARENT },
+  ]},
+  { id: "pathways", icon: GraduationCap, title: "Universities and employers", intro: "One lifelong record that follows the learner from school to university and work, shared only when they choose.", stops: [
+    { title: "Share my passport", what: "Pick a university, college or employer, what they may see and for how long. Stop at any time, and see every time they open it.", href: "/passport-sharing", as: LEARNER },
+    { title: "A parent approves", what: "A school learner's share waits for their verified parent's approval. Lerato has one waiting for Kwezi Skills & Training.", href: "/passport-sharing", as: PARENT },
+    { title: "Passports shared with a university", what: "Admissions sees results, learning DNA and journey for learners who chose to share, nothing more.", href: "/shared-passports", as: UNI },
+    { title: "Passports shared with an employer", what: "Recruiters see skills, verified achievements and results for an internship, with every view logged.", href: "/shared-passports", as: EMPLOYER },
+    { title: "University performance", what: "Universities run the same results, academics and Learner Success Loop for their own students.", href: "/academics", as: UNI },
   ]},
   { id: "ai", icon: BrainCircuit, title: "CABO AI", intro: "One AI voice across the platform: warm, local, honest, and always checkable.", stops: [
     { title: "Grounded answers with citations", what: "Answers come only from approved material, and each quote is checked against the source before it is shown.", href: "/materials", as: LEARNER },

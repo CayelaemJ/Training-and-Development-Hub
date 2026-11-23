@@ -2,7 +2,7 @@ import { and, eq, inArray, like, sql } from "drizzle-orm";
 import {
   db, organizationsTable, organizationMembersTable, courseEnrollmentsTable, courseStaffAssignmentsTable,
   academicCoursesTable, learnerSupportTicketsTable, learnerSupportEventsTable, studyMaterialsTable,
-  quizzesTable, aiSubscriptionsTable, aiCreditLedgerTable,
+  quizzesTable, aiSubscriptionsTable, aiCreditLedgerTable, passportSharesTable, passportCompetenciesTable, guardianRelationshipsTable,
 } from "@workspace/db";
 
 /**
@@ -247,6 +247,52 @@ async function seedCredits(now: Date): Promise<void> {
   await db.insert(aiCreditLedgerTable).values({ userId: uid("learner-south-a"), kind: "grant", delta: 50, operation: null, reference: "demo-showcase-grant-learner-south-a" }).onConflictDoNothing();
 }
 
+/**
+ * Passport shares so the demo university and employer have learners to open,
+ * plus one waiting for a parent's approval. Learners with a verified guardian
+ * are only shared as approved by that guardian, exactly as the app requires.
+ */
+async function seedPassportShares(now: Date): Promise<number> {
+  const orgId = async (name: string) => (await db.select({ id: organizationsTable.id }).from(organizationsTable).where(eq(organizationsTable.name, `[DEMO] ${name}`)).limit(1))[0]?.id;
+  const uni = await orgId("Mzanzi Digital University"), employer = await orgId("Kwezi Skills & Training");
+  if (!uni || !employer) return 0;
+  for (const [skill, category, level, demonstration, description] of [
+    ["Python programming", "technical", 3, "project", "Built a timetable clash checker for a student society (fictional demo)."],
+    ["Public speaking", "communication", 4, "presentation", "Presented a research poster at a faculty showcase (fictional demo)."],
+  ] as const) {
+    const [has] = await db.select({ id: passportCompetenciesTable.id }).from(passportCompetenciesTable)
+      .where(and(eq(passportCompetenciesTable.userId, uid("university-learner")), eq(passportCompetenciesTable.skill, skill))).limit(1);
+    if (!has) await db.insert(passportCompetenciesTable).values({ userId: uid("university-learner"), skill, category, masteryLevel: level, demonstration, description });
+  }
+  const plans: { learner: string; org: number; purpose: string; scope: string[]; guardian?: string; pending?: boolean }[] = [
+    { learner: "learner-south-a", org: uni, purpose: "admission", scope: ["results", "learning_dna", "journey"], guardian: "parent-south" },
+    { learner: "learner-bw", org: uni, purpose: "bursary", scope: ["results", "learning_dna"], guardian: "parent-bw" },
+    { learner: "university-learner", org: employer, purpose: "internship", scope: ["skills", "verified_achievements", "journey", "results"] },
+    { learner: "learner-south-a", org: employer, purpose: "internship", scope: ["skills", "journey"], pending: true },
+  ];
+  let created = 0;
+  for (const p of plans) {
+    const [exists] = await db.select({ id: passportSharesTable.id }).from(passportSharesTable)
+      .where(and(eq(passportSharesTable.learnerId, uid(p.learner)), eq(passportSharesTable.organizationId, p.org), eq(passportSharesTable.purpose, p.purpose))).limit(1);
+    if (exists) continue;
+    let guardianId: string | null = null;
+    if (p.guardian) {
+      const [g] = await db.select({ id: guardianRelationshipsTable.guardianId }).from(guardianRelationshipsTable)
+        .where(and(eq(guardianRelationshipsTable.learnerId, uid(p.learner)), eq(guardianRelationshipsTable.guardianId, uid(p.guardian)), eq(guardianRelationshipsTable.status, "verified"))).limit(1);
+      if (!g) continue; // never fake an approval the guardian could not have given
+      guardianId = g.id;
+    }
+    await db.insert(passportSharesTable).values({
+      learnerId: uid(p.learner), organizationId: p.org, purpose: p.purpose, scope: p.scope,
+      status: p.pending ? "pending_guardian" : "active", guardianId: p.pending ? null : guardianId,
+      guardianDecidedAt: guardianId && !p.pending ? new Date(now.getTime() - 2 * DAY) : null,
+      expiresAt: new Date(now.getTime() + 90 * DAY), createdAt: new Date(now.getTime() - 3 * DAY),
+    });
+    created++;
+  }
+  return created;
+}
+
 export async function seedCaboShowcase(now = new Date()): Promise<void> {
   if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) !== "testing" ||
       process.env.CABO_TEST_DATABASE_ISOLATED !== "true" ||
@@ -256,5 +302,6 @@ export async function seedCaboShowcase(now = new Date()): Promise<void> {
   const requests = await seedHelpRequests(now);
   const materials = await seedMaterials();
   await seedCredits(now);
-  console.info(`CABO showcase ready: ${requests} new help requests, ${materials} new AI-readable materials, demo AI credit balances`);
+  const shares = await seedPassportShares(now);
+  console.info(`CABO showcase ready: ${requests} new help requests, ${materials} new AI-readable materials, ${shares} new passport shares, demo AI credit balances`);
 }
