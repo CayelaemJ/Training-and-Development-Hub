@@ -6,6 +6,7 @@ import { recordAiMetric, type AiOperation } from "./aiObservability";
 const providerSchedulers = { groq: createProviderScheduler() };
 
 import { aiFailureAction } from "./aiRetryPolicy";
+import { cooldownForStatus, providerCircuit } from "./aiCircuitBreaker";
 
 type AiProvider = "groq";
 type Provider = { name: AiProvider; client: OpenAI; models: string[] };
@@ -43,6 +44,9 @@ async function groqModels(client: OpenAI): Promise<string[] | null> {
     groqModelCache.expires = Date.now() + 5 * 60_000;
     return models;
   } catch (error) {
+    // Remember the failure briefly so an outage does not add a lookup to every request.
+    groqModelCache.models = null;
+    groqModelCache.expires = Date.now() + 60_000;
     const code = error as { status?: number; code?: string };
     logger.warn({ provider: "groq", status: code.status ?? null, code: code.code ?? null }, "Groq model discovery unavailable");
     return null;
@@ -96,6 +100,12 @@ export async function completeAIJson<T>(args: {
     throw new AiUnavailableError();
   }
   providers: for (const provider of providers) {
+    const cooling = providerCircuit.remainingMs(provider.name);
+    if (cooling > 0) {
+      // Fail fast while the provider is cooling down after a provider-wide failure.
+      if (cooling >= 1000) quotaError ??= new ProviderQuotaError(cooling / 1000);
+      continue;
+    }
     for (const model of provider.models) {
       lastModel=model;
       for (const jsonMode of [true, false]) {
@@ -118,15 +128,23 @@ export async function completeAIJson<T>(args: {
           logger.info({ provider: provider.name, model }, "CABO AI completion validated");
           const inputTokens=response.usage?.prompt_tokens??null;
           const outputTokens=response.usage?.completion_tokens??null;
+          providerCircuit.reset(provider.name);
           void recordAiMetric(operation,provider.name,model,"success",startedAt,{inputTokens,outputTokens});
           return { value: parsed, modelId: model, inputTokens, outputTokens };
         } catch (error) {
-          if (error instanceof ProviderQuotaError) { quotaError = error; continue providers; }
+          if (error instanceof ProviderQuotaError) {
+            quotaError = error;
+            providerCircuit.postpone(provider.name, error.retryAfterSeconds * 1000);
+            continue providers;
+          }
           const err = error as { status?: number; code?: string; name?: string };
           // Retrying without JSON mode is useful for models that do not implement response_format.
           logger.warn({ provider: provider.name, model, jsonMode, status: err.status ?? null, code: err.code ?? null, type: err.name ?? "Error" }, "CABO AI candidate did not return valid output");
           const action = aiFailureAction(err, jsonMode);
-          if (action === "next-provider") continue providers;
+          if (action === "next-provider") {
+            providerCircuit.postpone(provider.name, cooldownForStatus(err.status));
+            continue providers;
+          }
           if (action === "next-model") break;
         }
       }
