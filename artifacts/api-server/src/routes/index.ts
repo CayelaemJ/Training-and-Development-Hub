@@ -44,6 +44,7 @@ import admissionEvidenceRouter from "./admissionEvidence";
 
 import lifelongPassportRouter from "./lifelongPassport";
 import passportTrustRouter from "./passportTrustRoutes";
+import passportSharesRouter from "./passportShares";
 import learnerAiProfileRouter from "./learnerAiProfile";
 import accountabilityRouter from "./accountability";
 import classChatRouter from "./classChat";
@@ -98,6 +99,7 @@ router.use(educationCommandRouter);
 router.use(admissionEvidenceRouter);
 router.use(lifelongPassportRouter);
 router.use(passportTrustRouter);
+router.use(passportSharesRouter);
 router.use(learnerAiProfileRouter);
 router.use(accountabilityRouter);
 router.use(classChatRouter);
