@@ -2,12 +2,23 @@ import { pool } from "@workspace/db";
 import { Router, type IRouter } from "express";
 import { HealthCheckResponse } from "@workspace/api-zod";
 import { checkRedisReadiness } from "../lib/redisReadiness";
+import { completeAIJson, hasAiProvider } from "../lib/aiCompletion";
+import { createAiHealthCheck } from "../lib/aiHealth";
 
 const router: IRouter = Router();
 
 router.get("/healthz", (_req, res) => {
   const data = HealthCheckResponse.parse({ status: "ok" });
   res.json(data);
+});
+
+// One real, synthetic AI call, cached for 10 minutes and shared by concurrent
+// callers, so this public endpoint cannot be used to run up AI usage.
+const checkAi = createAiHealthCheck({ complete: completeAIJson, configured: hasAiProvider });
+router.get("/healthz/ai", async (_req, res) => {
+  const result = await checkAi();
+  res.setHeader("Cache-Control", "no-store");
+  res.status(result.status === "healthy" ? 200 : 503).json(result);
 });
 
 router.get("/readyz", async (_req, res) => {
