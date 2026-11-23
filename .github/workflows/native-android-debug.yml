@@ -182,6 +182,11 @@ jobs:
           apk=$(ls app/build/outputs/apk/release/*.apk | head -n1)
           aab=app/build/outputs/bundle/release/app-release.aab
           test -s "$apk" && test -s "$aab"
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK is required}}"
+          zipalign=$(find "$sdk/build-tools" -type f -name zipalign | sort -V | tail -n 1)
+          test -n "$zipalign"
+          "$zipalign" -c -P 16 4 "$apk"
+          python3 verify-release-alignment.py "$apk" "$aab"
           unzip -l "$apk" | grep -q 'AndroidManifest.xml'
           unzip -l "$aab" | grep -q 'base/manifest/AndroidManifest.xml'
           if [[ "${{ steps.signing.outputs.signed }}" == "true" ]]; then suffix=signed; else suffix=UNSIGNED; fi
