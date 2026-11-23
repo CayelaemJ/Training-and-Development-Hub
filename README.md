@@ -1,3 +1,5 @@
+> **23 Nov 2026 documentation baseline:** [Full 25-section platform architecture](docs/ARCHITECTURE.md) · [Repository-wide Markdown inventory (104 files)](docs/engineering/DOCUMENTATION_BASELINE_2026-11-23.md) · [Current release gates](docs/engineering/RELEASE_READINESS.md) · [Cross-platform matrix](docs/MULTIPLATFORM.md). GitHub showed **0 open PRs** at review time; this does **not** mean production or real-school approval.
+
 > 🧭 **[Start here: CABO team handover and onboarding pack](docs/PLATFORM_GUIDE.md)** · [Project architecture and technical deep dive](docs/PORTFOLIO_SHOWCASE.md) · [Engineering profile](https://github.com/CayelaemJ)
 >
 > **Demo and partner case studies (23–29 Nov 2026):** [Capability catalogue](docs/DEMO_CAPABILITY_CATALOGUE_2026-11.md) · [Five synthetic case studies](docs/CASE_STUDIES_SYNTHETIC_2026-11.md) · [Weekly demo readiness sprint](docs/CASE_STUDY_SPRINT_2026-11-23.md). These are simulated pilot scenarios, **not** real partner impact studies.

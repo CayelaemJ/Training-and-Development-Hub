@@ -1,5 +1,8 @@
 # CABO Learning Hub — Multi-Layer Platform Architecture
 
+> **Updated engineering evidence (23 November 2026):** [Full-system 25-section implementation map](ARCHITECTURE.md) · [Cross-platform source status](MULTIPLATFORM.md) · [Release-readiness and production gates](engineering/RELEASE_READINESS.md). This showcase contains strategic target diagrams; government/tertiary interoperability, device distribution, real school adoption and regulatory clearance must not be inferred from them.
+
+
 > **Positioning:** Connected Education and Lifelong Development Platform — **not merely an LMS**.  
 > **Status:** Architecture combines implemented/prototype foundations, gated pilots and target design. See [delivery evidence](PHASES_1_TO_4_DELIVERY_REGISTER.md).  
 > **Source of authority:** [Platform identity](PLATFORM_IDENTITY.md), [national architecture](NATIONAL_EDUCATION_ARCHITECTURE.md), [connected hub modules](CONNECTED_HUB_SPRINTS.md).

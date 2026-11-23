@@ -1,5 +1,8 @@
 # CABO Learning Hub - Team Handover and Onboarding Pack
 
+> **Repository update — 23 November 2026:** This handover has a dated [canonical system architecture](ARCHITECTURE.md), [all-Markdown documentation inventory](engineering/DOCUMENTATION_BASELINE_2026-11-23.md), and [current release gate register](engineering/RELEASE_READINESS.md). Four client implementations (web/PWA, Android, iOS, Windows) and associated code are present in `main`; native signed deployment and production acceptance remain unverified. Historical instructions elsewhere in this pack should not override those source/status references.
+
+
 **Audience:** learners, families, educators, institutions, partners, the public and software contributors  
 **Product owner:** CABO Solutions  
 **Platform category:** Connected Education and Lifelong Development Platform  

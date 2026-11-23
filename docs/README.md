@@ -1,52 +1,40 @@
 # CABO Learning Hub — Documentation Centre
 
-CABO Learning Hub is a **Connected Education and Lifelong Development Platform**, developed by CABO Solutions. Its learning management features are one part of the ecosystem: educational progress, human support, institutional workflows, development evidence and age-appropriate opportunity pathways form the wider vision.
+**Baseline:** 23 November 2026 | **Product:** Connected Education and Lifelong Development Platform | **Maintainer:** independent CABO Solutions product development.
 
-**Official messaging source of truth:** [Platform identity](./PLATFORM_IDENTITY.md) · [Stakeholder language](./GO_TO_MARKET_MESSAGING.md) · [Presentation deck storyboard](./PRESENTATION_STORYBOARD.md). Technical document names and endpoint names can retain historical/module-specific terminology; buyer-facing wording must follow the new category.
+This is the documentation entry point for the entire connected education system, not merely its first study/assessment module. The repository contains implementation, prototype, pilot, candidate and target designs. **Source presence, zero open PRs and passed CI are not certification of real school deployment or production child-data readiness.**
 
-**Release claims:** Existing prototype or pilot functionality must not be mistaken for accredited school operations, official national integrations, mature mobile distribution or child-data compliance sign-off. See the [delivery register](./PHASES_1_TO_4_DELIVERY_REGISTER.md).
+## Start with the current references
 
-## Demo, evidence and case-study resources (23–29 November 2026)
+| Need | Document |
+| --- | --- |
+| Whole-system modules, tenancy, API, data, AI, infrastructure, native clients, diagrams and failure modes | [Master architecture](ARCHITECTURE.md) |
+| Scope, business journey and role experiences | [Platform guide](PLATFORM_GUIDE.md) · [Product identity](PLATFORM_IDENTITY.md) · [Role-based portals](ROLE_BASED_PORTALS.md) |
+| Up-to-date verification gates | [Release readiness](engineering/RELEASE_READINESS.md) · [Production audit snapshot](engineering/PRODUCTION_COMPLETION_AUDIT.md) |
+| Security, safety and country-law boundaries | [Security review](engineering/SECURITY_REVIEW.md) · [Privacy](PRIVACY_AND_CONSENT.md) · [ZA/BW live-school gates](legal/ZA_BW_LIVE_SCHOOL_RELEASE_GATES.md) |
+| Operations, availability, migration and hosting | [Infrastructure runbook](INFRA_OPERATIONS_RUNBOOK.md) · [Deployment](DEPLOYMENT.md) · [Infrastructure gaps](PLATFORM_INFRASTRUCTURE_GAPS.md) |
+| Web, Android, iOS and Windows | [Multiplatform](MULTIPLATFORM.md) · [Native feature parity](../native-apps/FEATURE_PARITY.md) |
+| Document-grounded AI and quality evaluation | [RAG](RAG_PIPELINE.md) · [AI evaluation](AI_RAG_EVALUATION.md) |
+| Learner identity, enrolment and verified disclosures | [National target](NATIONAL_EDUCATION_ARCHITECTURE.md) · [Passport trust](PASSPORT_TRUST_BOUNDARIES.md) |
+| School operations and admissions | [Admissions](ADMISSIONS_REGISTRATION_AND_MOBILITY_ZA_BW.md) · [Hierarchy](GOVERNANCE_HIERARCHY.md) |
+| School demos | [Capability catalogue](DEMO_CAPABILITY_CATALOGUE_2026-11.md) · [Synthetic scenarios](CASE_STUDIES_SYNTHETIC_2026-11.md) |
+| Engineering storytelling | [Technical showcase](PORTFOLIO_SHOWCASE.md) |
 
-- [Full platform capability catalogue and maturity claims](./DEMO_CAPABILITY_CATALOGUE_2026-11.md)
-- [Five synthetic learner-to-pathway case studies and evidence form](./CASE_STUDIES_SYNTHETIC_2026-11.md)
-- [One-week case-study sprint, responsibilities and 20-minute demo script](./CASE_STUDY_SPRINT_2026-11-23.md)
-- [Synthetic fixture accounts and isolation rules](./DEMO_CLIENTS.md)
+## Documentation conventions
 
-All scenarios are simulated. Do not represent these as successful live pilots or customer case studies.
+- **Implemented in main** means source or workflow exists, **not** live operational proof.
+- **Feature-gated or pilot** means additional configuration, migrations, review or explicit institutional permission is required.
+- **Design/target** means a proposed outcome; never present as shipped.
+- **Verified staging** requires dated deployment SHA, test output and synthetic-only proof.
+- **Verified production** requires owner sign-off, lawful real-data handling, security testing and operational evidence.
+- **Archived audits** are timestamped evidence, not living status dashboards. Amend a current register instead of rewriting what a past audit observed.
 
-## Document index
+## Demo and outreach evidence
 
-- [Team handover and onboarding pack — start here](./PLATFORM_GUIDE.md)
-- [Product vision and delivery scope](./PRODUCT_VISION.md)
-- [System architecture and data flows](./ARCHITECTURE.md)
-- [Security, POPIA and consent](./PRIVACY_AND_CONSENT.md)
-- [API reference](./API_POTENTIAL.md)
-- [Deployment, schema and verification](./DEPLOYMENT.md)
-- [Feature roadmap and acceptance criteria](./ROADMAP.md)
-- [Study-material retrieval and generation context](./RAG_PIPELINE.md)
+The 23–29 November 2026 demo pack is **synthetic**. No real government registration, approved national learner register, signed institutions or commercial traction can be inferred from it. Review [go-to-market messaging](GO_TO_MARKET_MESSAGING.md) before external use.
 
-## Engineering principles
+## Contribution rules
 
-1. A learner's identity outlives any single school, workplace or university.
-2. Claims made by learners are clearly labelled self-reported until independently verified.
-3. Grade and childhood observations are never silently exposed to employers.
-4. No automatic recruitment ranking, personality diagnosis or immutable talent label.
-5. A learner can see and withdraw any active employer access grant.
-6. Organization membership and possession of a subscription do not constitute subject consent.
-7. Retain model/source/version context for future explainable AI insights.
-8. Review privacy, fairness and access controls before rolling out new data pathways.
+Follow [AGENTS.md](../AGENTS.md): no secrets, no live child records, scoped authorisation, negative regression tests and review of deployment migrations. When a domain changes, update source-to-document references in the [master architecture](ARCHITECTURE.md) and the corresponding runbook.
 
-## Current status
-
-First-phase potential profile, evidence, job listings and consent API implemented in feature branch. Enterprise billing, employer verification, age checks, safeguarding, verified credentials, university integrations and automated career inference are **not yet implemented**. Employer profile access defaults **OFF**.
-
-- [Lifelong learner identity](./LIFELONG_LEARNER_IDENTITY.md)
-
-- [Institution enrolment, transfer and guardian workflows](./INSTITUTION_TRANSFERS_AND_GUARDIANS.md)
-
-- [Education governance hierarchy and roles](./GOVERNANCE_HIERARCHY.md)
-
-- [Role-based portals, superadmin oversight and course-scope permissions](./ROLE_BASED_PORTALS.md)
-
-- [Phases 1–4 delivery register, open gates and acceptance tests](./PHASES_1_TO_4_DELIVERY_REGISTER.md)
+**Repository PR count on 23 November:** zero open; this is a moment-in-time check.

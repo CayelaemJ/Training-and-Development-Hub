@@ -1,20 +1,39 @@
-# Release readiness — 2026-11-22
+# CABO Learning Hub — Release Readiness and Verification Register
 
-**Decision: NOT READY FOR PRODUCTION.** No production release is requested.
+**Review date:** 23 November 2026  
+**Current repository observation:** `main` contains a full-system architecture reference, multiple native clients, core domain routes, security policies, migrations and release workflows. GitHub open-PR inventory returned **zero** on 23 November 2026. This is a repository housekeeping observation, **not a production-completion score**.
 
-| Gate (directive §21) | State | Evidence / blocker |
-|---|---|---|
-| Essential workflows operate end to end | Not evidenced this session | Staging E2E not run |
-| No unresolved critical/high security issues | **No** — F-2026-11-22-01 fixed on branch only; route-by-route review and pen test outstanding | `SECURITY_REVIEW.md` |
-| Tenant isolation validated | Partially (unit/contract/DDL level) | Two-tenant integration suite outstanding (P0-06) |
-| Migration and recovery procedures tested | New migration tested locally; restore drill not evidenced | P0-02, P0-07 |
-| Production configuration validated | No | Identity provider, `email_verified`, MFA decision (P0-05) |
-| Staging deployment works | Not evidenced this session | Prior record: isolated preview deliberately setup-pending (`AI_EXECUTION_STATE.md`, 2026-10-28) |
-| Release artifacts generated | **No** | Android has no release/signing config; Windows has no installer (P1-01, P1-02) |
-| Android and Windows platform testing | Emulator UI tests and debug builds exist in CI; no device/installer evidence | — |
-| Monitoring and recovery procedures | Runbooks exist; alert delivery not evidenced | P2-06 |
-| Compliance blockers identified and addressed | Identified; legal review not done | P1-10 |
-| Independent code review | Requested for this branch; not done | `docs/reviews/CHATGPT_REVIEW_HANDOFF.md` |
-| Owner approval | Not given | — |
+**Release decision: NOT VERIFIED AS PRODUCTION READY.** Historical 22 November findings remain historical records; changed implementation status must be validated against source, CI and real staging environments before being closed.
 
-Architecture and deployment references (existing, not rewritten this session): `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/RENDER_TESTING.md`, `docs/INFRA_OPERATIONS_RUNBOOK.md`.
+| Gate | Evidence now visible | Acceptance still required |
+| --- | --- | --- |
+| Web core | React/Vite, domain pages, API router, shared contracts | Current staged end-to-end role workflow, browser accessibility and deployment smoke |
+| Backend security | Origin policy, rate limit, session middleware, MFA guard, privacy-safe error handling | Route-by-route two-tenant IDOR suite, independent security assessment, production IdP and MFA enforcement |
+| Data model | Drizzle schema modules and November migrations | Reviewed migration bootstrap, separate staging, restore drill and recoverability proof |
+| AI | Generation/marking, lexical RAG, source citations, quota and evaluation scaffolding | Representative educational evaluation, prompt-injection and consent testing; human review |
+| School privacy | Guardian, institution, country and release-gate policies | Legal and institution approval, country applicability, tested current relationship and revocation |
+| Notifications | Consent/eligibility, outbox and dispatcher code | Delivery proof, replay/idempotency, retention and recipient verification |
+| Android | Native code plus Android release CI definition | Actual signed artifact, emulator/device matrix, install and publication evidence |
+| iOS | Native Swift code and verification workflow | macOS/Xcode run, device acceptance, signing and publication evidence |
+| Windows | WinUI 3, unit tests, installer sources and release workflow | Signed installer, clean-install/upgrade evidence, OS compatibility |
+| Monitoring | Health/readiness endpoints, logging, platform health sources | Alert destination, load thresholds, incident simulation and owner review |
+| Hosting | Render-oriented scripts, Cloudflare staging/candidate assets | Confirm deployed SHA, domain, cookies, persistence, HTTPS, backups and rollback |
+| Compliance | Legal drafts and release gates for ZA/BW | Independent legal sign-off and approved processing agreements |
+| Independent review | PR checks and code review sources vary by commit | Final release-specific independent approval and documented evidence |
+
+### Historical audit reconciliation
+
+The 22 November [production audit](PRODUCTION_COMPLETION_AUDIT.md) and [security review](SECURITY_REVIEW.md) record findings at their specific branch/time. Do not silently rewrite them as if tests ran on 23 November. Their observations about absent Android release or Windows installer may be superseded by later source on `main`, but signed-release evidence remains outstanding. A missing open PR does not imply that every requested capability is implemented.
+
+### Release acceptance checklist
+
+1. Capture exact main commit and actual running deployment commit.
+2. Run frozen-install, typecheck, build, unit/contract, integration and security workflows; record failures and skipped checks.
+3. Exercise two institutions, two guardian contexts and revoke/change-role scenarios, including native device account switching.
+4. Prove DB bootstrap/migration and isolated backup restoration.
+5. Validate document storage approval/deletion, notification dispatcher, AI provider error paths and money-ledger replay.
+6. Run approved synthetic staging E2E and platform-native tests.
+7. Obtain legal/processor/child-data, security and release approvals.
+8. Roll out with telemetry and documented rollback; record actual smoke results.
+
+**Related:** [full architecture](../ARCHITECTURE.md) · [infrastructure gaps](../PLATFORM_INFRASTRUCTURE_GAPS.md) · [native release](../../native-apps/FEATURE_PARITY.md) · [engineering backlog](MASTER_COMPLETION_BACKLOG.md).
