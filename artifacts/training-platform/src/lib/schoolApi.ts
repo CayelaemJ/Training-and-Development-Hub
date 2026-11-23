@@ -1,6 +1,11 @@
 // Small fetch helpers shared by the accountability, class chat and privacy pages.
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
+}
+
+/** Thrown when the API returns 402 ai_credits_exhausted. */
+export class AiCreditsExhaustedError extends ApiError {
+  constructor(message: string) { super(402, message, "ai_credits_exhausted"); }
 }
 
 export async function api<T>(path: string, init?: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown }): Promise<T> {
@@ -17,7 +22,14 @@ export async function api<T>(path: string, init?: { method?: "GET" | "POST" | "P
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   const data = await r.json().catch(() => null);
-  if (!r.ok) throw new ApiError(r.status, (data && typeof data.error === "string" && data.error) || (r.status === 404 ? "Not available to your account." : "Something went wrong. Try again."));
+  if (!r.ok) {
+    // Surface AI credit exhaustion with a dedicated error type so components
+    // can link to /ai-credits rather than showing a generic failure message.
+    if (r.status === 402 && data?.code === "ai_credits_exhausted") {
+      throw new AiCreditsExhaustedError(data.error ?? "You have run out of AI credits.");
+    }
+    throw new ApiError(r.status, (data && typeof data.error === "string" && data.error) || (r.status === 404 ? "Not available to your account." : "Something went wrong. Try again."));
+  }
   return data as T;
 }
 

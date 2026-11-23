@@ -61,4 +61,5 @@ artifacts/api-server/src/tests/integration/generated-guardian-progress.mjs
 security-reports/
 artifacts/api-server/src/tests/integration/generated-accountability-chat.mjs
 artifacts/api-server/src/tests/integration/generated-demo-scale.mjs
+artifacts/api-server/src/tests/integration/generated-ai-credits.mjs
 artifacts/api-server/src/tests/integration/generated-profile.mjs

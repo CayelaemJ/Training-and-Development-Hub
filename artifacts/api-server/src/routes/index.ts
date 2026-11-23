@@ -49,12 +49,14 @@ import accountabilityRouter from "./accountability";
 import classChatRouter from "./classChat";
 import privacyRouter from "./privacy";
 import profileRouter from "./profile";
+import aiCreditsRouter from "./aiCredits";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(educationFrameworksRouter);
 router.use(learnerSupportRouter);
+router.use(aiCreditsRouter);
 router.use(workerInsightsRouter);
 
 router.use(authRouter);

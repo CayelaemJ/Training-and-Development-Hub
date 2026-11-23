@@ -38,6 +38,7 @@ import AccountabilityPage from '@/pages/accountability';
 import ClassChatPage from '@/pages/class-chat';
 import PrivacyRightsPage from '@/pages/privacy-rights';
 import MyProfilePage from '@/pages/my-profile';
+import AiCreditsPage from '@/pages/ai-credits';
 import { Avatar } from '@/components/avatar';
 import { ReadAloud, VoiceInput } from '@/components/speech';
 import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '@/lib/appearance';
@@ -61,7 +62,7 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 // Every signed-in person can raise a concern and see which privacy rules apply.
-const alwaysNav=['/me','/notification-preferences','/accountability','/privacy'];
+const alwaysNav=['/me','/notification-preferences','/accountability','/privacy','/ai-credits'];
 const allowedNav:Record<PortalKind,string[]>={
  superadmin:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
@@ -96,6 +97,7 @@ const navItems = [
   { href: '/class-chat', label: 'Class chat', icon: MessageSquare },
   { href: '/privacy', label: 'Privacy & my rights', icon: Scale },
   { href: '/me', label: 'My profile & look', icon: Palette },
+  { href: '/ai-credits', label: 'AI credits', icon: BrainCircuit },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
@@ -161,6 +163,7 @@ function Router() {
     <Route path="/class-chat" component={ClassChatPage} />
     <Route path="/privacy" component={PrivacyRightsPage} />
     <Route path="/me" component={MyProfilePage} />
+    <Route path="/ai-credits" component={AiCreditsPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
