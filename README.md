@@ -1,4 +1,6 @@
 > 🧭 **[Start here: CABO team handover and onboarding pack](docs/PLATFORM_GUIDE.md)** · [Project architecture and technical deep dive](docs/PORTFOLIO_SHOWCASE.md) · [Engineering profile](https://github.com/CayelaemJ)
+>
+> **Demo and partner case studies (23–29 Nov 2026):** [Capability catalogue](docs/DEMO_CAPABILITY_CATALOGUE_2026-11.md) · [Five synthetic case studies](docs/CASE_STUDIES_SYNTHETIC_2026-11.md) · [Weekly demo readiness sprint](docs/CASE_STUDY_SPRINT_2026-11-23.md). These are simulated pilot scenarios, **not** real partner impact studies.
 
 ---
 

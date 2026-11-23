@@ -1,0 +1,8 @@
+<Project>
+  <!-- Imported after each project's own properties so the SDK's DEBUG/TRACE
+       constants are preserved. Never set CaboIsolatedTestBuild for builds that
+       are packaged, archived or distributed. -->
+  <PropertyGroup Condition="'$(CaboIsolatedTestBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);CABO_ISOLATED_TEST</DefineConstants>
+  </PropertyGroup>
+</Project>

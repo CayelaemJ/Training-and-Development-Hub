@@ -13,12 +13,13 @@ test("self report endpoint uses authenticated learner ID and draft status", () =
 test("iOS Android and Windows show only backend-provided self-report summaries", () => {
   const ios=read("native-apps/ios/NativeSession.swift");
   const android=read("native-apps/android/app/src/main/java/za/co/cabosolutions/learninghub/NativeApi.kt");
-  const win=read("native-apps/windows/CABO.Native/NativeLearningService.cs");
+  const win=read("native-apps/windows/CABO.Native.Core/NativeLearningService.cs");
   for(const client of [ios,android,win]){
     assert.match(client,/api\/reports\/me\?organizationId=/);
     assert.doesNotMatch(client,/faker|mockMarks|testGrade/);
   }
-  assert.match(win,/DateTime\.UtcNow\.Year/);
+  assert.match(win,/year=\{year\}/);
+  assert.doesNotMatch(win,/reports\/me\?[^"]*learnerId/);
   assert.match(ios,/learnerReports = nextLearnerReports/);
   assert.match(android,/learnerReports = learnerReports/);
 });
@@ -26,6 +27,6 @@ test("learner report copy is explicitly not an official report card", () => {
   for(const path of [
     "native-apps/ios/NativeHomeView.swift",
     "native-apps/android/app/src/main/java/za/co/cabosolutions/learninghub/MainActivity.kt",
-    "native-apps/windows/CABO.Native/MainWindow.xaml",
+    "native-apps/windows/CABO.Native/Views/LearnerViews.cs",
   ]) assert.match(read(path),/not an officially issued report card/i);
 });

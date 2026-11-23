@@ -27,6 +27,7 @@ import SchoolStagesPage from '@/pages/school-stages';
 import InstitutionSetupPage from '@/pages/institution-setup';
 import SchoolProgressionPage from '@/pages/school-progression';
 import CaboApplyPage from '@/pages/cabo-apply';
+import AdmissionsHubPage from '@/pages/admissions-hub';
 import EducationReportsPage from '@/pages/education-reports';
 import GuardianConnectPage from '@/pages/guardian-connect';
 import NotificationPreferencesPage from '@/pages/notification-preferences';
@@ -65,28 +66,28 @@ type PortalKind='superadmin'|'national_director'|'provincial_director'|'district
 // Every signed-in person can raise a concern and see which privacy rules apply.
 const alwaysNav=['/me','/notification-preferences','/accountability','/privacy','/ai-credits','/accessibility'];
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
  provincial_director:['/','/education-command','/organizations','/governance'],
  district_director:['/','/education-command','/organizations','/governance'],
  group_executive:['/','/education-command','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
- deputy_headmaster:['/class-chat','/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
+ headmaster:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/admissions','/class-chat','/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
  department_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
  grade_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
- administrator:['/class-chat','/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ administrator:['/admissions','/class-chat','/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
  teacher:['/class-chat','/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
  assessor:['/class-chat','/','/learner-success','/organizations','/written-exams'],
- parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
- learner:['/class-chat','/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ parent:['/admissions','/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
+ learner:['/admissions','/class-chat','/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
   { href: '/my-ai', label: 'My CABO AI profile', icon: BrainCircuit },
   { href: '/learner-success', label: 'Learner Success Loop', icon: Target },
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
-  { href: '/cabo-apply', label: 'Apply to university', icon: GraduationCap },
+  { href: '/admissions', label: 'Admissions & transfers', icon: GraduationCap },
   { href: '/education-reports', label: 'Reports & statistics', icon: BookOpen },
   { href: '/report-issuance', label: 'Issue report cards', icon: FileText },
   { href: '/school-intelligence', label: 'School progress', icon: BookOpen },
@@ -153,6 +154,7 @@ function Router() {
     <Route path="/my-ai" component={LearnerAiProfilePage} />
     <Route path="/learner-success" component={LearnerSuccessPage} />
     <Route path="/hub-modules" component={HubModulesPage} />
+    <Route path="/admissions" component={AdmissionsHubPage} />
     <Route path="/cabo-apply" component={CaboApplyPage} />
     <Route path="/education-reports" component={EducationReportsPage} />
     <Route path="/report-issuance" component={ReportIssuancePage} />
@@ -218,7 +220,7 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/admissions' ? 'Admissions & transfers' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   const [me,setMe] = useState<{profile:{initials:string;name:string;avatarStyle:'initials'|'pattern'|'photo';avatarColor:Appearance['accent']};appearance:Appearance;photo:{status:string;url:string}|null}|null>(null);
   useEffect(()=>{let live=true;fetch('/api/me/profile',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(!live||!d?.profile||!d?.appearance)return;setMe(d);applyAppearance({...DEFAULT_APPEARANCE,...d.appearance});}).catch(()=>undefined);return()=>{live=false};},[location==='/me']);
@@ -260,6 +262,7 @@ function AppShell({ user }: { user: any }) {
       {portalRole && <nav className="mobile-family-nav" aria-label="Mobile primary navigation">
         {([
           {href:'/',label:'Home',icon:LayoutDashboard},
+          ...(allowedNav[portalRole].includes('/admissions')?[{href:'/admissions',label:'Admissions',icon:GraduationCap}]:[]),
           ...(allowedNav[portalRole].includes('/platform-admin')?[{href:'/platform-admin',label:'Admin',icon:GraduationCap}]:[]),
           ...(allowedNav[portalRole].includes('/platform-health')?[{href:'/platform-health',label:'Health',icon:Activity}]:[]),
           ...(allowedNav[portalRole].includes('/school-operations')?[{href:'/school-operations',label:'School',icon:BookOpen}]:[]),

@@ -1,0 +1,18 @@
+<Project>
+  <!-- Shared metadata for every CABO Windows project (app, core library, tests).
+       Bump CaboVersion for each release; CI can override with -p:CaboVersion=x.y.z. -->
+  <PropertyGroup>
+    <CaboVersion Condition="'$(CaboVersion)' == ''">1.1.0</CaboVersion>
+    <Version>$(CaboVersion)</Version>
+    <AssemblyVersion>$(CaboVersion).0</AssemblyVersion>
+    <FileVersion>$(CaboVersion).0</FileVersion>
+    <InformationalVersion>$(CaboVersion)</InformationalVersion>
+    <Company>CABO Solutions</Company>
+    <Product>CABO Learning Hub</Product>
+    <Copyright>© CABO Solutions</Copyright>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

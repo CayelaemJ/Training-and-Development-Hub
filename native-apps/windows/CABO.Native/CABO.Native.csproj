@@ -3,18 +3,36 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <RootNamespace>CABO.Native</RootNamespace>
+    <AssemblyName>CABO.Native</AssemblyName>
+    <AssemblyTitle>CABO Learning Hub</AssemblyTitle>
+    <Description>CABO Learning Hub for Windows</Description>
     <UseWinUI>true</UseWinUI>
+    <!-- Unpackaged, self-contained Windows App SDK: installs per user with the
+         Inno Setup installer and needs no separate runtime download. -->
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <WindowsPackageType>None</WindowsPackageType>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-  <!-- Never define this symbol for store/distribution builds. -->
-  <PropertyGroup Condition="'$(CaboIsolatedTestBuild)' == 'true'">
-    <DefineConstants>$(DefineConstants);CABO_ISOLATED_TEST</DefineConstants>
+    <!-- Required for unpackaged apps: generates CABO.Native.pri, which holds the
+         compiled XAML. Without it InitializeComponent fails at launch (0xC000027B). -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\cabo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250401001"/>
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742"/>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0"/>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250401001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CABO.Native.Core\CABO.Native.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Remove any SDK default globbing first so these are never duplicated. -->
+    <Content Remove="Assets\**" />
+    <None Remove="Assets\**" />
+    <Content Include="Assets\cabo.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\cabo-256.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
