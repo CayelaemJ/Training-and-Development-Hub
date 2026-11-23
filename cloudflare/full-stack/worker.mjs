@@ -1,23 +1,13 @@
 import {Container} from "@cloudflare/containers";
 import {env as bindings} from "cloudflare:workers";
-import {validateLearningHubCutover} from "./gate.mjs";
+import {learningHubContainerEnv, validateLearningHubCutover} from "./gate.mjs";
 
 // This image builds the EXISTING workspace's Express API and training-platform
 // React UI together. No static-only substitute for learner/parent/teacher flows.
 export class LearningHubFullStack extends Container {
   defaultPort=3000;
   sleepAfter="20m";
-  envVars={
-    PORT:"3000",NODE_ENV:"production",TRUST_PROXY_HOPS:"1",
-    FRONTEND_DIST_DIR:"artifacts/training-platform/dist/public",
-    DATABASE_URL:bindings.CABO_LEARNING_DATABASE_URL,
-    CABO_ALLOWED_ORIGINS:bindings.CABO_ALLOWED_ORIGINS,
-    CABO_ENVIRONMENT:"cloudflare",
-    ENABLE_CABO_DEMO_SEED:"false",
-    CABO_GROQ_SMOKE_TEST:"false",
-    // AI, OAuth, payments and messaging secrets must be separately verified,
-    // not copied from unrelated projects or embedded in code.
-  };
+  envVars = learningHubContainerEnv(bindings);
 }
 const noStore={"Cache-Control":"no-store","X-Robots-Tag":"noindex,nofollow","Content-Type":"application/json; charset=utf-8"};
 export default {

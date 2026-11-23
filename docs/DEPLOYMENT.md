@@ -41,3 +41,11 @@ Implement in a feature branch; require CI success, human review, database migrat
 ## Rollback
 
 Disable `ENABLE_EMPLOYER_ACCESS_PILOT` immediately if any disclosure issue is detected. Keep an auditable deployment rollback. Do not drop tables containing user data without approved export/retention analysis.
+
+## Cloudflare full-stack deployment
+
+The full-stack candidate in [wrangler.cabo-full-stack.jsonc](../wrangler.cabo-full-stack.jsonc) packages the existing Express API and web client in a Cloudflare Container. The static Pages deployment does not provide the API.
+
+Configure `CABO_LEARNING_HOST` with the assigned HTTPS hostname. Set `CABO_LEARNING_DATABASE_URL` through Cloudflare secrets, and configure `CABO_LEARNING_OIDC_ISSUER_URL` and `CABO_LEARNING_OIDC_CLIENT_ID` for the identity provider registered to that hostname. Register `https://<hostname>/api/callback` and the applicable logout redirect with the provider before verifying browser and device sign-in. The Worker injects the canonical browser origin into Express and enables native PKCE only after the OIDC origin verification flag is set.
+
+Keep the production backend disabled until the configured hostname, identity, data access, and existing cutover gates have been verified. In an isolated environment with synthetic data, validate `/api/healthz`, `/api/readyz`, browser sign-in, the Android/iOS/Windows native callback and token exchange, and a shared synthetic record visible to the expected roles. Rebuild connected native clients for the verified API hostname. Existing offline demo builds use local fixtures. The candidate container can sleep after inactivity, so measure cold start and configure capacity against the demo availability and budget requirements before cutover.
