@@ -34,6 +34,15 @@ import ReportIssuancePage from '@/pages/report-issuance';
 import SchoolIntelligencePage from '@/pages/school-intelligence';
 import QuestionBankPage from '@/pages/assessment-question-bank';
 import EducationCommandPage from '@/pages/education-command';
+import AccountabilityPage from '@/pages/accountability';
+import ClassChatPage from '@/pages/class-chat';
+import PrivacyRightsPage from '@/pages/privacy-rights';
+import MyProfilePage from '@/pages/my-profile';
+import AiCreditsPage from '@/pages/ai-credits';
+import AccessibilityPage from '@/pages/accessibility';
+import { Avatar } from '@/components/avatar';
+import { ReadAloud, VoiceInput } from '@/components/speech';
+import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '@/lib/appearance';
 import { Link, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
@@ -43,32 +52,34 @@ import {
 } from '@workspace/api-client-react';
 import type { QuizDetail, QuizAttemptResult, StudyMaterial, QuizSummary } from '@workspace/api-client-react';
 import {
-  Activity, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
+  Accessibility, Activity, ArrowLeft, ArrowRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, Check,
   CheckCircle2, ChevronRight, CircleHelp, Clock3, FileText, FileUp, GraduationCap,
   LayoutDashboard, LoaderCircle, LogOut, Plus, RotateCcw, Search,
-  Sparkles, Target, Trash2, X,
+  Sparkles, Target, Trash2, X, ShieldAlert, MessageSquare, Scale, Palette,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
 const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
+// Every signed-in person can raise a concern and see which privacy rules apply.
+const alwaysNav=['/me','/notification-preferences','/accountability','/privacy','/ai-credits','/accessibility'];
 const allowedNav:Record<PortalKind,string[]>={
- superadmin:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
+ superadmin:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
  provincial_director:['/','/education-command','/organizations','/governance'],
  district_director:['/','/education-command','/organizations','/governance'],
  group_executive:['/','/education-command','/organizations','/governance'],
  governing_body_chair:['/','/organizations','/governance'],
- headmaster:['/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
- deputy_headmaster:['/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
- department_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
- grade_head:['/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
- administrator:['/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
- teacher:['/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
- assessor:['/','/learner-success','/organizations','/written-exams'],
+ headmaster:['/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/sports-development','/development-plan','/organizations','/academics','/institution-records','/governance','/written-exams'],
+ deputy_headmaster:['/class-chat','/','/learner-success','/learner-success','/school-progression','/institution-setup','/school-stages','/hub-modules','/organizations','/academics','/governance','/institution-records'],
+ department_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance','/written-exams'],
+ grade_head:['/class-chat','/','/learner-success','/school-stages','/hub-modules','/organizations','/academics','/governance'],
+ administrator:['/class-chat','/','/learner-success','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/school-progression','/institution-setup','/hub-modules','/organizations','/governance'],
+ teacher:['/class-chat','/','/learner-success','/question-bank','/school-stages','/hub-modules','/sports-development','/school-operations','/organizations','/materials','/written-exams'],
+ assessor:['/class-chat','/','/learner-success','/organizations','/written-exams'],
  parent:['/','/guardian-connect','/development-plan','/sports-development','/institution-records'],
- learner:['/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
+ learner:['/class-chat','/','/my-ai','/learner-success','/education-reports','/cabo-apply','/school-stages','/hub-modules','/development-plan','/sports-development','/career-passport','/school-operations','/study-overview','/materials','/quizzes','/written-exams','/potential','/learner-journey','/institution-records']
 };
 const navItems = [
   { href: '/my-ai', label: 'My CABO AI profile', icon: BrainCircuit },
@@ -83,6 +94,12 @@ const navItems = [
   { href: '/education-command', label: 'Education Command', icon: LayoutDashboard },
   { href: '/guardian-connect', label: 'Guardian Connect', icon: GraduationCap },
   { href: '/notification-preferences', label: 'Notifications', icon: Bell },
+  { href: '/accountability', label: 'Concerns & accountability', icon: ShieldAlert },
+  { href: '/class-chat', label: 'Class chat', icon: MessageSquare },
+  { href: '/privacy', label: 'Privacy & my rights', icon: Scale },
+  { href: '/me', label: 'My profile & look', icon: Palette },
+  { href: '/ai-credits', label: 'AI credits', icon: BrainCircuit },
+  { href: '/accessibility', label: 'Accessibility', icon: Accessibility },
   { href: '/school-stages', label: 'School stages', icon: BookOpen },
   { href: '/institution-setup', label: 'Institution setup', icon: GraduationCap },
   { href: '/school-progression', label: 'Year-end progression', icon: BookOpen },
@@ -144,6 +161,12 @@ function Router() {
     <Route path="/education-command" component={EducationCommandPage} />
     <Route path="/guardian-connect" component={GuardianConnectPage} />
     <Route path="/notification-preferences" component={NotificationPreferencesPage} />
+    <Route path="/accountability" component={AccountabilityPage} />
+    <Route path="/class-chat" component={ClassChatPage} />
+    <Route path="/privacy" component={PrivacyRightsPage} />
+    <Route path="/me" component={MyProfilePage} />
+    <Route path="/ai-credits" component={AiCreditsPage} />
+    <Route path="/accessibility" component={AccessibilityPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
@@ -197,19 +220,24 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
   const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
+  const [me,setMe] = useState<{profile:{initials:string;name:string;avatarStyle:'initials'|'pattern'|'photo';avatarColor:Appearance['accent']};appearance:Appearance;photo:{status:string;url:string}|null}|null>(null);
+  useEffect(()=>{let live=true;fetch('/api/me/profile',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(!live||!d?.profile||!d?.appearance)return;setMe(d);applyAppearance({...DEFAULT_APPEARANCE,...d.appearance});}).catch(()=>undefined);return()=>{live=false};},[location==='/me']);
+  const pinned = me?.appearance?.pinned ?? [];
+  const orderedNav = [...navItems].sort((a,b)=>{const ia=pinned.indexOf(a.href),ib=pinned.indexOf(b.href);return (ia<0?99:ia)-(ib<0?99:ib);});
   return <div className="app-frame">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:shadow">Skip to main content</a>
     <aside className="sidebar">
       <Link href="/" className="brand"><Mark /><span>Training &amp; Development Hub</span></Link>
       <div className="side-label">YOUR WORKSPACE</div>
       <nav className="side-nav">
         <a href="/install" className="nav-link"><ArrowUpRight size={18} /><span>Install CABO app</span></a>
-        {navItems.filter(item=>portalRole!==null&&(item.href==='/notification-preferences'||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
+        {orderedNav.filter(item=>portalRole!==null&&(alwaysNav.includes(item.href)||allowedNav[portalRole]?.includes(item.href))).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === '/materials' && location.startsWith('/materials/')) ? 'active' : ''}`} data-testid={`link-nav-${label.toLowerCase().replaceAll(' ', '-')}`}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === '/materials' && <span className="nav-chevron"><ChevronRight size={14} /></span>}</Link>)}
       </nav>
       <div className="side-bottom">
         <div className="side-note"><span className="note-mark"><Target size={17} /></span><p>Small sessions add up.<br /><strong>Keep your rhythm.</strong></p></div>
         <div className="profile-row">
-          <div className="avatar">{initials}</div>
-          <div className="profile-copy"><strong>{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Learner'}</strong><span>{user?.email || 'Your account'}</span></div>
+          <Link href="/me" aria-label="My profile and look">{me?<Avatar initials={me.profile.initials} color={me.profile.avatarColor} style={me.profile.avatarStyle} photoUrl={me.photo?.url} size={38} />:<div className="avatar">{initials}</div>}</Link>
+          <div className="profile-copy"><strong>{me?.profile.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Learner'}</strong><span>{user?.email || 'Your account'}</span></div>
         </div>
         <button type="button" className="sidebar-signout" disabled={signingOut} onClick={signOut} data-testid="button-logout">
           <LogOut size={16} /><span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
@@ -244,9 +272,9 @@ function AppShell({ user }: { user: any }) {
       </nav>}
       {portalRole && mobileMenuOpen && <div className="mobile-family-more" id="mobile-family-more" role="dialog" aria-modal="false" aria-label="All permitted pages">
         <div className="mobile-family-more-heading"><strong>All your workspaces</strong><button type="button" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}><X size={20}/></button></div>
-        {navItems.filter(item=>allowedNav[portalRole].includes(item.href)).map(({href,label,icon:Icon})=><Link key={href} href={href} onClick={()=>setMobileMenuOpen(false)} className="mobile-family-more-link"><Icon size={18} aria-hidden="true"/>{label}<ChevronRight size={16} aria-hidden="true"/></Link>)}
+        {navItems.filter(item=>alwaysNav.includes(item.href)||allowedNav[portalRole].includes(item.href)).map(({href,label,icon:Icon})=><Link key={href} href={href} onClick={()=>setMobileMenuOpen(false)} className="mobile-family-more-link"><Icon size={18} aria-hidden="true"/>{label}<ChevronRight size={16} aria-hidden="true"/></Link>)}
       </div>}
-      <main className="main-content"><Router /></main>
+      <main className="main-content" id="main-content" tabIndex={-1}><Router /></main>
       <footer className="footer cabo-product-footer"><Mark /><span>Training &amp; Development Hub</span><span className="footer-divider" /> A CABO Solutions product.</footer>
     </div>
   </div>;
@@ -484,13 +512,13 @@ function MaterialConfigurePage() {
     <section className="rounded-xl border bg-card p-5 sm:p-6 space-y-4" aria-labelledby="ask-material-title">
       <div className="flex items-start gap-3"><CircleHelp size={20} aria-hidden="true" /><div><h2 id="ask-material-title" className="text-xl font-semibold">Ask this material</h2><p className="text-sm text-muted-foreground">Get an answer grounded in the most relevant passages from “{material.title}”.</p></div></div>
       <form className="space-y-3" onSubmit={ask}>
-        <label className="field-label" htmlFor="material-question">Your question</label>
+        <div className="flex items-center justify-between gap-2"><label className="field-label" htmlFor="material-question">Your question</label><VoiceInput label="Ask by voice" onText={t=>setAskQuestion(q=>(q?q+" ":"")+t)} /></div>
         <textarea id="material-question" className="text-input min-h-24 w-full resize-y" value={askQuestion} onChange={(event)=>setAskQuestion(event.target.value)} minLength={5} maxLength={2000} required placeholder="What is the difference between mitosis and meiosis?" />
         <p className="text-xs text-muted-foreground">Relevant passages from this material are sent to the configured AI provider to answer. Answers include source quotations and should be checked against your notes.</p>
         {askError && <p role="alert" className="form-error">{askError}</p>}
         <button type="submit" className="button button-primary" disabled={asking || askQuestion.trim().length<5}>{asking?<><LoaderCircle className="spin" size={17}/>Finding an answer…</>:<>Ask from this material <ArrowRight size={16}/></>}</button>
       </form>
-      {groundedAnswer && <div className="rounded-lg border bg-background p-4 space-y-3" aria-live="polite"><h3 className="font-semibold">Answer</h3><p className="whitespace-pre-wrap text-sm leading-6">{groundedAnswer.answer}</p><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source quotations</p><ul className="mt-2 space-y-2">{groundedAnswer.citations.map((citation,index)=><li key={`${index}-${citation.excerpt}`} className="border-l-2 pl-3 text-sm italic">“{citation.excerpt}”</li>)}</ul></div><p className="text-xs text-muted-foreground">AI draft · Check the quoted passages and confirm important details with your educator.</p></div>}
+      {groundedAnswer && <div className="rounded-lg border bg-background p-4 space-y-3" aria-live="polite"><div className="flex items-center justify-between gap-2"><h3 className="font-semibold">Answer</h3><ReadAloud text={groundedAnswer.answer} label="Read the answer aloud" /></div><p className="whitespace-pre-wrap text-sm leading-6">{groundedAnswer.answer}</p><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source quotations</p><ul className="mt-2 space-y-2">{groundedAnswer.citations.map((citation,index)=><li key={`${index}-${citation.excerpt}`} className="border-l-2 pl-3 text-sm italic">“{citation.excerpt}”</li>)}</ul></div><p className="text-xs text-muted-foreground">AI draft · Check the quoted passages and confirm important details with your educator.</p></div>}
     </section>
   </div>;
 }

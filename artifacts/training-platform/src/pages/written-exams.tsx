@@ -5,6 +5,7 @@ type Question = { prompt: string; type: string; maxMarks: number };
 type Exam = { id: number; title: string; difficulty: string; questions: Question[] };
 type Mark = { questionIndex: number; awardedMarks: number; maxMarks: number; feedback: string; needsReview: boolean };
 type Assignment = { id:number; examId:number; title:string; organization:string; dueAt:string|null };
+type ReviewedResult = { submissionId:number; title:string; organization:string; aiPercentage:number; effectivePercentage:number; reviewStatus:"ai_provisional"|"assessor_adjusted"; questions:{questionIndex:number; maxMarks:number; aiMarks:number; effectiveMarks:number; overridden:boolean; reviewReason:string|null}[] };
 type Result = { percentage: number; awardedMarks: number; maxMarks: number; feedback: Mark[]; reviewRequired: number };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -18,6 +19,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export default function WrittenExamsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [results, setResults] = useState<ReviewedResult[]>([]);
   const [activeAssignment, setActiveAssignment] = useState<number|null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
   const [materialId, setMaterialId] = useState("");
@@ -31,6 +33,7 @@ export default function WrittenExamsPage() {
   useEffect(() => {
     Promise.all([request<Material[]>("/materials"), request<Exam[]>("/written-exams"),request<Assignment[]>("/my-assignments")])
       .then(([m, e, a]) => { setMaterials(m); setExams(e); setAssignments(a); })
+      .then(() => request<ReviewedResult[]>("/my-assignment-results").then(setResults).catch(() => setResults([])))
       .catch(e => setError(e.message));
   }, []);
   async function generate() {
@@ -84,6 +87,7 @@ export default function WrittenExamsPage() {
       </div>
       <button disabled={!materialId || working} onClick={generate} className="rounded-md bg-primary px-5 py-3 text-primary-foreground disabled:opacity-50">{working ? "Working…" : "Generate written examination"}</button>
     </div>
+    {results.length>0 && <section className="space-y-3" aria-labelledby="assignment-results-heading"><h2 id="assignment-results-heading" className="text-xl font-semibold">Your assignment results</h2><ul className="space-y-2">{results.map(r=><li key={r.submissionId} className="rounded-md border p-3 text-sm"><p><strong>{r.title}</strong> · {r.organization} · {r.reviewStatus==="assessor_adjusted"?<>Reviewed score {r.effectivePercentage}% <span className="text-muted-foreground">(AI {r.aiPercentage}%)</span></>:<>AI score {r.aiPercentage}% <span className="text-muted-foreground">· not yet reviewed by an assessor</span></>}</p>{r.questions.filter(q=>q.overridden).map(q=><p key={q.questionIndex} className="text-muted-foreground">Q{q.questionIndex+1}: {q.effectiveMarks}/{q.maxMarks} after review (AI {q.aiMarks}){q.reviewReason?<> — {q.reviewReason}</>:null}</p>)}</li>)}</ul></section>}
     {assignments.length>0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Assigned to you</h2><div className="flex flex-wrap gap-2">{assignments.map(a=><button key={a.id} className="rounded-md border px-4 py-3 text-sm" onClick={()=>openAssignment(a)}>{a.title} · {a.organization}{a.dueAt ? " · Due "+new Date(a.dueAt).toLocaleDateString() : ""}</button>)}</div></section>}
     {exams.length > 0 && <section className="space-y-3"><h2 className="text-xl font-semibold">Your examinations</h2>
       <div className="flex flex-wrap gap-2">{exams.map(e => <button key={e.id} onClick={() => {setActiveAssignment(null);selectExam(e)}} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">{e.title} · {e.questions.length} questions</button>)}</div>

@@ -5,7 +5,8 @@ import {
   courseEnrollmentsTable, academicAssessmentsTable, academicGradesTable, academicGradeEventsTable,
   courseStaffAssignmentsTable, managementUnitsTable, managementRoleGrantsTable,
   schoolAttendanceTable, schoolNoticesTable, guardianRelationshipsTable,
-  studyMaterialsTable, quizzesTable,
+  studyMaterialsTable, quizzesTable, verifiedEnrollmentsTable,
+  learnerSupportTicketsTable, learnerSupportEventsTable, hubRecordsTable,
 } from "@workspace/db";
 
 // Fictional, non-identifying test data. No passwords, secrets, real school names or real learners.
@@ -16,6 +17,7 @@ const people = [
   ["assessor-south", "Palesa", "Mokoena"],
   ["learner-south-a", "Lerato", "Mahlobo"],
   ["learner-south-b", "Sipho", "Khumalo"],
+  ["learner-south-c", "Anele", "Radebe"],
   ["parent-south", "Mpho", "Mahlobo"],
   ["district-south", "Zanele", "Nkosi"],
   ["university-head", "Dr Nandi", "Molefe"],
@@ -108,6 +110,17 @@ export async function seedCaboDemo(): Promise<void> {
       organizationId,name,type,createdBy:uid(createdBy),
     }).returning())[0]).id;
   }
+  async function supportCase(organizationId:number,courseId:number,learner:string,teacher:string) {
+    const requestKey = `demo-${learner}-fractions-2026`;
+    const [existing] = await db.select().from(learnerSupportTicketsTable).where(and(eq(learnerSupportTicketsTable.learnerId,uid(learner)),eq(learnerSupportTicketsTable.requestKey,requestKey))).limit(1);
+    if (existing) return;
+    const [ticket] = await db.insert(learnerSupportTicketsTable).values({organizationId,courseId,learnerId:uid(learner),concept:"Algebraic fractions",question:"How do I identify the lowest common denominator?",attempted:"I factorised both denominators and highlighted the common factors.",status:"in_progress",assignedTo:uid(teacher),requestKey,reviewAt:new Date("2026-10-23T12:00:00Z")}).returning();
+    await db.insert(learnerSupportEventsTable).values({ticketId:ticket.id,actorId:uid(teacher),kind:"educator_note",body:"Synthetic intervention: use worked examples, then review one week later.",metadata:{synthetic:true,nextStep:"guided-practice"}});
+  }
+  async function hubRecord(organizationId:number,kind:string,title:string,description:string,createdBy:string,subject?:string) {
+    const [existing] = await db.select().from(hubRecordsTable).where(and(eq(hubRecordsTable.organizationId,organizationId),eq(hubRecordsTable.kind,kind),eq(hubRecordsTable.title,title))).limit(1);
+    if (!existing) await db.insert(hubRecordsTable).values({organizationId,kind,title,description,status:"active",createdBy:uid(createdBy),reviewedBy:uid(createdBy),subjectId:subject?uid(subject):null});
+  }
   async function grant(organizationId:number,unitId:number,person:string,role:string,by:string) {
     await db.insert(managementRoleGrantsTable).values({
       organizationId,unitId,userId:uid(person),role,grantedBy:uid(by),
@@ -119,7 +132,7 @@ export async function seedCaboDemo(): Promise<void> {
   const uni = await org("Mzanzi Digital University", "university-head");
   const company = await org("Kwezi Skills & Training", "company-head");
   for (const [organizationId, assignments] of [
-    [south, [["headmaster-south","owner"],["teacher-south","teacher"],["assessor-south","assessor"],["learner-south-a","learner"],["learner-south-b","learner"],["district-south","admin"]]],
+    [south, [["headmaster-south","owner"],["teacher-south","teacher"],["assessor-south","assessor"],["learner-south-a","learner"],["learner-south-b","learner"],["learner-south-c","learner"],["district-south","admin"]]],
     [north, [["headmaster-north","owner"],["learner-north","learner"]]],
     [uni, [["university-head","owner"],["university-teacher","teacher"],["university-learner","learner"]]],
     [company, [["company-head","owner"]]],
@@ -129,18 +142,20 @@ export async function seedCaboDemo(): Promise<void> {
   await db.insert(academicSettingsTable).values({organizationId:south,institutionType:"school",framework:"NSC",academicYear:2026}).onConflictDoNothing();
   await db.insert(academicSettingsTable).values({organizationId:north,institutionType:"school",framework:"IEB",academicYear:2026}).onConflictDoNothing();
   await db.insert(academicSettingsTable).values({organizationId:uni,institutionType:"university",framework:"UNIVERSITY",academicYear:2026}).onConflictDoNothing();
-  await group(south,"Grade 12A — Demo",["learner-south-a","learner-south-b"]);
+  await group(south,"Grade 12A — Demo",["learner-south-a","learner-south-b","learner-south-c"]);
   await group(north,"Grade 12 — Demo",["learner-north"]);
   await group(uni,"First-year Software Development — Demo",["university-learner"]);
   const southTerm = await period(south,"Term 3 — Demo");
   const northTerm = await period(north,"Term 3 — Demo");
   const uniTerm = await period(uni,"Semester 2 — Demo");
-  const maths = await course(south,"MAT12","Mathematics","Grade 12","teacher-south",["learner-south-a","learner-south-b"]);
-  const science = await course(south,"PHY12","Physical Sciences","Grade 12","assessor-south",["learner-south-a","learner-south-b"]);
+  const maths = await course(south,"MAT12","Mathematics","Grade 12","teacher-south",["learner-south-a","learner-south-b","learner-south-c"]);
+  const science = await course(south,"PHY12","Physical Sciences","Grade 12","assessor-south",["learner-south-a","learner-south-b","learner-south-c"]);
+  const lifeOrientation = await course(south,"LIF12","Life Orientation","Grade 12","teacher-south",["learner-south-a","learner-south-b","learner-south-c"]);
   const english = await course(north,"ENG12","English Home Language","Grade 12","headmaster-north",["learner-north"]);
   const programming = await course(uni,"CS101","Programming Fundamentals","Year 1","university-teacher",["university-learner"]);
-  await assessment(south,maths,southTerm,"Algebra Test — Synthetic","teacher-south",[["learner-south-a",82],["learner-south-b",64]]);
-  await assessment(south,science,southTerm,"Mechanics Test — Synthetic","assessor-south",[["learner-south-a",74],["learner-south-b",88]]);
+  await assessment(south,maths,southTerm,"Algebra Test — Synthetic","teacher-south",[["learner-south-a",82],["learner-south-b",64],["learner-south-c",71]]);
+  await assessment(south,science,southTerm,"Mechanics Test — Synthetic","assessor-south",[["learner-south-a",74],["learner-south-b",88],["learner-south-c",69]]);
+  await assessment(south,lifeOrientation,southTerm,"Study and career plan — Synthetic","teacher-south",[["learner-south-a",86],["learner-south-b",76],["learner-south-c",81]]);
   await assessment(north,english,northTerm,"Literature Test — Synthetic","headmaster-north",[["learner-north",91]]);
   await assessment(uni,programming,uniTerm,"TypeScript Test — Synthetic","university-teacher",[["university-learner",79]]);
   const schoolUnit = await unit(south,"Ubuntu Future Secondary School — Demo","school","headmaster-south");
@@ -151,12 +166,22 @@ export async function seedCaboDemo(): Promise<void> {
   await db.insert(guardianRelationshipsTable).values({
     learnerId:uid("learner-south-a"),guardianId:uid("parent-south"),status:"accepted",
   }).onConflictDoNothing();
-  for (const [learnerId,status] of [["learner-south-a","present"],["learner-south-b","absent"]] as const) {
-    await db.insert(schoolAttendanceTable).values({
-      organizationId:south,learnerId:uid(learnerId),day:"2026-10-09",status,
-      note:"Synthetic attendance example",recordedBy:uid("headmaster-south"),
-    }).onConflictDoNothing();
+  for (const learner of ["learner-south-a","learner-south-b","learner-south-c"] as const) await db.insert(verifiedEnrollmentsTable).values({organizationId:south,learnerId:uid(learner),stage:"12",academicYear:2026,status:"active",recordedBy:uid("headmaster-south")}).onConflictDoNothing();
+  await db.insert(verifiedEnrollmentsTable).values({organizationId:north,learnerId:uid("learner-north"),stage:"12",academicYear:2026,status:"active",recordedBy:uid("headmaster-north")}).onConflictDoNothing();
+  await db.insert(verifiedEnrollmentsTable).values({organizationId:uni,learnerId:uid("university-learner"),stage:"Year 1",academicYear:2026,status:"active",recordedBy:uid("university-head")}).onConflictDoNothing();
+  const attendanceLearners = ["learner-south-a","learner-south-b","learner-south-c"] as const;
+  for (let day=5;day<=16;day++) for (const [index,learnerId] of attendanceLearners.entries()) {
+    const status = (learnerId==="learner-south-b"&&day===9)||(learnerId==="learner-south-c"&&day===14)?"absent":day===12&&index===0?"late":"present";
+    await db.insert(schoolAttendanceTable).values({organizationId:south,learnerId:uid(learnerId),day:`2026-10-${String(day).padStart(2,"0")}`,status,note:"[DEMO] Synthetic attendance example",recordedBy:uid("headmaster-south")}).onConflictDoNothing();
   }
+  await supportCase(south,maths,"learner-south-b","teacher-south");
+  for (const [kind,title,description,subject] of [
+    ["academic_intervention","[DEMO] Algebra support cycle","Teacher-led practice and follow-up review; fictional and non-diagnostic.","learner-south-b"],
+    ["timetable","[DEMO] Grade 12 weekly timetable","A synthetic timetable item for the institution workspace",undefined],
+    ["sports","[DEMO] Athletics participation","Fictional extracurricular participation; no verified achievement implied.","learner-south-a"],
+    ["family_meeting","[DEMO] Progress consultation","Pending synthetic family consultation; guardian authority remains unverified.","learner-south-a"],
+    ["talent_skill","[DEMO] Robotics project reflection","Learner-owned synthetic portfolio example; not a credential.","learner-south-c"],
+  ] as const) await hubRecord(south,kind,title,description,"headmaster-south",subject);
   const [notice] = await db.select().from(schoolNoticesTable).where(and(
     eq(schoolNoticesTable.organizationId,south),eq(schoolNoticesTable.subject,"[DEMO] October assessment week"),
   )).limit(1);
@@ -250,5 +275,5 @@ export async function seedCaboDemo(): Promise<void> {
     }
   }
 
-  console.info("CABO synthetic fixtures ready: 4 organisations, 13 identities, 4 courses, 4 assessments, 2 native learner quizzes");
+  console.info("CABO synthetic fixtures ready: 4 organisations, 14 identities, 5 courses, 5 assessments, 36 attendance rows, 1 intervention, 5 hub records, 2 native learner quizzes");
 }

@@ -8,6 +8,7 @@ const demoAccounts = [
   { label: 'Assessor — Ubuntu Future', username: 'cabo_assessor_south' },
   { label: 'Learner — Ubuntu Future (Lerato)', username: 'cabo_learner_south_a' },
   { label: 'Learner — Ubuntu Future (Sipho)', username: 'cabo_learner_south_b' },
+  { label: 'Learner — Ubuntu Future (Anele)', username: 'cabo_learner_south_c' },
   { label: 'Parent — Ubuntu Future', username: 'cabo_parent_south' },
   { label: 'District director — Demo district', username: 'cabo_district_south' },
   { label: 'Headmaster — Highveld Independent', username: 'cabo_headmaster_north' },
@@ -16,6 +17,11 @@ const demoAccounts = [
   { label: 'University lecturer — Mzanzi Digital', username: 'cabo_university_teacher' },
   { label: 'University learner — Mzanzi Digital', username: 'cabo_university_learner' },
   { label: 'Training organisation — Kwezi Skills', username: 'cabo_company_head' },
+  { label: 'Grade 12 head — Ubuntu Future', username: 'cabo_teacher_gradehead' },
+  { label: 'School head — Kgalagadi Senior (Botswana)', username: 'cabo_headmaster_bw' },
+  { label: 'Teacher — Kgalagadi Senior (Botswana)', username: 'cabo_teacher_bw' },
+  { label: 'Learner — Kgalagadi Senior (Masego)', username: 'cabo_learner_bw' },
+  { label: 'Parent — Kgalagadi Senior (Botswana)', username: 'cabo_parent_bw' },
 ];
 
 const audiences = [

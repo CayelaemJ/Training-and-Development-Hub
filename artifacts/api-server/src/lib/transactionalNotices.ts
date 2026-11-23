@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
  * No public send endpoint is mounted: callers must validate recipient,
  * lawful purpose and organisation membership before invoking this module.
  */
-export type NoticeKind = "guardian_review_requested" | "learner_support_updated" | "account_security";
+export type NoticeKind = "guardian_review_requested" | "learner_support_updated" | "results_published" | "account_security";
 export type NoticeOutcome = "accepted" | "deduplicated" | "disabled" | "limit_reached";
 export type NoticeInput = {
   to: string;
@@ -26,6 +26,10 @@ const subjects: Record<NoticeKind,{subject:string;body:string}> = {
   learner_support_updated: {
     subject:"CABO Learning Hub — learning support update",
     body:"An update is available in your CABO Learning Hub account. Open the application directly and sign in to review it. No learner details are included in this email.",
+  },
+  results_published: {
+    subject:"CABO Learning Hub — new results published",
+    body:"Your child's school has published new results in CABO Learning Hub. Open the application directly and sign in to see them with the progress view. For privacy, no names or marks are included in this email.",
   },
   account_security: {
     subject:"CABO Learning Hub — security notification",

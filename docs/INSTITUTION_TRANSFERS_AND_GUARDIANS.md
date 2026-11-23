@@ -31,12 +31,14 @@ This is a controlled first iteration that keeps institution-authored learner rec
 | GET | /api/institution-records/me | Learner, own data |
 | POST | /api/organizations/:orgId/verified-enrollments | Org owner/admin |
 | GET | /api/organizations/:orgId/verified-enrollments | Org owner/admin |
-| POST | /api/institution-records/transfers | Learner |
+| POST | /api/institution-records/transfers | Learner — **off unless `ENABLE_LEARNER_TRANSFER_REQUESTS=true`** (404 otherwise) |
 | GET | /api/organizations/:orgId/transfers/incoming | Destination owner/admin |
 | POST | /api/organizations/:orgId/transfers/:transferId/decision | Destination owner/admin |
-| POST | /api/guardian-relationships | Learner |
+| POST | /api/guardian-relationships | Learner — **off unless `ENABLE_LEARNER_GUARDIAN_INVITES=true`** (404 otherwise); when on, always 202 with the same body |
 | GET | /api/guardian-relationships/incoming | Invited guardian |
 | POST | /api/guardian-relationships/:id/decision | Invited guardian |
+
+**Server gates (2026-11-22):** the web client disabled both learner-initiated actions on 2026-10-26. The API now enforces the same decision: both routes return 404 unless their flag is exactly `true`. Enabling either is an owner decision after the release gates below. Known residual when guardian invites are enabled: the learner's own `GET /api/institution-records/me` lists created relationships, so a learner can still infer that an email had an account; email-keyed requests (as used for organization invitations) would remove this.
 
 ## Release gates
 

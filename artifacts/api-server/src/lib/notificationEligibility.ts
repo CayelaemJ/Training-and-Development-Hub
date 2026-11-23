@@ -2,8 +2,8 @@
  * Conservative notification eligibility. A verified relationship does NOT
  * imply marketing consent; explicit school/event preferences are mandatory.
  */
-export type NotificationKind="guardian_review_requested"|"learner_support_updated"|"account_security";
-export type NoticeSource={kind:"support_ticket"|"guardian_relationship";id:number};
+export type NotificationKind="guardian_review_requested"|"learner_support_updated"|"results_published"|"account_security";
+export type NoticeSource={kind:"support_ticket"|"guardian_relationship"|"academic_grade";id:number};
 export type EligibilityEvidence={
   kind:NotificationKind;
   source:NoticeSource;
@@ -16,6 +16,7 @@ export type EligibilityEvidence={
   assignedCourse?:boolean;
   verifiedGuardianRelationship?:boolean;
   latestGuardianDecision?:string|null;
+  gradePublished?:boolean;
 };
 
 export function isNotificationEligible(e:EligibilityEvidence):boolean {
@@ -28,6 +29,13 @@ export function isNotificationEligible(e:EligibilityEvidence):boolean {
       !e.activeEnrollment) return false;
   if(e.kind==="guardian_review_requested") {
     return e.source.kind==="guardian_relationship" &&
+      e.verifiedGuardianRelationship===true &&
+      e.latestGuardianDecision==="verified";
+  }
+  if(e.kind==="results_published") {
+    // A published result for a child the recipient is a school-verified guardian of.
+    return e.source.kind==="academic_grade" &&
+      e.gradePublished===true &&
       e.verifiedGuardianRelationship===true &&
       e.latestGuardianDecision==="verified";
   }
