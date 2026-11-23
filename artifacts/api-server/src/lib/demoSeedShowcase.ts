@@ -258,7 +258,7 @@ async function seedPassportShares(now: Date): Promise<number> {
   if (!uni || !employer) return 0;
   for (const [skill, category, level, demonstration, description] of [
     ["Python programming", "technical", 3, "project", "Built a timetable clash checker for a student society (fictional demo)."],
-    ["Public speaking", "communication", 4, "presentation", "Presented a research poster at a faculty showcase (fictional demo)."],
+    ["Public speaking", "transferable", 4, "practical", "Presented a research poster at a faculty showcase (fictional demo)."],
   ] as const) {
     const [has] = await db.select({ id: passportCompetenciesTable.id }).from(passportCompetenciesTable)
       .where(and(eq(passportCompetenciesTable.userId, uid("university-learner")), eq(passportCompetenciesTable.skill, skill))).limit(1);

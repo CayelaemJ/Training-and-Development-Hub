@@ -80,7 +80,7 @@ export default function SharedPassportsPage() {
         {open.sections.learning_dna && <div><h3 className="font-semibold">Learning DNA</h3>
           <ul className="mt-1 space-y-1 text-sm">{open.sections.learning_dna.map(d => <li key={d.concept}>{d.concept}: <strong>{STATE[d.state] ?? d.state}</strong> <span className="text-muted-foreground">({date(d.reviewedAt)})</span></li>)}</ul></div>}
         {open.sections.skills && <div><h3 className="font-semibold">Skills (self-reported)</h3>
-          <ul className="mt-1 space-y-1 text-sm">{open.sections.skills.map(s => <li key={s.skill}><strong>{s.skill}</strong>, level {s.masteryLevel}/5, {s.demonstration}: {s.description}</li>)}</ul></div>}
+          <ul className="mt-1 space-y-1 text-sm">{open.sections.skills.map(s => <li key={s.skill}><strong>{s.skill}</strong>, level {s.masteryLevel} of 4, {s.demonstration}: {s.description}</li>)}</ul></div>}
         {open.sections.verified_achievements && <div><h3 className="font-semibold">Verified achievements</h3>
           <ul className="mt-1 space-y-1 text-sm">{open.sections.verified_achievements.map(a => <li key={a.skill + a.verifiedBy}>{a.skill}: verified by {a.verifiedBy} {a.verifiedAt ? `on ${date(a.verifiedAt)}` : ""}</li>)}</ul>
           {open.sections.verified_achievements.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}</div>}
