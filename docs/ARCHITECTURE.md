@@ -251,3 +251,376 @@ The pre-existing `docs/ARCHITECTURE.md` described only the **Potential & Opportu
 Whenever a feature or PR changes a domain, update this file **and** the relevant operational runbook. Record the exact source paths, database migrations, API contracts, feature flags, tenant/privacy threats, evidence, rollout and rollback. Mark each new subsystem **present / gated / candidate / target**; never convert a design document or merged PR into an unqualified “production ready” statement.
 
 Start with [platform identity](PLATFORM_IDENTITY.md), [national target](NATIONAL_EDUCATION_ARCHITECTURE.md), [role portals](ROLE_BASED_PORTALS.md), [admissions](ADMISSIONS_REGISTRATION_AND_MOBILITY_ZA_BW.md), [security](engineering/SECURITY_REVIEW.md), [RAG](RAG_PIPELINE.md), [native apps](../native-apps/README.md), [infrastructure](INFRA_OPERATIONS_RUNBOOK.md) and [release gates](EIGHT_WORKSTREAM_RELEASE_GATES.md).
+
+
+---
+
+## 14. Architecture decisions, constraints and non-functional requirements
+
+The runtime is a **modular monolith**, not a fleet of microservices. The API is one Express deployment with domain-owned routers, shared policies and a transactional relational database. The optional Cloudflare Django worker is a narrowly bounded advisory processor. Do not convert the diagram into invented separate services.
+
+| Decision | Today / direction | Reason and trade-off |
+| --- | --- | --- |
+| Node.js / Express 5 API | Single modular application | Centralizes shared authorization and database transactions; a failure can affect multiple domains |
+| PostgreSQL and Drizzle | Source of truth and shared schema packages | Referential integrity and transactional operations; needs disciplined migrations and query budgets |
+| Web React/Vite | Responsive SPA/PWA | Wide reach and one deployable UI; must isolate sensitive authenticated content from offline caching |
+| Android, iOS, Windows native | Separate Kotlin, Swift, WinUI 3 applications | Platform-specific access/UX; multiplied contract, release and account isolation testing |
+| OIDC/session-centered auth | Server-validated sessions; native auth flows | Centralized identity but issuer changes and MFA deployment require rehearsed migration |
+| Groq and lexical retrieval | Server-side bounded generation and source-aware Q&A | Lower infrastructure cost; lexical retrieval misses semantically distant paraphrases |
+| Outbox and signed callbacks | Gated asynchronous tasks and notifications | Supports decoupled delivery, but idempotency, retry, dead-letter recovery and current consent must be demonstrated |
+| Private object adapters | Signed/owned access, staging and quotas | Limits direct file exposure; malware/retention/deletion and billing reconciliation require release review |
+| Cloudflare migration | Candidate; explicit deny-by-default release controls | May change deployment topology; a static frontend alone cannot replace the authenticated backend |
+| Synthetic demos | Explicit isolated testing | Avoids unauthorised live learner records; must never accidentally enable synthetic identities on live environments |
+
+### Quality-attribute acceptance
+
+| Attribute | Acceptance evidence; no unverified numeric promises |
+| --- | --- |
+| Security | Cross-school IDOR and role escalation tests for every sensitive domain; independent review and penetration assessment |
+| Privacy | Approved child-data purposes, guardian evidence, POPIA/Botswana processor mapping, deletion/retention decisions |
+| Performance | Synthetic load profiles, p50/p95/p99 latency, connection-pool utilization, slow-query plans, material size budgets |
+| Availability | Dependency fault injection, readiness probes, incident runbook and tested recovery |
+| Consistency | Concurrent write tests, transaction boundaries, idempotency and report/ledger correction behaviour |
+| Maintainability | Domain ownership, documented contracts, reviewed schema changes and CI reproducibility |
+| Accessibility | WCAG 2.2 AA audits including keyboard, screen reader, zoom, mobile and native device testing |
+| Cost | Provider quota, AI credit, Redis, DB, job and storage usage thresholds with owner-visible budget alerts |
+
+No approved SLO, RPO, RTO, throughput ceiling or national-scale capacity target is verified by repository inspection. Define and test these before selling an uptime/capacity guarantee.
+
+## 15. HTTP lifecycle and API contract ownership
+
+The actual request order in `artifacts/api-server/src/app.ts` is architecturally significant:
+
+1. Configure trusted proxy based on the explicit `TRUST_PROXY_HOPS` setting.
+2. Attach privacy-limited Pino HTTP logging, baseline response security headers and allowlisted CORS.
+3. Validate browser mutation origins and apply the shared API rate limiter **before** normal body parsing and session lookups.
+4. Parse cookies; preserve byte-exact JSON for QStash material preview and Paystack signature verification callbacks.
+5. Parse JSON/forms, resolve and refresh the browser/native session as applicable, and attach heartbeat.
+6. Apply privileged MFA guard and **optional** `CABO_COUNTRY_PILOT_ENFORCEMENT` middleware.
+7. Dispatch signed internal callback handlers, then the consolidated domain router in `routes/index.ts`.
+8. Handle malformed or oversized JSON, followed by a generic exception boundary and opaque request reference.
+9. Optionally serve the compiled React SPA from the same server, without routing unknown `/api/*` requests to HTML.
+
+```mermaid
+flowchart TD
+  A[Inbound request] --> B[Proxy, security headers, redacted logging]
+  B --> C[CORS and mutation-origin policy]
+  C --> D[Shared API throttling]
+  D --> E[Cookie and signed-webhook parsing]
+  E --> F[Session validation / refresh]
+  F --> G[Privileged MFA / conditional school-data release]
+  G --> H{Domain route guard}
+  H -->|Unauthorised| I[401 / 403 / feature gated]
+  H -->|Permitted| J[Validate DTO, actor, tenant, object and consent]
+  J --> K[Transaction / scoped read / approved external service]
+  K --> L[Minimal response, audit or outbox]
+  K -->|Unhandled error| M[Redacted error and opaque reference]
+```
+
+**Important:** this is a description of the API composition, not proof that every individual route is correct. The router-level security audit must check all endpoints and every nested object ownership decision.
+
+### Domain route inventory
+
+All paths in this table are source files inside `artifacts/api-server/src/routes/`, not a claim that all features are activated on a deployed instance.
+
+| Ownership | Routers | Mandatory control |
+| --- | --- | --- |
+| Platform identity and user settings | `auth.ts`, `nativeAuth.ts`, `rolePortals.ts`, `profile.ts`, `privacy.ts` | Authenticated identity and user-owned private data |
+| Organisations and hierarchy | `organizations.ts`, `institutionSetup.ts`, `institutionRecords.ts`, `managementHierarchy.ts` | Institution membership, invitation acceptance, delegated administrative authority |
+| Learning delivery | `training.ts`, `hubModules.ts`, `educationFrameworks.ts`, `storage.ts` | Material owner, school assignment, approved file state |
+| Assessments | `writtenExams.ts`, `assessmentPapers.ts`, `assessmentQuestionBank.ts`, `academicExamLinks.ts` | Authorised assessor/class; published evidence and approved grading |
+| Academic and school operations | `academic.ts`, `attendanceSync.ts`, `timetable.ts`, `schoolStages.ts`, `schoolProgression.ts` | Institution, period, academic year, grade/class and issuer |
+| Student success and institutional intelligence | `learnerJourney.ts`, `learnerSupport.ts`, `developmentPlans.ts`, `academicIntelligence.ts`, `educationCommand.ts` | Learner support confidentiality and aggregate/report thresholds |
+| Family and accountability | `guardianVerification.ts`, `guardianProgress.ts`, `nativeParent.ts`, `notificationPreferences.ts`, `classChat.ts`, `accountability.ts` | Current verified relationship, safety escalation and controlled recipients |
+| Admissions and opportunity | `admissions.ts`, `admissionEvidence.ts`, `potential.ts`, `educationTalent.ts` | Authorised institutional action and candidate-controlled disclosure |
+| Passport and trust | `lifelongPassport.ts`, `passportTrustRoutes.ts`, `reportCards.ts`, `reportIssuance.ts` | Issuer evidence, versioning and prohibited silent credential upgrade |
+| AI, processing and billing | `learnerAiProfile.ts`, `mlops.ts`, `workerInsights.ts`, `aiCredits.ts` | AI consent, quotas, attribution, financial webhook verification |
+| Infrastructure and pilot | `health.ts`, `demoShowcase.ts`, `demoStatus.ts`, `demoAdmissionsInbox.ts`, `qstashMaterialPreview.ts` | Diagnostic disclosure minimization, explicit testing isolation, signed callbacks |
+
+For each new endpoint record: HTTP method, public path, authenticated actor, source of effective organisation ID, role, object owner, Zod schema, response shape, feature flags, rate limiter, audit, idempotency policy, error cases, and **negative** cross-user and cross-school tests.
+
+## 16. Relational data model and ownership
+
+The exported schema index is `lib/db/src/schema/index.ts`. These source modules are **not** separate database servers.
+
+| Data family | Representative schema modules | Invariant |
+| --- | --- | --- |
+| Accounts, tenant roles, educational structure | `auth`, `organizations`, `managementHierarchy`, `courseStaff` | Person identity is not organisation membership; privileges are time/context limited |
+| Course materials and academic records | `training`, `materialUploadBlobs`, `academic`, `academicExamLinks`, `educationFrameworks` | Restrict by owner/institution/assignment and track material approval |
+| Exams and quality | `writtenExams`, `assessmentQuestionBank`, `assessmentPapers`, `schoolReportIssuance` | Separate draft/marking/approved issuance; preserve historical corrections |
+| School events and development | `schoolOperations`, `schoolTimetable`, `schoolProgressionEvents`, `learnerJourney`, `schoolStages`, `learnerSupport` | No silent reassignment across school year, school or issuing authority |
+| Guardian and school trust | `guardianVerification`, `institutionDataClearances`, `institutionSetup` | Relationship verification and jurisdiction eligibility at access time |
+| Longitudinal and adult sharing | `lifelongPassport`, `passportTrustLayers`, `talentPassport`, `potential`, `admissions` | Self-report, school-issued and formally verified evidence remain different |
+| Governance and interaction | `platformAudit`, `notificationConsent`, `notificationOutbox`, `accountability`, `classChat`, `profiles` | Approved recipients, revocation, moderation and record retention |
+| AI and accounting | `aiMetrics`, `mlops`, `learnerAiProfile`, `aiCredits` | Per-person/tenant attribution, bounded spend and event uniqueness |
+
+### Lifecycle of a sensitive record
+
+```mermaid
+flowchart LR
+  S[Source / institution / owner] --> V[Validated, authorised submission]
+  V --> T[(PostgreSQL transaction)]
+  T --> E[Versioned evidence / source attribution]
+  E --> R[Scoped read / report]
+  E --> O[Outbox on authorised state change]
+  O --> D[Consent recheck and delivery]
+  E --> X[Correction / supersession]
+  X --> E
+  E --> Z[Approved retention / export / deletion]
+```
+
+**Read:** resolve actor → institutional/record policy → constrain SQL predicate to tenant and owner → project minimum fields → bound pagination and redaction.
+
+**Write:** validate Zod input → resolve effective tenant on the server → authorize → apply transactional state change and audit → enqueue post-commit action using a reliable outbox. External failure must not falsely report that a school result was rolled back when it was committed.
+
+**Transfer:** retain previous issuer attribution and source history; new school membership does not automatically authorize reading previous private records.
+
+**Deletion:** determine legal retention; revoke access and pending shares; delete or archive source, derived indexes and blob according to reviewed policy; preserve a minimal lawful audit trail.
+
+**Migration:** additive backwards-compatible changes first; test against isolated representative schema; inspect `lib/db/migrations/ORDER`, expected locks and old/new version compatibility; take backup and rehearse restore. The repository's earlier development base-schema `drizzle-kit push` means an empty-to-current production migration bootstrap must be independently proven.
+
+## 17. Role and tenant access-control contract
+
+The matrix is the **required security target**, not evidence every endpoint has passed integration testing.
+
+| Workflow | Learner | Verified guardian | Staff/assessor | Institution leadership | Platform operator |
+| --- | --- | --- | --- | --- | --- |
+| Personal study assistant | Own approved material | Not automatically | Assigned material | Delegated scope | No implicit routine content access |
+| Learner academic progress | Own permitted data | Verified dependent, per-school | Assigned class | Audited school scope | Exception only, logged |
+| Attendance / timetable | Own context | Child-scoped | Assigned grade/class | Institution scope | Audited administration |
+| Examination publication | Assigned attempt | Read permitted published child results | Review and approve by assigned duty | Defined institutional issuer | No forged educational authority |
+| Support and safeguarding | Appropriate self-service | Verified and purpose-limited | Assigned professionals | Case-authorised leadership | Restricted escalated audit path |
+| Admissions / transfers | Self application | Approved dependent | Delegated desk role | Institution decision authority | No invented regulator powers |
+| Public/private career profile | Age-appropriate opt-in | No impersonation | No default access | No silent student disclosure | Platform policy only |
+| Aggregate education command view | No other-child visibility | Own dependent only | Appropriate cohort | Aggregated institution scope | Legally approved aggregation scope |
+
+A valid login must never act as a shortcut for permission to view **any** record in the same school. Negative tests: outsider ID guessing, school A vs B, revoked member, guardian with stale verification, wrong enrolment, platform list ≠ institution membership, expired share, unapproved data release, changed role mid-session and replayed background task.
+
+## 18. Domain lifecycle state diagrams
+
+### Institution onboarding (target contract)
+
+```mermaid
+stateDiagram-v2
+ [*] --> Requested
+ Requested --> EvidencePending
+ EvidencePending --> Verification
+ Verification --> Rejected
+ Verification --> Approved
+ Approved --> Configured
+ Configured --> SyntheticPilot
+ SyntheticPilot --> LiveEligible: legal, privacy and security acceptance
+ LiveEligible --> Operating: explicit owner / institution approval
+ Operating --> Suspended: policy or incident trigger
+ Suspended --> Operating: reviewed remediation
+ Operating --> Offboarded
+```
+
+Not all states have corresponding production persistence today. In particular, synthetic demonstrations and draft verification code are **not** official institution registration.
+
+### Assessment and report lifecycle
+
+```mermaid
+stateDiagram-v2
+ [*] --> Draft
+ Draft --> UnderReview
+ UnderReview --> RejectedForCorrection
+ RejectedForCorrection --> Draft
+ UnderReview --> Approved
+ Approved --> Published
+ Published --> Superseded: traceable correction
+ Published --> Archived: lawful retention
+```
+
+AI marking and generated questions must never be silently promoted into institutional certification. Preserve reviewer, source and version.
+
+### Guardian disclosure
+
+```mermaid
+stateDiagram-v2
+ [*] --> Unverified
+ Unverified --> EvidencePending
+ EvidencePending --> VerifiedForInstitution: authorized verification
+ EvidencePending --> Denied
+ VerifiedForInstitution --> AccessEligible: active enrolment + current clearance
+ AccessEligible --> Revoked: relationship, school or permission change
+ AccessEligible --> Expired: revalidation required
+```
+
+### Adult opportunity disclosure
+
+Pending → approved for a specific purpose/scope and expiry → revoked or expired. Re-evaluate the grant for **every read**. Previously downloaded information cannot be clawed back; no employer gets child academic data by default.
+
+## 19. AI / RAG architecture in engineering detail
+
+### Input trust boundaries
+
+1. Authenticate the caller, determine authorized material IDs and verify current profile/AI consent.
+2. Validate the question/assessment input size and allowed operation, enforce request and provider/credit quotas.
+3. Read approved material using an owner-scoped storage adapter or cache. File text and OCR output are **data**, never trusted instructions.
+4. Split and rank bounded chunks. Local BM25 and a gated PostgreSQL lexical index provide lexical retrieval foundations; neither proves semantic retrieval quality or a production vector database.
+5. Add only approved minimal learner preferences where explicitly opted in. Do not use inferred sensitive characteristics to determine access or marks.
+6. Issue a bounded provider call with explicit time/retry limits and an allowed model; parse and validate the returned JSON/schema where required.
+7. Verify cited excerpts are supported by selected passages. Reject unsupported answers, wrong question indices, invalid marks or malformed outputs.
+8. Store permitted usage, redacted quality telemetry and audit references; do not log the private prompt/body by default.
+9. Return draft feedback with citations and uncertainty. Staff review remains mandatory for consequential assessments.
+
+```mermaid
+sequenceDiagram
+  actor U as Learner / authorised educator
+  participant API as Express owner/consent policy
+  participant DB as PostgreSQL and material store
+  participant RET as Lexical retrieval
+  participant LLM as Server-side AI provider
+  U->>API: Question or assessment request
+  API->>API: Auth, tenant, credit and consent gates
+  API->>DB: Owner-scoped approved text
+  DB-->>API: Source/version evidence
+  API->>RET: Chunk and rank, bounded context
+  RET-->>API: Evidence excerpts
+  API->>LLM: Bounded text / structured response format
+  LLM-->>API: Proposed answer or marks
+  API->>API: Schema and citation checks; telemetry
+  API-->>U: Supported draft / error requiring review
+```
+
+**Failure semantics:** missing consent → denied; source unavailable → no ungrounded answer; provider quota/timeout → explicit retriable or unavailable response, not fabricated results; malformed citations → reject/fallback; spend exhausted → fail before expensive work; learner safety issue → human-owned escalation workflow, **not an autonomous diagnosis**.
+
+**Evaluation plan:** source retrieval Hit@k/MRR, supported-answer precision, abstention quality, mark-agreement against educators, harmful-output refusal, prompt-injection tests, latency/cost by task, and cross-owner retrieval isolation. Synthetic lexical evaluation cannot certify real curricula, languages or neurodiverse accessibility.
+
+## 20. Storage, queues, notifications and payments
+
+### Storage states
+
+**Target upload pipeline:** requested → size/MIME validation → isolated private staging → malware/content review → consent and ownership approval → indexed/available → retained, revoked or deleted. Object paths must be opaque and links should be short-lived and audience-scoped. No R2 adapter or database quota alone proves anti-malware scanning or policy-compliant deletion.
+
+### Notification outbox
+
+The repository contains `lib/notificationOutbox.ts`, `lib/currentNotificationAuthorization.ts`, `lib/notificationEligibility.ts`, `lib/outboxDispatcher.ts` and associated schemas. The intended workflow is:
+
+```mermaid
+flowchart LR
+ E[Approved domain event] --> T[(Transactional outbox)]
+ T --> W[Authorised dispatcher]
+ W --> C{Current recipient / consent / source authorization?}
+ C -->|No| S[Suppress and audit]
+ C -->|Yes| P[Delivery adapter]
+ P -->|Success| OK[Delivered metadata]
+ P -->|Transient failure| RET[Retry with backoff]
+ RET --> W
+ P -->|Permanent failure| DLQ[Escalate / dead-letter]
+```
+
+Outbox enabled flags, recipient encryption, idempotency, delivery provider credentials, and live delivery logs must be verified independently. Never include grades, national identifiers or attachments in plaintext notifications; use authenticated deep links where needed.
+
+### Payments and AI credits
+
+`routes/aiCredits.ts` provides balance/plan/credit ledger contracts and a hosted Paystack integration candidate. Payment callbacks require exact-body signature verification and idempotent provider references; only server-confirmed settlement can change a paid ledger. The code explicitly requires provider secret and owner-set pricing before genuine purchase is available. Demo top-ups are limited to an isolated testing database. **Do not claim live revenue or completed payment-provider certification** based on the route's existence.
+
+### Optional processing and external authorities
+
+The Cloudflare Django Worker is staging-only, guarded by a secret and approved aggregate-only inputs. National education, university and government exchange points remain *contract-dependent future integrations*. Never send child records to a worker or third party merely because a technical connector exists.
+
+## 21. Detailed cross-platform contract and state handling
+
+| Surface | Source | Local state and security requirement | Release evidence required |
+| --- | --- | --- | --- |
+| Web/PWA | `artifacts/training-platform/src` | Server remains source of truth; no private API response in public SW caches; role navigation is not authorization | Browser role/guard E2E, accessibility, auth renew/logout |
+| Android | `native-apps/android` | Native API layer with token/session isolation, account-switch reset and correct owner-scoped response parsing | Unit and instrumented checks, signed APK/AAB, devices and OS coverage |
+| iOS | `native-apps/ios` | Swift session and role state; clear account caches on logout, 401, failed refresh and next login | Xcode build, Swift tests, supported device versions and signing |
+| Windows | `native-apps/windows` | WinUI 3 views, .NET core and safe session persistence; prevent stale school state crossing logins | xUnit, packaged installer, signed distribution/upgrade/uninstall testing |
+| Web install experience | `docs/INSTALLABLE_APP_RELEASE.md` | PWA installation is **not** equivalent to native store distribution | Icon/manifest/offline-safe tests and platform-specific install review |
+
+Server contract changes should document additive fields, versioned breaking changes, native minimum supported client and rollout order (backward-compatible API first, then clients). An outdated native client must not bypass new privacy/consent rules.
+
+## 22. Infrastructure environments, recovery and deployment
+
+```mermaid
+flowchart TB
+  DEV[Local isolated developer environment] --> CI[GitHub Actions / CircleCI checks]
+  CI --> STAGE[Dedicated synthetic staging / preview]
+  STAGE --> GATE{Release and privacy sign-off}
+  GATE -->|Blocked| HOLD[Keep current deployed version]
+  GATE -->|Approved| PROD[Approved live API + web deployment]
+  PROD --> SQL[(PostgreSQL)]
+  PROD --> BLOB[Private object store]
+  PROD --> REDIS[Redis / rate-limit dependency]
+  PROD --> JOB[Approved callbacks / outbox delivery]
+  PROD --> AI[Approved AI provider]
+  PROD --> MON[Redacted logging / alerts]
+  PROD --> ROLL[Recovery plan and backup restore]
+```
+
+This depicts **environment separation as a requirement**; do not infer an existing fully working production deployment from the diagram. The checked-in deployment documents describe Render pilots, PostgreSQL/Neon, Upstash services, and gated Cloudflare candidates. An infrastructure migration must prove session/cookie continuity, DB compatibility, signed callbacks, storage ownership, secrets, monitoring, data location and rollback.
+
+### CI and release responsibility
+
+- `.github/workflows/verify.yml`, `code-safety.yml`: core checks and code-safety definitions.
+- `native-android-debug.yml` and `native-android-release.yml`: emulator/build and release-candidate paths, **not** automatic Play Store publication.
+- `native-ios-verify.yml`: iOS verification definition, not a guarantee of signed/App Store release.
+- `native-windows-verify.yml` and `windows-release.yml`: Windows verification/packaging path.
+- `.circleci/config.yml`: main verification, security/deployment steps, optional Django staging actions and guardrails.
+- `scripts/render-build.sh`, `render-start.sh` and test/smoke scripts: documented Render-associated build and runtime helpers.
+
+For every release retain: version and commit, exact environment, CI run URLs, test output, reviewed migration plan, backup/restore evidence, privacy assessment, independent security review, owner approval, smoke checks and rollback decision.
+
+### Failure-mode register
+
+| Failure | Expected behaviour | Verification |
+| --- | --- | --- |
+| PostgreSQL unavailable | Readiness 503; private data never served from an unsafe bypass | Disable DB in isolated staging; check error privacy |
+| Redis unavailable | Apply documented safe limiter fallback; no unlimited expensive endpoint bypass | Dependency fault test and alert |
+| AI provider quota/outage | Clear unavailable response, bounded retry/fallback, no invented marks | Simulated 429/5xx/timeout |
+| R2/blob unavailable | Keep records inaccessible if cannot safely read; no public bucket fallback | Storage read/write fault tests |
+| Outbox dispatcher restart | Replay safely without duplicate end-user notices | Crash-before/after-send tests |
+| Paystack callback replay | Do not credit balance twice | Repeat valid signed event |
+| Native session expires | Clear all account-scoped state; reject stale in-flight replies | Two-user device switch tests |
+| School membership revoked | Immediately remove restricted data visibility; revalidate queued notices | Role revocation concurrent read test |
+| Migration partially applied | Stop rollout; recover from validated migration state, not manual destructive drop | Staging interrupted migration drill |
+| Data exposure suspected | Revoke credentials and access, preserve sanitized evidence, invoke incident review | Tabletop incident exercise |
+
+### Monitoring dimensions
+
+Use low-cardinality route categories, HTTP outcomes, database query latency, pool wait, queue age, outbox delivery delay, retry/dead-letter counts, AI tokens/cost/quality, object storage quota, private blob failures, failed authorization trends, and release-level error changes. Never tag metrics with child's name, school-record body, secret or free-text query. Health endpoints `/api/healthz` and `/api/readyz` are currently wired through a router mounted at `/api`; readiness checks DB and optionally Redis. No external uptime alert integration is proven here.
+
+## 23. Privacy, safeguarding and compliance control points
+
+**Data classes:** public platform content; institutional operational data; restricted learner records; highly sensitive child/family/admissions evidence; private study material; authentication and financial metadata; AI prompts/model outputs. Each class needs explicit access, permitted processors, retention, deletion and incident handling.
+
+**South Africa / Botswana:** platform access must respect actual institution authority and legal review, not an assumed unified national permissions model. POPIA, Botswana data protection obligations and institutional contracts require a documented applicability matrix and processor list. Official school integrations and data transfers cannot be activated merely by importing a CSV.
+
+**Safeguarding:** class chat, reports and wellbeing alerts must use adult accountability, evidence minimization, moderation escalation and abuse prevention. A suicide/mental-health risk inference is not a diagnosis. Do not automatically send inferred mental-health content to unrelated recipients or make irreversible automated decisions without vetted policy and clinical/safeguarding governance.
+
+**Future talent/scouting:** school sports performance, leaderboards and external scouts must not expose identified children by default. Consent, privacy thresholds, verified adult institutions, age transitions, anti-profiling and purpose restrictions are release prerequisites.
+
+## 24. Known gaps and production gates, classified
+
+**Present in source:** substantial web and native clients; Express domain routes; Drizzle schema; AI/Q&A and assessment paths; country/guardian policy helpers; RAG evaluation foundation; notification outbox; signing/release workflow definitions.
+
+**Gated or unverified:** production identity migration and privileged MFA enforcement; country pilot and school-data release; child-safe private storage retention and malware processes; transaction notice dispatch; payment provider onboarding; current production deployment; complete load/error budgets; end-to-end release-artifact distribution.
+
+**Explicitly not established:** operational official South African/Botswana education-system integration; government accreditation; cryptographically verified nationwide passport; automatic real-world institution adoption; full cross-tenant penetration assessment; independent legal sign-off; tested national-scale performance.
+
+### Minimum evidence before live institutional use
+
+1. Production IdP, MFA and all role/session termination paths tested.
+2. Two-institution and two-guardian negative authorization suite including revocations.
+3. Legal and child-data approvals, data processing contracts, retention and geographic processor decisions.
+4. Every required migration applied to isolated staging with successful restore drill.
+5. Trusted report issuance, academic corrections and outbox/notification consent tested end to end.
+6. AI safety, document provenance, grading moderation and source-grounding benchmark approved.
+7. Device-level web, Android, iOS and Windows regression for supported release channels.
+8. Dependency failure, alert delivery, incident response and rollback rehearsal.
+9. Signed artefacts and authenticated deployment with verified smoke tests.
+10. Human release sign-off recorded; production data remains untouched otherwise.
+
+### Maintenance and architecture drift
+
+Every module change should update its schema/route map, public contract, actor/tenant authorization, feature flags, external processors, event delivery, observability and rollback section. Avoid duplicating unverified roadmap promises as actual infrastructure. Use the [engineering release audit](engineering/PRODUCTION_COMPLETION_AUDIT.md) and current CI to refresh status after merge.
+
+## 25. Documentation review method and exclusions
+
+**Inspected for this version:** repository file tree, `app.ts` and `routes/index.ts`, database schema index, route examples for organisations, written exams and AI credits, `health.ts`, identity middleware, lexical retrieval, notification outbox, native source paths, CircleCI and GitHub Actions definitions, and existing engineering/legal/design documents. These establish architecture **from source**, not live operational results.
+
+**Not performed:** complete static review of every route and schema field; exhaustive API schema extraction; signed release validation; live database or Cloudflare/Render/Neon inspection; full CI reruns; independent legal or penetration audit; physical device testing. Therefore diagrams and matrices are architectural contracts and evidence-scoped descriptions, never unqualified certification.
+
