@@ -1,0 +1,22 @@
+# CABO Learning Hub — original monorepo, API server + branded React UI.
+# No DB push, demo seeds, or migrations occur in this image build.
+FROM node:24-slim AS build
+WORKDIR /app
+RUN npm install -g pnpm@10.28.2
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY artifacts ./artifacts
+COPY lib ./lib
+COPY scripts ./scripts
+COPY tsconfig.base.json tsconfig.json ./
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @workspace/training-platform build
+RUN pnpm --filter @workspace/api-server build
+
+FROM node:24-slim
+ENV NODE_ENV=production PORT=3000 CABO_ENVIRONMENT=cloudflare ENABLE_CABO_DEMO_SEED=false CABO_GROQ_SMOKE_TEST=false
+WORKDIR /app
+# Preserve the pnpm workspace symlinks/native modules used by the existing API.
+COPY --from=build --chown=node:node /app /app
+USER node
+EXPOSE 3000
+CMD ["node","--enable-source-maps","artifacts/api-server/dist/index.mjs"]
