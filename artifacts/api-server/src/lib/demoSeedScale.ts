@@ -1,313 +1,342 @@
-/**
- * Scaled demo seed — ~452 learners across 4 institutions.
- *
- * Uses a deterministic mulberry32 PRNG seeded with a fixed value so the
- * output is identical on every run (idempotent). Never uses real personal
- * data; all names, emails and credentials are fictional.
- *
- * Institutions:
- *   1. Ubuntu Future Secondary School    (ZA / CAPS Gr 9-12)   226 learners
- *   2. Kgalagadi Community Senior School (BW / BGCSE Form 3-5) 162 learners
- *   3. Highveld Independent College      (ZA / IEB Gr 12)       34 learners
- *   4. Limpopo TVET College              (ZA / NATED N4-N5)     24 learners
- *                                                               ─────────
- *                                                         Total: 446 learners
- *
- * Password for every demo account: 12345  (hashed with bcrypt cost 10)
- */
-
-// ---------------------------------------------------------------------------
-// PRNG — mulberry32 (deterministic, seeded)
-// ---------------------------------------------------------------------------
-
-function mulberry32(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s |= 0;
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const rng = mulberry32(0xcab0_5eed);
-
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(rng() * arr.length)];
-}
-
-function pickN<T>(arr: T[], n: number): T[] {
-  const copy = [...arr];
-  const result: T[] = [];
-  for (let i = 0; i < n && copy.length; i++) {
-    const idx = Math.floor(rng() * copy.length);
-    result.push(copy.splice(idx, 1)[0]);
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Name pools (fictional)
-// ---------------------------------------------------------------------------
-
-const ZA_FIRST = [
-  "Amahle","Bongani","Busisiwe","Dikeledi","Dumisani","Fatima","Gcina",
-  "Hloni","Khanya","Lerato","Lethiwe","Lwazi","Mandisa","Mpho","Nandi",
-  "Nokuthula","Nomsa","Nompumelelo","Nontobeko","Ntombi","Phumzile",
-  "Sibusiso","Siphamandla","Siyabonga","Thandeka","Thabo","Tshepiso",
-  "Unathi","Vusumuzi","Wandile","Yandisa","Zintle","Zwelakhe","Ayanda",
-  "Buhle","Celiwe","Dalisu","Enkosi","Fezile","Gcinile","Hlanganani",
-  "Imogen","Jabulile","Khulekani","Lindani","Mlungisi","Nandipha",
-  "Olwethu","Phindile","Qhawe","Rethabile","Sandile","Thandolwethu",
-  "Ulwazi","Vuyani","Wiseman","Xolani","Yolokazi","Zinokuthula",
-];
-
-const BW_FIRST = [
-  "Agang","Boago","Bogosi","Bontle","Boitumelo","Dimpho","Ditiro",
-  "Gaone","Gorata","Kabelo","Kagiso","Karabo","Katlego","Kefilwe",
-  "Kgomotso","Kitso","Legodimo","Lesego","Letlhogonolo","Lorato",
-  "Masego","Mmoloki","Mmoni","Moitlheki","Molebogeng","Mothusi",
-  "Mpho","Neo","Nkosi","Ntlhang","Oarabile","Olebogeng","Onalerona",
-  "Phenyo","Pontsho","Refilwe","Retsang","Sethunya","Sithole",
-  "Tebogo","Thabo","Thari","Tirafalo","Tsaone","Tumelo","Warona",
-  "Wonga","Xolani","Yrro","Zaone",
-];
-
-const ZA_LAST = [
-  "Dlamini","Khumalo","Mthembu","Nkosi","Sithole","Zulu","Ndlovu",
-  "Mhlongo","Cele","Shabalala","Mthethwa","Khoza","Ntuli","Buthelezi",
-  "Mabaso","Molefe","Nxumalo","Dube","Madlala","Majola","Mkhize",
-  "Myeni","Nene","Ngema","Ngcobo","Nkululeko","Ntombela","Sibiya",
-  "Vilakazi","Xulu","Zwane","Mthetwa","Jiyane","Hlatshwayo","Mthombeni",
-  "Phiri","Banda","Mokoena","Modise","Mahlangu","Nkuna","Mashego",
-  "Mabunda","Maluleke","Chauke","Khoza","Mthiyane","Luthuli","Majozi",
-  "Mncwango","Nxumalo","Shabalala",
-];
-
-const BW_LAST = [
-  "Moatlhodi","Bogwasi","Ramotse","Tshekedi","Molefhe","Dikgale",
-  "Modise","Mmolawa","Kgomotso","Letsebe","Ramotlhwa","Setlhabi",
-  "Pheto","Montsho","Garebangwe","Baitshepi","Kekgonne","Nthite",
-  "Dikgang","Tlhagane","Sebetlela","Ramosweu","Bogosi","Phuthego",
-  "Disang","Molefe","Morake","Nthaga","Sithole","Moffat","Morwesi",
-  "Ramatlhodi","Thobega","Nkwe","Thekiso","Baleseng","Rampedi",
-];
-
-// ---------------------------------------------------------------------------
-// Subject pools by curriculum
-// ---------------------------------------------------------------------------
-
-const SUBJECTS_CAPS_GR9_10 = [
-  "Mathematics","Mathematical Literacy","English Home Language",
-  "Afrikaans First Additional Language","isiZulu First Additional Language",
-  "Life Sciences","Physical Sciences","Geography","History","Accounting",
-  "Economics","Business Studies","Life Orientation","Tourism",
-  "Agricultural Sciences","Consumer Studies","Visual Arts","Music",
-  "Dramatic Arts","Information Technology","Computer Applications Technology",
-];
-
-const SUBJECTS_CAPS_GR11_12 = [
-  "Mathematics","Mathematical Literacy","English Home Language",
-  "Afrikaans First Additional Language","isiZulu First Additional Language",
-  "Life Sciences","Physical Sciences","Chemistry","Geography","History",
-  "Accounting","Economics","Business Studies","Life Orientation",
-  "Tourism","Agricultural Sciences","Information Technology",
-  "Computer Applications Technology","Engineering Graphics and Design",
-  "Electrical Technology","Civil Technology","Mechanical Technology",
-];
-
-const SUBJECTS_BGCSE = [
-  "English Language","Setswana","Mathematics","Science","Agriculture",
-  "Business Studies","Accounting","Economics","History","Geography",
-  "Biology","Chemistry","Physics","Computer Studies","Home Economics",
-  "Design and Technology","Art and Design","French","Physical Education",
-];
-
-const SUBJECTS_IEB = [
-  "Mathematics","English Home Language","Afrikaans Second Language",
-  "Life Sciences","Physical Sciences","Accounting","Business Studies",
-  "Economics","History","Geography","Information Technology",
-  "Life Orientation","Visual Arts","Drama","Music",
-];
-
-const SUBJECTS_NATED = [
-  "Engineering Science N4","Mathematics N4","Engineering Drawing N4",
-  "Industrial Electronics N4","Mechanotechnology N4",
-  "Electrotechnology N4","Motor Trade Theory N4",
-  "Engineering Science N5","Mathematics N5","Engineering Drawing N5",
-  "Industrial Electronics N5","Mechanotechnology N5",
-  "Electrotechnology N5","Motor Trade Theory N5",
-  "Supervisory Management N5","Communication N4","Communication N5",
-];
-
-// ---------------------------------------------------------------------------
-// Explanation styles / interests / goals
-// ---------------------------------------------------------------------------
-
-const EXPLANATION_STYLES = [
-  "step_by_step","examples_first","concise","practice_first","visual",
-] as const;
-
-const INTERESTS_POOL = [
-  "football","music","coding","cooking","fashion","gaming","reading",
-  "science","mathematics","history","art","photography","dance",
-  "entrepreneurship","agriculture","environmental science","travel",
-  "social media","drama","film","robotics","data science","healthcare",
-  "architecture","law","psychology","economics","politics",
-];
-
-const GOALS_POOL = [
-  "pass matric","get a university bursary","become an engineer",
-  "study medicine","start a business","improve mathematics",
-  "learn to code","get distinctions","pass BGCSE with merit",
-  "get into NWU","study at UJ","qualify for a bursary",
-  "complete N6","find a job after TVET","become a nurse",
-  "study at UP","pass with 70%+","get a distinction in Maths",
-];
-
-const LANGUAGES = [
-  "en","zu","xh","st","tn","ss","ve","ts","nr","af",
-  "tn","st","en", // Setswana/Sesotho more common in BW seeds
-];
-
-// ---------------------------------------------------------------------------
-// Institution definitions
-// ---------------------------------------------------------------------------
-
-export interface DemoInstitution {
-  id: number;
-  name: string;
-  country: "ZA" | "BW";
-  curriculum: string;
-  grades: string[];
-  targetCount: number;
-}
-
-export const DEMO_INSTITUTIONS: DemoInstitution[] = [
-  {
-    id: 1,
-    name: "Ubuntu Future Secondary School",
-    country: "ZA",
-    curriculum: "CAPS",
-    grades: ["Grade 9","Grade 10","Grade 11","Grade 12"],
-    targetCount: 226,
-  },
-  {
-    id: 2,
-    name: "Kgalagadi Community Senior School",
-    country: "BW",
-    curriculum: "BGCSE",
-    grades: ["Form 3","Form 4","Form 5"],
-    targetCount: 162,
-  },
-  {
-    id: 3,
-    name: "Highveld Independent College",
-    country: "ZA",
-    curriculum: "IEB",
-    grades: ["Grade 12"],
-    targetCount: 34,
-  },
-  {
-    id: 4,
-    name: "Limpopo Technical & Vocational Education College",
-    country: "ZA",
-    curriculum: "NATED",
-    grades: ["N4","N5"],
-    targetCount: 24,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Learner record type
-// ---------------------------------------------------------------------------
-
-export interface DemoLearner {
-  /** Deterministic slug — usable as a stable local ID. */
-  slug: string;
-  institutionId: number;
-  firstName: string;
-  lastName: string;
-  /** Fictional email — safe to log. */
-  email: string;
-  /** Plain-text demo password — hash with bcrypt(10) on insert. */
-  password: "12345";
-  grade: string;
-  curriculum: string;
-  country: "ZA" | "BW";
-  subjects: string[];
-  explanationStyle: (typeof EXPLANATION_STYLES)[number];
-  interests: string[];
-  goals: string[];
-  languagePreference: string;
-}
-
-// ---------------------------------------------------------------------------
-// Generator
-// ---------------------------------------------------------------------------
-
-function subjectsForInstitution(
-  inst: DemoInstitution,
-  grade: string,
-): string[] {
-  let pool: string[];
-  if (inst.curriculum === "CAPS") {
-    pool =
-      grade === "Grade 9" || grade === "Grade 10"
-        ? SUBJECTS_CAPS_GR9_10
-        : SUBJECTS_CAPS_GR11_12;
-  } else if (inst.curriculum === "BGCSE") {
-    pool = SUBJECTS_BGCSE;
-  } else if (inst.curriculum === "IEB") {
-    pool = SUBJECTS_IEB;
-  } else {
-    pool = SUBJECTS_NATED;
-  }
-  const count = 4 + Math.floor(rng() * 4); // 4–7 subjects
-  return pickN(pool, count);
-}
+import { and, eq, inArray, like, sql } from "drizzle-orm";
+import {
+  db, usersTable, organizationsTable, organizationMembersTable, academicSettingsTable, academicCoursesTable,
+  academicPeriodsTable, courseEnrollmentsTable, academicAssessmentsTable, academicGradesTable,
+  courseStaffAssignmentsTable, managementUnitsTable, managementRoleGrantsTable, schoolAttendanceTable,
+  guardianRelationshipsTable, guardianVerificationEventsTable, verifiedEnrollmentsTable, institutionSetupTable,
+  classChatChannelsTable, classChatMessagesTable, accountabilityCasesTable,
+} from "@workspace/db";
+import { openCase } from "./accountabilityService";
 
 /**
- * Generates the full set of demo learner records.
- * Calling this twice with the same PRNG seed produces identical output.
+ * Demo dataset at school scale: about 450 fictional people across a South
+ * African secondary school, a Botswana senior school, an independent school
+ * and a TVET college, with every subject, three terms of published results,
+ * six weeks of attendance, verified guardians, class chats and accountability
+ * cases. Deterministic (seeded random numbers) and idempotent: rerunning adds
+ * nothing that already exists and never overwrites edited results.
+ *
+ * Same guard as seedCaboDemo: only on an isolated, explicitly enabled testing
+ * database. All names are invented combinations; ids use the cabo-fixture-
+ * prefix and addresses use the reserved example.invalid domain.
  */
-export function generateDemoLearners(): DemoLearner[] {
-  const learners: DemoLearner[] = [];
 
-  for (const inst of DEMO_INSTITUTIONS) {
-    const firstPool = inst.country === "BW" ? BW_FIRST : ZA_FIRST;
-    const lastPool = inst.country === "BW" ? BW_LAST : ZA_LAST;
+const FIRST = ["Amahle", "Bontle", "Kagiso", "Lesedi", "Thandiwe", "Neo", "Ofentse", "Tumelo", "Zinhle", "Lwazi", "Naledi", "Karabo", "Onalenna", "Masego", "Kabelo", "Refilwe", "Sibusiso", "Nandi", "Tshepo", "Ayanda", "Boitumelo", "Katlego", "Mpho", "Lindiwe", "Thato", "Palesa", "Sello", "Keabetswe", "Unathi", "Wandile", "Aaliyah", "Dineo", "Gaone", "Itumeleng", "Junior", "Kgosi", "Lorato", "Mosa", "Nomvula", "Omphile", "Pule", "Rethabile", "Siyabonga", "Tebogo", "Usisipho", "Vuyo", "Xolani", "Yolanda", "Zola", "Priya"];
+const LAST = ["Dlamini", "Mokoena", "Ndlovu", "Sithole", "Khumalo", "Mahlangu", "Nkosi", "Molefe", "Mabaso", "Radebe", "Modise", "Kgosana", "Tau", "Phiri", "Seretse", "Motsamai", "Gaolathe", "Ramotswe", "Mogale", "Ntuli", "Zungu", "Botha", "Naidoo", "Pillay", "Masilo", "Kekana", "Letsholo", "Mmusi", "Segokgo", "Tshabalala"];
 
-    for (let i = 0; i < inst.targetCount; i++) {
-      const firstName = pick(firstPool);
-      const lastName = pick(lastPool);
-      const grade = pick(inst.grades);
-      const slug = `inst${inst.id}-learner-${String(i + 1).padStart(3, "0")}`;
-      const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i + 1}@demo.cabo.education`;
+/** mulberry32: small seeded generator so every run produces the same people and marks. */
+function rng(seed: number) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function normal(r: () => number, mean: number, sd: number) {
+  const u = Math.max(r(), 1e-9), v = r();
+  return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+const uid = (key: string) => `cabo-fixture-${key}`;
 
-      learners.push({
-        slug,
-        institutionId: inst.id,
-        firstName,
-        lastName,
-        email,
-        password: "12345",
-        grade,
-        curriculum: inst.curriculum,
-        country: inst.country,
-        subjects: subjectsForInstitution(inst, grade),
-        explanationStyle: pick([...EXPLANATION_STYLES]),
-        interests: pickN(INTERESTS_POOL, 2 + Math.floor(rng() * 4)),
-        goals: pickN(GOALS_POOL, 1 + Math.floor(rng() * 3)),
-        languagePreference: pick(
-          inst.country === "BW"
-            ? ["en", "tn", "st"]
-            : ["en", "zu", "xh", "st", "af", "tn"],
-        ),
-      });
+async function chunked<T>(rows: T[], size: number, run: (part: T[]) => Promise<unknown>) {
+  for (let i = 0; i < rows.length; i += size) await run(rows.slice(i, i + size));
+}
+
+type Person = { key: string; firstName: string; lastName: string };
+
+function makePeople(prefix: string, count: number, seed: number): Person[] {
+  const r = rng(seed);
+  return Array.from({ length: count }, (_, i) => ({
+    key: `${prefix}-${String(i + 1).padStart(3, "0")}`,
+    firstName: FIRST[Math.floor(r() * FIRST.length)],
+    lastName: LAST[Math.floor(r() * LAST.length)],
+  }));
+}
+
+async function ensureUsers(people: readonly Person[]) {
+  await chunked([...people], 500, part => db.insert(usersTable)
+    .values(part.map(p => ({ id: uid(p.key), email: `${p.key}@example.invalid`, firstName: p.firstName, lastName: p.lastName })))
+    .onConflictDoNothing());
+}
+
+async function ensureOrg(name: string, ownerKey: string): Promise<number> {
+  const title = `[DEMO] ${name}`;
+  const [existing] = await db.select({ id: organizationsTable.id }).from(organizationsTable).where(eq(organizationsTable.name, title)).limit(1);
+  return existing?.id ?? (await db.insert(organizationsTable).values({ name: title, ownerId: uid(ownerKey) }).returning({ id: organizationsTable.id }))[0].id;
+}
+
+async function members(organizationId: number, people: readonly string[], role: string) {
+  await chunked([...people], 500, part => db.insert(organizationMembersTable)
+    .values(part.map(k => ({ organizationId, userId: uid(k), role }))).onConflictDoNothing());
+}
+
+async function ensurePeriods(organizationId: number, names: readonly [string, string][]): Promise<number[]> {
+  const ids: number[] = [];
+  for (const [name, begins] of names) {
+    const [existing] = await db.select({ id: academicPeriodsTable.id }).from(academicPeriodsTable)
+      .where(and(eq(academicPeriodsTable.organizationId, organizationId), eq(academicPeriodsTable.name, name), eq(academicPeriodsTable.year, 2026))).limit(1);
+    if (existing) {
+      await db.update(academicPeriodsTable).set({ beginsAt: new Date(begins) }).where(and(eq(academicPeriodsTable.id, existing.id), sql`${academicPeriodsTable.beginsAt} IS NULL`));
+      ids.push(existing.id);
+    } else {
+      ids.push((await db.insert(academicPeriodsTable).values({ organizationId, name, year: 2026, beginsAt: new Date(begins) }).returning({ id: academicPeriodsTable.id }))[0].id);
     }
   }
+  return ids;
+}
 
-  return learners;
+async function ensureCourse(organizationId: number, code: string, name: string, level: string, teacherKey: string, assignedBy: string): Promise<number> {
+  const [row] = await db.insert(academicCoursesTable).values({ organizationId, code, name, level })
+    .onConflictDoUpdate({ target: [academicCoursesTable.organizationId, academicCoursesTable.code, academicCoursesTable.level], set: { name: sql`${academicCoursesTable.name}` } })
+    .returning({ id: academicCoursesTable.id });
+  await db.insert(courseStaffAssignmentsTable).values({ organizationId, courseId: row.id, staffId: uid(teacherKey), assignedBy: uid(assignedBy) }).onConflictDoNothing();
+  return row.id;
+}
+
+async function ensureAssessment(organizationId: number, courseId: number, periodId: number, title: string, category: string, createdBy: string): Promise<number> {
+  const [existing] = await db.select({ id: academicAssessmentsTable.id }).from(academicAssessmentsTable).where(and(
+    eq(academicAssessmentsTable.organizationId, organizationId), eq(academicAssessmentsTable.courseId, courseId),
+    eq(academicAssessmentsTable.periodId, periodId), eq(academicAssessmentsTable.title, title))).limit(1);
+  return existing?.id ?? (await db.insert(academicAssessmentsTable).values({
+    organizationId, courseId, periodId, title, category, maxMarks: 100, weight: category === "test" ? 60 : 40,
+    instructions: "Synthetic demo assessment, not an official grade", createdBy: uid(createdBy),
+  }).returning({ id: academicAssessmentsTable.id }))[0].id;
+}
+
+type SchoolPlan = {
+  name: string; country: "ZA" | "BW"; framework: string; curriculum: string; institutionType: string;
+  head: Person; staff: Person[]; seed: number;
+  /** level -> learners */
+  cohorts: { level: string; learners: Person[] }[];
+  core: [string, string][]; streams: [string, string][][];
+  periods: [string, string][];
+  guardians: number;
+  existingOrgName?: string; existingLearners?: string[]; existingParent?: [string, string];
+};
+
+const ZA_CORE: [string, string][] = [["ENG", "English Home Language"], ["ZUL", "isiZulu First Additional Language"], ["MAT", "Mathematics"], ["LIF", "Life Orientation"]];
+const ZA_STREAMS: [string, string][][] = [
+  [["PHY", "Physical Sciences"], ["LSC", "Life Sciences"], ["GEO", "Geography"]],
+  [["ACC", "Accounting"], ["BUS", "Business Studies"], ["CAT", "Computer Applications Technology"]],
+  [["HIS", "History"], ["GEO", "Geography"], ["LSC", "Life Sciences"]],
+];
+const BW_CORE: [string, string][] = [["ENG", "English Language"], ["SET", "Setswana"], ["MAT", "Mathematics"], ["SCI", "Combined Science"]];
+const BW_STREAMS: [string, string][][] = [
+  [["PHY", "Physics"], ["CHE", "Chemistry"], ["BIO", "Biology"]],
+  [["ACC", "Accounting"], ["BUS", "Business Studies"], ["COM", "Computer Studies"]],
+  [["HIS", "History"], ["GEO", "Geography"], ["DEV", "Development Studies"]],
+];
+/** TVET N4–N6 engineering / business programmes */
+const TVET_CORE: [string, string][] = [["ENG", "Engineering Communication (N4)"], ["ENG_SC", "Engineering Science (N4)"], ["MAT", "Mathematics (N4)"]];
+const TVET_STREAMS: [string, string][][] = [
+  [["MEC", "Mechanotechnology (N4)"], ["ELC", "Electrotechnology (N4)"], ["ENG_D", "Engineering Drawing (N4)"]],
+  [["ACC", "Financial Accounting (N4)"], ["BUS", "Entrepreneurship & Business Management (N4)"], ["COM", "Computer Practice (N4)"]],
+];
+const TERMS: [string, string][] = [["Term 1 — Demo", "2026-01-14"], ["Term 2 — Demo", "2026-04-08"], ["Term 3 — Demo", "2026-07-21"]];
+
+/** Schooldays (Mon-Fri) in the six weeks to 20 November 2026. */
+function schoolDays(): string[] {
+  const days: string[] = [];
+  for (let d = new Date("2026-10-12T00:00:00Z"); d <= new Date("2026-11-20T00:00:00Z"); d = new Date(d.getTime() + 86_400_000)) {
+    const w = d.getUTCDay();
+    if (w !== 0 && w !== 6) days.push(d.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+async function seedSchool(plan: SchoolPlan) {
+  const r = rng(plan.seed);
+  await ensureUsers([plan.head, ...plan.staff, ...plan.cohorts.flatMap(c => c.learners)]);
+  const organizationId = plan.existingOrgName ? await ensureOrg(plan.existingOrgName, plan.head.key) : await ensureOrg(plan.name, plan.head.key);
+  await members(organizationId, [plan.head.key], "owner");
+  await members(organizationId, plan.staff.map(s => s.key), "teacher");
+  await members(organizationId, plan.cohorts.flatMap(c => c.learners.map(l => l.key)), "learner");
+  await db.insert(academicSettingsTable).values({ organizationId, institutionType: "school", framework: plan.framework, academicYear: 2026 }).onConflictDoNothing();
+  await db.insert(institutionSetupTable).values({
+    organizationId, institutionType: plan.institutionType, countryCode: plan.country, province: plan.country === "ZA" ? "Gauteng" : "Kgalagadi",
+    district: plan.country === "ZA" ? "Johannesburg North (demo)" : "Tsabong (demo)", curriculum: plan.curriculum, academicYear: 2026,
+    status: "draft", updatedBy: uid(plan.head.key),
+  }).onConflictDoNothing();
+
+  // Management: school unit, deputy, one grade head per cohort.
+  const unitId = async (name: string, type: string, parentId: number | null) => {
+    const [existing] = await db.select({ id: managementUnitsTable.id }).from(managementUnitsTable)
+      .where(and(eq(managementUnitsTable.organizationId, organizationId), eq(managementUnitsTable.name, name))).limit(1);
+    return existing?.id ?? (await db.insert(managementUnitsTable).values({ organizationId, name, type, parentId, createdBy: uid(plan.head.key) }).returning({ id: managementUnitsTable.id }))[0].id;
+  };
+  const school = await unitId(`${plan.name} (school)`, "school", null);
+  const grants: { unitId: number; userId: string; role: string }[] = [
+    { unitId: school, userId: uid(plan.head.key), role: "headmaster" },
+    { unitId: school, userId: uid(plan.staff[0].key), role: "deputy_headmaster" },
+  ];
+  for (const [i, cohort] of plan.cohorts.entries()) {
+    const grade = await unitId(`${cohort.level} (grade)`, "grade", school);
+    grants.push({ unitId: grade, userId: uid(plan.staff[(i + 1) % plan.staff.length].key), role: "grade_head" });
+  }
+  await db.insert(managementRoleGrantsTable).values(grants.map(g => ({ ...g, organizationId, grantedBy: uid(plan.head.key) }))).onConflictDoNothing();
+
+  const periodIds = await ensurePeriods(organizationId, plan.periods);
+  let teacherIndex = 0;
+  const nextTeacher = () => plan.staff[(teacherIndex++) % plan.staff.length].key;
+  const days = schoolDays();
+  const enrolments: { courseId: number; userId: string }[] = [];
+  const verified: { organizationId: number; learnerId: string; stage: string; academicYear: number; status: string; recordedBy: string }[] = [];
+  const attendance: { organizationId: number; learnerId: string; day: string; status: string; note: string; recordedBy: string }[] = [];
+  const gradeRows: { assessmentId: number; learnerId: string; marks: number; status: string; reviewedBy: string; feedback: string }[] = [];
+  const courseIds: number[] = [];
+
+  for (const cohort of plan.cohorts) {
+    const suffix = cohort.level.replace(/\D+/g, "") || cohort.level.slice(0, 2).toUpperCase();
+    const subjects = new Map<string, { id: number; name: string; teacher: string; assessments: number[][] }>();
+    const subjectFor = async (code: string, name: string) => {
+      if (subjects.has(code)) return subjects.get(code)!;
+      const teacher = nextTeacher();
+      const id = await ensureCourse(organizationId, `${code}${suffix}`, name, cohort.level, teacher, plan.head.key);
+      courseIds.push(id);
+      const assessments: number[][] = [];
+      for (const [t, periodId] of periodIds.entries()) assessments.push([
+        await ensureAssessment(organizationId, id, periodId, `${name} test (term ${t + 1})`, "test", teacher),
+        await ensureAssessment(organizationId, id, periodId, `${name} assignment (term ${t + 1})`, "assignment", teacher),
+      ]);
+      const entry = { id, name, teacher, assessments };
+      subjects.set(code, entry);
+      return entry;
+    };
+    for (const [i, learner] of cohort.learners.entries()) {
+      const ability = clamp(normal(r, 62, 12), 28, 96);
+      const momentum = normal(r, 0, 3);
+      const stream = plan.streams[i % plan.streams.length];
+      verified.push({ organizationId, learnerId: uid(learner.key), stage: cohort.level, academicYear: 2026, status: "active", recordedBy: uid(plan.head.key) });
+      for (const [code, name] of [...plan.core, ...stream]) {
+        const s = await subjectFor(code, name);
+        enrolments.push({ courseId: s.id, userId: uid(learner.key) });
+        const subjectOffset = normal(r, 0, 8);
+        for (const [t, pair] of s.assessments.entries()) for (const assessmentId of pair) {
+          const marks = Math.round(clamp(ability + subjectOffset + momentum * t + normal(r, 0, 6), 8, 100));
+          gradeRows.push({ assessmentId, learnerId: uid(learner.key), marks, status: "published", reviewedBy: uid(s.teacher), feedback: "Synthetic demo result — not an official grade" });
+        }
+      }
+      const absentRate = clamp(normal(r, 0.05, 0.05), 0, 0.3);
+      for (const day of days) {
+        const x = r();
+        attendance.push({ organizationId, learnerId: uid(learner.key), day, status: x < absentRate ? "absent" : x < absentRate + 0.04 ? "late" : "present", note: "", recordedBy: uid(plan.head.key) });
+      }
+    }
+  }
+  await chunked(enrolments, 1000, part => db.insert(courseEnrollmentsTable).values(part).onConflictDoNothing());
+  await chunked(verified, 500, part => db.insert(verifiedEnrollmentsTable).values(part).onConflictDoNothing());
+  // Never overwrite a result someone has edited since seeding.
+  await chunked(gradeRows, 1000, part => db.insert(academicGradesTable).values(part).onConflictDoNothing());
+  await chunked(attendance, 1000, part => db.insert(schoolAttendanceTable).values(part).onConflictDoNothing());
+
+  // Guardians: one per learner for the first N learners, verified by the school.
+  const learners = plan.cohorts.flatMap(c => c.learners);
+  const guardians = makePeople(`gen-${plan.country.toLowerCase()}${plan.seed}-guardian`, plan.guardians, plan.seed + 7)
+    .map((g, i) => ({ ...g, lastName: learners[i].lastName }));
+  const pairs: [string, string][] = guardians.map((g, i) => [learners[i].key, g.key]);
+  if (plan.existingParent) pairs.push(plan.existingParent);
+  await ensureUsers(guardians);
+  await db.insert(guardianRelationshipsTable).values(pairs.map(([learner, guardian]) => ({ learnerId: uid(learner), guardianId: uid(guardian), status: "verified", respondedAt: new Date("2026-02-01") })))
+    .onConflictDoUpdate({ target: [guardianRelationshipsTable.learnerId, guardianRelationshipsTable.guardianId], set: { status: "verified" } });
+  const relationships = await db.select({ id: guardianRelationshipsTable.id }).from(guardianRelationshipsTable)
+    .where(inArray(guardianRelationshipsTable.guardianId, pairs.map(([, g]) => uid(g))));
+  const reviewed = new Set((await db.select({ id: guardianVerificationEventsTable.relationshipId }).from(guardianVerificationEventsTable)
+    .where(and(eq(guardianVerificationEventsTable.organizationId, organizationId), inArray(guardianVerificationEventsTable.relationshipId, relationships.map(x => x.id))))).map(x => x.id));
+  const pending = relationships.filter(x => !reviewed.has(x.id));
+  if (pending.length) await db.insert(guardianVerificationEventsTable).values(pending.map(x => ({ relationshipId: x.id, organizationId, reviewedBy: uid(plan.head.key), decision: "verified" })));
+
+  // Class chat in the first cohort's subjects, with ordinary messages.
+  const firstLevel = plan.cohorts[0];
+  const chatCourses = await db.select({ id: academicCoursesTable.id, name: academicCoursesTable.name }).from(academicCoursesTable)
+    .where(and(eq(academicCoursesTable.organizationId, organizationId), eq(academicCoursesTable.level, firstLevel.level))).limit(3);
+  for (const c of chatCourses) {
+    const [channel] = await db.insert(classChatChannelsTable).values({ organizationId, courseId: c.id, status: "open", createdBy: uid(plan.head.key) })
+      .onConflictDoUpdate({ target: classChatChannelsTable.courseId, set: { status: sql`${classChatChannelsTable.status}` } }).returning();
+    const [has] = await db.select({ n: sql<number>`count(*)::int` }).from(classChatMessagesTable).where(eq(classChatMessagesTable.channelId, channel.id));
+    if (Number(has?.n ?? 0) > 0) continue;
+    const [a, b, d] = firstLevel.learners;
+    await db.insert(classChatMessagesTable).values([
+      { channelId: channel.id, organizationId, authorId: uid(plan.staff[0].key), body: `Welcome to the ${c.name} chat. Ask questions about the work here; be kind and stay on topic.`, status: "visible" },
+      { channelId: channel.id, organizationId, authorId: uid(a.key), body: "Which pages do we need for Friday's test?", status: "visible" },
+      { channelId: channel.id, organizationId, authorId: uid(b.key), body: "I think chapters 4 and 5, the teacher said in class.", status: "visible" },
+      { channelId: channel.id, organizationId, authorId: uid(d.key), body: "Can someone explain question 3 from the homework?", status: "visible" },
+    ]);
+  }
+
+  // A few accountability cases so dashboards have something to show.
+  const [anyCase] = await db.select({ id: accountabilityCasesTable.id }).from(accountabilityCasesTable)
+    .where(and(eq(accountabilityCasesTable.organizationId, organizationId), like(accountabilityCasesTable.summary, "[DEMO]%"))).limit(1);
+  if (!anyCase) {
+    const L = learners;
+    await openCase({ organizationId, kind: "safeguarding", severity: "high", reporterId: uid(L[3].key), subjectUserId: uid(L[4].key), summary: "[DEMO] A learner reports that an older learner is demanding their lunch money." });
+    await openCase({ organizationId, kind: "service", severity: "medium", reporterId: uid(plan.staff[2].key), summary: "[DEMO] Projector in the science lab has not worked for two weeks." });
+    const late = await openCase({ organizationId, kind: "conduct", severity: "medium", reporterId: uid(guardians[0].key), subjectUserId: uid(plan.staff[3].key), summary: "[DEMO] A parent says homework feedback was not returned for a month." });
+    // Make one case overdue so the next sweep escalates it on screen.
+    await db.update(accountabilityCasesTable).set({ acknowledgeDueAt: new Date(Date.now() - 3_600_000) }).where(eq(accountabilityCasesTable.id, late.id));
+    await openCase({ organizationId, kind: "data_incident", severity: "high", reporterId: uid(plan.staff[1].key), summary: "[DEMO] A class list with learner names was emailed to the wrong parent group.", awareAt: new Date(Date.now() - 20 * 3_600_000) });
+  }
+  return { organizationId, learners: learners.length, staff: plan.staff.length + 1, guardians: guardians.length, courses: courseIds.length, grades: gradeRows.length, attendance: attendance.length };
+}
+
+export async function seedCaboDemoAtScale(): Promise<void> {
+  if ((process.env.CABO_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME) !== "testing" ||
+      process.env.CABO_TEST_DATABASE_ISOLATED !== "true" ||
+      process.env.ENABLE_CABO_DEMO_SEED !== "true") {
+    throw new Error("CABO demo fixtures require an isolated and explicitly enabled test database.");
+  }
+  const named = (key: string, firstName: string, lastName: string): Person => ({ key, firstName, lastName });
+  // Ubuntu Future: 226 learners across Gr 9–12 (64 + 61 + 61 + 40)
+  const za = makePeople("gen-za-learner", 226, 11);
+  const zaStaff = [named("teacher-gradehead", "Refilwe", "Ntuli"), ...makePeople("gen-za-teacher", 15, 12)];
+  // Kgalagadi: 162 learners across Form 3–5 (54 + 54 + 54)
+  const bw = makePeople("gen-bw-learner", 162, 21);
+  const bwStaff = [named("teacher-bw", "Onalenna", "Seretse"), ...makePeople("gen-bw-teacher", 11, 22)];
+  // Highveld: 35 learners (unchanged)
+  const hv = makePeople("gen-hv-learner", 34, 31);
+  const hvStaff = makePeople("gen-hv-teacher", 5, 32);
+  // Limpopo TVET: 25 students
+  const tvet = makePeople("gen-tvet-student", 24, 41);
+  const tvetStaff = [named("lecturer-tvet", "Busisiwe", "Zulu"), ...makePeople("gen-tvet-lecturer", 5, 42)];
+  // The named demo learners join the large classes so their dashboards are full.
+  const zaGrade12 = [named("learner-south-a", "Lerato", "Mahlobo"), named("learner-south-b", "Sipho", "Khumalo"), named("learner-south-c", "Anele", "Radebe"), ...za.slice(0, 61)];
+  await ensureUsers([named("parent-bw", "Lorato", "Ramotswe")]);
+  const results = [];
+  results.push(await seedSchool({
+    name: "Ubuntu Future Secondary School", existingOrgName: "Ubuntu Future Secondary School", country: "ZA", framework: "NSC", curriculum: "CAPS (NSC)", institutionType: "highschool",
+    head: named("headmaster-south", "Nomsa", "Dube"), staff: [named("teacher-south", "Thabo", "Maseko"), named("assessor-south", "Palesa", "Mokoena"), ...zaStaff], seed: 101,
+    cohorts: [
+      { level: "Grade 12", learners: zaGrade12 },
+      { level: "Grade 11", learners: za.slice(61, 122) },
+      { level: "Grade 10", learners: za.slice(122, 183) },
+      { level: "Grade 9", learners: za.slice(183) },
+    ],
+    core: ZA_CORE, streams: ZA_STREAMS, periods: TERMS, guardians: 55, existingParent: ["learner-south-a", "parent-south"],
+  }));
+  results.push(await seedSchool({
+    name: "Kgalagadi Community Senior School", country: "BW", framework: "BGCSE", curriculum: "BGCSE", institutionType: "highschool",
+    head: named("headmaster-bw", "Kgosi", "Gaolathe"), staff: bwStaff, seed: 202,
+    cohorts: [
+      { level: "Form 5", learners: [named("learner-bw", "Masego", "Ramotswe"), ...bw.slice(0, 54)] },
+      { level: "Form 4", learners: bw.slice(54, 108) },
+      { level: "Form 3", learners: bw.slice(108) },
+    ],
+    core: BW_CORE, streams: BW_STREAMS, periods: TERMS, guardians: 35, existingParent: ["learner-bw", "parent-bw"],
+  }));
+  results.push(await seedSchool({
+    name: "Highveld Independent Academy", existingOrgName: "Highveld Independent Academy", country: "ZA", framework: "IEB", curriculum: "IEB", institutionType: "independent",
+    head: named("headmaster-north", "Musa", "Mabena"), staff: hvStaff, seed: 303,
+    cohorts: [{ level: "Grade 12", learners: [named("learner-north", "Sihle", "Naidoo"), ...hv] }],
+    core: [["ENG", "English Home Language"], ["AFR", "Afrikaans First Additional Language"], ["MAT", "Mathematics"], ["LIF", "Life Orientation"]],
+    streams: [[["PHY", "Physical Sciences"], ["LSC", "Life Sciences"], ["IT", "Information Technology"]], [["ACC", "Accounting"], ["ECO", "Economics"], ["DRA", "Dramatic Arts"]]],
+    periods: TERMS, guardians: 5,
+  }));
+  results.push(await seedSchool({
+    name: "Limpopo Technical & Vocational Education College", country: "ZA", framework: "NATED", curriculum: "TVET NATED (N4)", institutionType: "tvet",
+    head: named("principal-tvet", "Dimpho", "Sello"), staff: [named("lecturer-tvet", "Busisiwe", "Zulu"), ...tvetStaff], seed: 404,
+    cohorts: [
+      { level: "N4", learners: [named("learner-tvet", "Karabo", "Modise"), ...tvet.slice(0, 12)] },
+      { level: "N5", learners: tvet.slice(12) },
+    ],
+    core: TVET_CORE, streams: TVET_STREAMS, periods: TERMS, guardians: 8,
+  }));
+  const total = results.reduce((n, x) => n + x.learners + x.staff + x.guardians, 0);
+  console.info(`CABO demo at scale ready: ${results.length} institutions, ${total} people, ${results.reduce((n, x) => n + x.courses, 0)} subject classes, ${results.reduce((n, x) => n + x.grades, 0)} results, ${results.reduce((n, x) => n + x.attendance, 0)} attendance rows`);
 }
