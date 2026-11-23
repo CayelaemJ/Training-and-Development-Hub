@@ -58,7 +58,7 @@ async function claimOne():Promise<Claim|null> {
       status:"leased",leaseToken:token,leaseUntil:until,
       updatedAt:new Date(),attempts:sql`attempts + 1`,
     }).where(eq(notificationOutboxTable.id,candidate.id));
-    if(!["guardian_review_requested","learner_support_updated","account_security"].includes(candidate.kind)) {
+    if(!["guardian_review_requested","learner_support_updated","results_published","account_security"].includes(candidate.kind)) {
       throw new Error("Unexpected outbox event kind");
     }
     return {...candidate,kind:candidate.kind as NoticeInput["kind"],leaseToken:token};

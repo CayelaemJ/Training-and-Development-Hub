@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 // a sidebar + content pane on iPad and a single touch-first view on iPhone.
 struct NativeHomeView: View {
     @StateObject private var session = NativeSession()
+    @ObservedObject private var shortcuts = NativeShortcutRouter.shared
     @State private var testUsername = "cabo_test"
     @State private var testPassword = ""
     @State private var selectedQuiz: NativeQuizSummary?
@@ -65,6 +66,17 @@ struct NativeHomeView: View {
         .navigationViewStyle(StackNavigationViewStyle())
         .tint(clay)
         .task { await session.restore() }
+        .onReceive(shortcuts.$pending) { destination in
+            // Siri / Shortcuts: open the requested section once signed in.
+            guard let destination, session.role != nil else { return }
+            switch destination {
+            case "support": showSupportRequests = true
+            case "journey": showLearnerJourney = true
+            case "passport": showLearnerPassport = true
+            default: break
+            }
+            shortcuts.pending = nil
+        }
         .onChange(of: session.role) { current in
             if current != "learner" {
                 showAdmissions = false

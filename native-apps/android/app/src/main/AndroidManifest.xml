@@ -14,6 +14,13 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="cabo-learninghub-android" android:host="auth"/>
       </intent-filter>
+      <!-- Voice assistant and launcher shortcuts: open one named section only. -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:scheme="cabo-learninghub-android" android:host="open"/>
+      </intent-filter>
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
     </activity>
   </application>
 </manifest>

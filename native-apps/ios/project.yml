@@ -31,6 +31,7 @@ targets:
       - path: NativeAdmissionsView.swift
       - path: NativeGuardianReport.swift
       - path: NativeChildProgress.swift
+      - path: NativeAppIntents.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: za.co.cabosolutions.learninghub
