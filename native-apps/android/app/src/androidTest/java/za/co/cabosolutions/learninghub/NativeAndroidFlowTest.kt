@@ -1230,3 +1230,119 @@ class NativeAndroidChildProgressTest {
         assertEquals(true, demo.method.startsWith("Demo records only"))
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidStudyTutorTest {
+    @get:Rule
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun tutorShowsGroundedAnswerWithCitationAndReviewLabel() {
+        var askedMaterial = 0
+        compose.setContent {
+            MaterialTheme {
+                NativeTutorScreen(
+                    materials = listOf(MaterialSummary(9, "Fractions notes")),
+                    ask = { materialId, question ->
+                        askedMaterial = materialId
+                        assertEquals("What is a fraction?", question)
+                        TutorAnswer(9, "Fractions notes", "A fraction names equal parts of a whole.",
+                            listOf(TutorCitation("A fraction names equal parts of one whole.")), true)
+                    },
+                    askTeacher = {},
+                    close = {}
+                )
+            }
+        }
+        compose.onNodeWithTag("tutor-question").performTextInput("What is a fraction?")
+        compose.onNodeWithTag("tutor-send").performClick()
+        compose.waitUntil(timeoutMillis = 5000) { compose.onAllNodesWithText("A fraction names equal parts of a whole.").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(9, askedMaterial)
+        compose.onNodeWithText("A fraction names equal parts of one whole.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("check with your teacher", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun tutorShowsFriendlyErrorWhenAiIsUnavailable() {
+        compose.setContent {
+            MaterialTheme {
+                NativeTutorScreen(
+                    materials = listOf(MaterialSummary(9, "Fractions notes")),
+                    ask = { _, _ -> throw IllegalStateException("CABO API HTTP 503") },
+                    askTeacher = {}, close = {}
+                )
+            }
+        }
+        compose.onNodeWithTag("tutor-question").performTextInput("Explain this section")
+        compose.onNodeWithTag("tutor-send").performClick()
+        compose.waitUntil(timeoutMillis = 5000) { compose.onAllNodesWithText("isn't switched on", substring = true).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test
+    fun safeguardingQuestionIsNotSentAndOffersATeacher() {
+        var sent = false
+        var teacher = false
+        compose.setContent {
+            MaterialTheme {
+                NativeTutorScreen(
+                    materials = listOf(MaterialSummary(9, "Fractions notes")),
+                    ask = { _, _ -> sent = true; error("must not be called") },
+                    askTeacher = { teacher = true }, close = {}
+                )
+            }
+        }
+        compose.onNodeWithTag("tutor-question").performTextInput("someone is hurting me at home")
+        compose.onNodeWithTag("tutor-send").performClick()
+        compose.onNodeWithTag("tutor-trusted-adult").assertIsDisplayed()
+        compose.onNodeWithText("Ask a teacher for help").performClick()
+        assertEquals(false, sent)
+        assertEquals(true, teacher)
+    }
+
+    @Test
+    fun tutorWithoutMaterialsExplainsWhatToDo() {
+        compose.setContent {
+            MaterialTheme { NativeTutorScreen(materials = emptyList(), ask = { _, _ -> error("no") }, askTeacher = {}, close = {}) }
+        }
+        compose.onNodeWithTag("tutor-no-materials").assertIsDisplayed()
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class NativeAndroidDevelopmentPlanTest {
+    @get:Rule
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun sportsPlanIsDraftedAndLabelledForReview() {
+        var sent: DevelopmentPlanRequest? = null
+        compose.setContent {
+            MaterialTheme {
+                NativeDevelopmentPlanScreen(draft = { request ->
+                    sent = request
+                    DevelopmentPlan("Netball passing plan", "A draft to improve passing accuracy.",
+                        listOf(DevelopmentRecommendation("sport", "Improve chest-pass accuracy",
+                            listOf("Warm up gently.", "Pass against a wall."), "Count clean passes", 3)),
+                        "A coach should review this plan before use.", fromTemplate = false, warning = null)
+                }, close = {})
+            }
+        }
+        compose.onNodeWithTag("plan-activity").performTextInput("Netball")
+        compose.onNodeWithTag("plan-goal").performTextInput("Improve my passing")
+        compose.onNodeWithTag("plan-generate").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 5000) { compose.onAllNodesWithText("Netball passing plan").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals("sport", sent?.observations?.single()?.area)
+        compose.onNodeWithText("AI draft · needs review").assertIsDisplayed()
+    }
+
+    @Test
+    fun invalidPlanInputIsNotSent() {
+        var called = false
+        compose.setContent {
+            MaterialTheme { NativeDevelopmentPlanScreen(draft = { called = true; error("must not be called") }, close = {}) }
+        }
+        compose.onNodeWithTag("plan-generate").performScrollTo().performClick()
+        compose.onNodeWithTag("plan-message").assertIsDisplayed()
+        assertEquals(false, called)
+    }
+}
