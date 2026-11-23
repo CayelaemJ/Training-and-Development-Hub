@@ -6,7 +6,7 @@ const read = p => readFileSync(p, "utf8");
 const android = read("native-apps/android/app/src/main/java/za/co/cabosolutions/learninghub/NativeChildProgress.kt")
   + read("native-apps/android/app/src/main/java/za/co/cabosolutions/learninghub/NativeApi.kt");
 const ios = read("native-apps/ios/NativeChildProgress.swift") + read("native-apps/ios/NativeSession.swift");
-const windows = read("native-apps/windows/CABO.Native/NativeChildProgress.cs") + read("native-apps/windows/CABO.Native/NativeLearningService.cs");
+const windows = read("native-apps/windows/CABO.Native.Core/NativeChildProgress.cs") + read("native-apps/windows/CABO.Native.Core/NativeLearningService.cs");
 const policy = read("artifacts/api-server/src/lib/guardianProgressPolicy.ts");
 const route = read("artifacts/api-server/src/routes/guardianProgress.ts");
 

@@ -1,29 +1,42 @@
-# Windows internal test build
+# Windows builds
 
-The GitHub Actions workflow `.github/workflows/native-windows-verify.yml` compiles the WinUI 3 client when Windows source or the workflow changes.
+The WinUI 3 client lives in `native-apps/windows`:
 
-## Download
+| Project | Purpose |
+|---|---|
+| `CABO.Native` | WinUI 3 desktop app (unpackaged, self-contained Windows App SDK) |
+| `CABO.Native.Core` | UI-free API client, PKCE sign-in, DPAPI session store and role policy |
+| `CABO.Native.Tests` | xUnit tests: auth/PKCE loopback, token lifecycle, API contracts, permissions, upload safety, parsing limits |
+| `installer/CABOLearningHub.iss` | Inno Setup per-user installer (no admin rights) |
 
-1. Open the pull request's **Checks** tab and select **CABO native Windows build verification**.
-2. Confirm the run is green and its commit matches the source you are testing.
-3. Download artifact `CABO-Windows-DEBUG-no-test-login` and extract the debug build directory.
+## CI
 
-The workflow retains this artifact for two days. Rerun the workflow from GitHub Actions when a fresh build is needed.
+`.github/workflows/native-windows-verify.yml` runs on Windows pull requests and `main`:
+
+1. Unit tests (`dotnet test`), results uploaded as `CABO-Windows-test-results`.
+2. NuGet vulnerability scan — fails on any known vulnerable package or if the scan cannot run.
+3. Debug builds of the isolated test-login variant (never archived) and the standard client.
+4. Release publish (`scripts/build-windows-release.ps1`), check that the isolated test switch is absent from shipped binaries, optional Authenticode signing, installer + portable zip + SHA-256 sums.
+5. Installer smoke test (`scripts/windows-installer-smoke.ps1`): silent install, version and uninstall-registration checks, 15-second launch without a crash log, reinstall over the top, silent uninstall that removes files, registration and local session data.
+
+Artifacts: `CABO-Windows-installer-<version>` (14 days), `CABO-Windows-DEBUG-no-test-login` (2 days).
+
+## Releases
+
+`.github/workflows/windows-release.yml` (manual dispatch with a version, or a `windows-vX.Y.Z` tag) reuses the pipeline above and, only when asked or on a tag, creates a **draft, pre-release** GitHub release. A maintainer must publish it manually.
+
+Signing is used only when both repository secrets `CABO_WINDOWS_CERT_BASE64` (base64 `.pfx`) and `CABO_WINDOWS_CERT_PASSWORD` are configured; the app and installer are then signed with SHA-256 and an RFC 3161 timestamp. Otherwise every build is marked **UNSIGNED** in `SIGNING_STATUS.txt` and must not be distributed to schools.
+
+This is the only Windows installer. It replaces the interim `native-windows-release.yml` / `installer/CABO.Native.iss` pipeline from #198, which used a different AppId; neither was distributed.
+
+## Local build (Windows)
+
+```powershell
+dotnet test native-apps/windows/CABO.Native.Tests
+./scripts/build-windows-release.ps1 -Version 1.1.0      # needs VS Build Tools + Inno Setup 6.3+
+./scripts/windows-installer-smoke.ps1 -Installer native-apps/windows/artifacts/release/CABO-LearningHub-Setup-1.1.0-x64.exe -Version 1.1.0
+```
 
 ## Test limits
 
-This is an unsigned debug build directory, not an MSIX installer or production-signed executable. CI compilation does not verify Windows installation, upgrades, uninstall, OIDC sign-in, role authorization or behavior on a school device. Do not distribute it as a production school app.
-
-Use authorised test accounts and synthetic learner records. Record Windows version, test result and reproduction steps without capturing real learner data. CABO signing, packaging and installation testing remain required release work.
-
-## Windows installer (`.exe`)
-
-Workflow **CABO native Windows installer** (`.github/workflows/native-windows-release.yml`) builds the **Release x64** client with the isolated test sign-in compiled out, and verifies that in the built assembly before packaging. It then produces an Inno Setup installer from `native-apps/windows/installer/CABO.Native.iss`.
-
-- **Install type:** per-user into `%LOCALAPPDATA%\Programs\CABO Learning Hub`; no administrator rights; Windows 10 1809 or later, x64. It registers a standard uninstaller with a fixed AppId, so upgrades replace the previous version.
-- **Uninstall:** removes program files and the local sign-in token (`%LOCALAPPDATA%\CABO\LearningHub\native-session.bin`), so a shared computer is not left signed in.
-- **CI test on a hosted Windows runner:** silent install, a check that the executable and uninstall registration are present, an informational 15-second startup check, silent uninstall, and a check that the files, registration and token are gone.
-- **Signing:** set both repository secrets `CABO_WINDOWS_CERT_BASE64` (base64 `.pfx`) and `CABO_WINDOWS_CERT_PASSWORD` to sign the app and installer with SHA-256 and an RFC 3161 timestamp. Without them the file is named `…-UNSIGNED-do-not-distribute.exe`, and Windows SmartScreen will warn on it.
-- **When it runs:** automatically on pull requests that change Windows files (version `0.0.0-pr<number>`, artifact kept 2 days), or manually with a version for a release candidate (artifact kept 7 days).
-
-A hosted-runner install is not a school-device test. Sign-in, role access, offline behaviour and accessibility still need testing on real Windows 10/11 devices before distribution.
+CI does not verify live browser sign-in against the pilot, role behaviour with real accounts, screen-reader use, or school-device behaviour. Use authorised test accounts and synthetic learner records only; record Windows version, result and reproduction steps without capturing real learner data. A hosted-runner install is not a school-device test: sign-in, role access, offline behaviour and accessibility still need testing on real Windows 10/11 devices before distribution.

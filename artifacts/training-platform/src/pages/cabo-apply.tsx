@@ -1,4 +1,5 @@
 import {useEffect,useState} from "react";
+import { Link } from "wouter";
 type Institution={id:number;name:string;province:string;officialUrl:string;route:string;verification:string};
 type Programme={id:number;name:string;faculty:string;qualification:string;requirements:string};
 type Application={id:number;programmeId:number;status:string;externalReference:string|null};
@@ -12,7 +13,7 @@ export default function CaboApplyPage(){
  async function run(fn:()=>Promise<unknown>,success:string){setBusy(true);setError("");setNotice("");try{await fn();await reload();setNotice(success)}catch(e){setError(e instanceof Error?e.message:"Request failed")}finally{setBusy(false)}}
  const selected=institutions.find(x=>String(x.id)===institution);
  return <section className="mx-auto max-w-6xl space-y-6 pb-16">
-  <header className="space-y-2 border-b pb-5"><p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CABO · Education to Opportunity</p><h1 className="font-display text-3xl sm:text-4xl">CABO Apply</h1><p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Explore university programmes, prepare one reusable application and keep track of official submissions. Partner university integrations are being developed: creating a CABO draft does not submit it to a university.</p></header>
+  <header className="space-y-2 border-b pb-5"><Link href="/admissions" className="inline-block text-sm underline underline-offset-4">Back to Admissions &amp; Transfers</Link><p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CABO · Education to Opportunity</p><h1 className="font-display text-3xl sm:text-4xl">CABO Apply</h1><p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">Explore university programmes, prepare one reusable application and keep track of official submissions. Partner university integrations are being developed: creating a CABO draft does not submit it to a university.</p></header>
   {error&&<p className="rounded-md border border-destructive p-3" role="alert">{error}</p>}{notice&&<p className="rounded-md border p-3" role="status">{notice}</p>}
   <div className="grid gap-5 lg:grid-cols-2">
    <section className="rounded-xl border p-5 space-y-4"><h2 className="font-display text-xl">Find a university</h2><label className="block text-sm">Institution<select className={field+" mt-1"} value={institution} onChange={e=>setInstitution(e.target.value)}><option value="">Choose a university</option>{institutions.map(u=><option key={u.id} value={u.id}>{u.name} · {u.province}</option>)}</select></label>
