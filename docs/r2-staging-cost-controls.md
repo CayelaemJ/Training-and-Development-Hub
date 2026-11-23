@@ -29,7 +29,7 @@ Reference: `docs/r2-ai-knowledge-foundation.md` and issue #164.
 
 ## Implemented in draft PR #165 (9 November)
 - `artifacts/api-server/src/lib/r2Staging.ts`: disabled-by-default private R2 API adapter, 8 MiB cap, bounded GET stream, opaque keys and strict staging bucket identity.
-- `lib/db/migrations/20261109_r2_staging_budget.sql`: **not applied**. New accounting and institution-bound object tables.
+- `lib/db/migrations/20261109_object_staging_budget.sql`: applied in `ORDER` on isolated databases (the runner accepts only lowercase letters and underscores after the date, hence not `r2`). New accounting and institution-bound object tables.
 - `artifacts/api-server/src/lib/r2BudgetLedger.ts`: PostgreSQL-transaction-backed quota reservations, quarantined-byte confirmation, approved-object read budget, tombstone and verified-delete acknowledgement. This module is NOT connected to the HTTP layer; tenant membership still needs to be resolved and verified there.
 - `artifacts/api-server/src/tests/r2Staging.test.mjs` and `r2BudgetMigration.test.mjs`: negative contract and isolated PGlite schema tests. Do not claim passing before CI confirms them.
 - R2 synthetic remote upload/download/delete was successful and the temporary object was removed.

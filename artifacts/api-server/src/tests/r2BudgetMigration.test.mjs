@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 const require = createRequire(new URL("../../package.json", import.meta.url));
 const { PGlite } = require("@electric-sql/pglite");
 const migration = await readFile(
-  new URL("../../../../lib/db/migrations/20261109_r2_staging_budget.sql", import.meta.url), "utf8",
+  new URL("../../../../lib/db/migrations/20261109_object_staging_budget.sql", import.meta.url), "utf8",
 );
 
 test("R2 staging schema enforces immutable opaque keys, byte caps and tenant ownership fields", async () => {

@@ -1,5 +1,5 @@
 -- CABO owner-scoped lexical retrieval foundation.
--- Dependency: 20261021_material_reading and 20261109_r2_staging_budget (both earlier in ORDER).
+-- Dependency: 20261021_material_reading and 20261109_object_staging_budget (both earlier in ORDER).
 -- Additive. Applied in ORDER by render-start.sh, inside the runner's own checksummed transaction.
 CREATE TABLE IF NOT EXISTS cabo_material_chunks (
   id bigserial PRIMARY KEY,
