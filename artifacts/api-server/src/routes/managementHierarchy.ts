@@ -85,10 +85,10 @@ router.post("/organizations/:orgId/hierarchy/grants",async(req,res)=>{
  if(!ctx.owned&&actorRank<=leadershipRanks[payload.data.role]){res.sendStatus(403);return}
  if(["parent","learner"].includes(payload.data.role)){res.status(400).json({error:"Learner and parent relationships use separate, consent-aware workflows"});return}
  const [person]=await db.select({id:usersTable.id}).from(usersTable).where(eq(usersTable.email,payload.data.email)).limit(1);
- if(!person){res.status(404).json({error:"The account must be registered first"});return}
- const [membership]=await db.select({role:organizationMembersTable.role}).from(organizationMembersTable)
-  .where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,person.id))).limit(1);
- if(!membership){res.status(409).json({error:"Add the user as an organisation member before assigning responsibility"});return}
+ // Same response for "no account" and "not a member": no account-existence oracle.
+ const [membership]=person?await db.select({role:organizationMembersTable.role}).from(organizationMembersTable)
+  .where(and(eq(organizationMembersTable.organizationId,org.data),eq(organizationMembersTable.userId,person.id))).limit(1):[];
+ if(!person||!membership){res.status(409).json({error:"Add the user as an organisation member before assigning responsibility"});return}
  const [existing]=await db.select({id:managementRoleGrantsTable.id}).from(managementRoleGrantsTable)
   .where(and(eq(managementRoleGrantsTable.unitId,unit.id),eq(managementRoleGrantsTable.userId,person.id),eq(managementRoleGrantsTable.role,payload.data.role))).limit(1);
  if(existing){res.status(409).json({error:"That assignment already exists"});return}

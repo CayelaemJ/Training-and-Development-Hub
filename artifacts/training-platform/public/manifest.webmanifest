@@ -46,6 +46,45 @@
     {
       "name": "Learner Success Loop",
       "url": "/learner-success"
+    },
+    {
+      "name": "Class chat",
+      "short_name": "Chat",
+      "url": "/class-chat",
+      "description": "Talk about your subjects with your class and teachers",
+      "icons": [
+        {
+          "src": "/icons/cabo-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Raise a concern",
+      "short_name": "Concern",
+      "url": "/accountability",
+      "description": "Tell the school about a worry; a named person responds",
+      "icons": [
+        {
+          "src": "/icons/cabo-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "My profile and look",
+      "short_name": "Profile",
+      "url": "/me",
+      "description": "Change your theme, text size and accessibility settings",
+      "icons": [
+        {
+          "src": "/icons/cabo-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }

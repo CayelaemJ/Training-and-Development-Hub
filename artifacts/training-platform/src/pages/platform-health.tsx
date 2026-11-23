@@ -83,7 +83,7 @@ export default function PlatformHealthPage() {
     {stateLabels[state]}
   </span>;
 
-  return <main className="mx-auto max-w-7xl space-y-6 pb-12">
+  return <div className="mx-auto max-w-7xl space-y-6 pb-12">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="space-y-2"><p className="text-xs uppercase tracking-widest text-muted-foreground">Superadmin · operational monitoring</p><h1 className="font-display text-3xl sm:text-4xl">Platform health</h1><p className="max-w-3xl text-sm text-muted-foreground">Live service checks, privacy-safe client activity, AI reliability and recorded cost estimates. Refreshes every 30 seconds while this page is open.</p></div>
       <div className="flex items-center gap-3"><span className="text-xs text-muted-foreground">{health ? `Checked ${new Date(health.observedAt).toLocaleTimeString()}` : "Waiting for first check"}</span><button type="button" onClick={() => { setLoading(true); void refresh(); }} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"><RefreshCw size={15} /> Refresh</button></div>
@@ -146,5 +146,5 @@ export default function PlatformHealthPage() {
 
       <p className="text-xs text-muted-foreground">Operational data refreshes while this page is open. Client activity means a recent successful or failed API response from that app build, not an automated native UI test. Native UI/build checks remain in CI.</p>
     </>}
-  </main>;
+  </div>;
 }

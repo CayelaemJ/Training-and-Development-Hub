@@ -4,6 +4,7 @@ import {
   guardianRelationshipsTable, guardianVerificationEventsTable,
   verifiedEnrollmentsTable, learnerSupportTicketsTable,
   courseEnrollmentsTable, courseStaffAssignmentsTable, organizationMembersTable,
+  academicGradesTable, academicAssessmentsTable,
 } from "@workspace/db";
 import { isNotificationEligible, type NotificationKind, type NoticeSource } from "./notificationEligibility";
 
@@ -28,7 +29,7 @@ export async function currentNoticeAuthorization(input:AuthorizationRequest):Pro
     sourceId:notificationEventSourcesTable.sourceId,
   }).from(notificationEventSourcesTable)
     .where(eq(notificationEventSourcesTable.eventId,input.eventId)).limit(1);
-  if(!source || !["support_ticket","guardian_relationship"].includes(source.sourceKind)) return false;
+  if(!source || !["support_ticket","guardian_relationship","academic_grade"].includes(source.sourceKind)) return false;
   const typed:NoticeSource={kind:source.sourceKind as NoticeSource["kind"],id:source.sourceId};
   return currentSourceAuthorization(input,typed);
 }
@@ -125,6 +126,39 @@ export async function currentSourceAuthorization(input:AuthorizationRequest,type
     return isNotificationEligible({
       ...base,activeEnrollment:true,staffMemberRole:member[0]?.role??null,
       assignedCourse:!!assignment.length,
+    });
+  }
+  if(typed.kind==="academic_grade" && input.kind==="results_published") {
+    // The grade must still be published, belong to this school, and be for a
+    // child the recipient is currently a school-verified guardian of.
+    const [grade]=await db.select({
+      learnerId:academicGradesTable.learnerId,status:academicGradesTable.status,
+    }).from(academicGradesTable)
+      .innerJoin(academicAssessmentsTable,eq(academicAssessmentsTable.id,academicGradesTable.assessmentId))
+      .where(and(eq(academicGradesTable.id,typed.id),eq(academicAssessmentsTable.organizationId,org))).limit(1);
+    if(!grade)return false;
+    const [relationship]=await db.select({id:guardianRelationshipsTable.id,status:guardianRelationshipsTable.status})
+      .from(guardianRelationshipsTable).where(and(
+        eq(guardianRelationshipsTable.guardianId,input.recipientUserId),
+        eq(guardianRelationshipsTable.learnerId,grade.learnerId),
+        eq(guardianRelationshipsTable.status,"verified"),
+      )).limit(1);
+    if(!relationship)return false;
+    const [enrollment,latest]=await Promise.all([
+      db.select({id:verifiedEnrollmentsTable.id}).from(verifiedEnrollmentsTable).where(and(
+        eq(verifiedEnrollmentsTable.organizationId,org),
+        eq(verifiedEnrollmentsTable.learnerId,grade.learnerId),
+        eq(verifiedEnrollmentsTable.status,"active"),
+      )).limit(1),
+      db.select({decision:guardianVerificationEventsTable.decision})
+        .from(guardianVerificationEventsTable).where(and(
+          eq(guardianVerificationEventsTable.organizationId,org),
+          eq(guardianVerificationEventsTable.relationshipId,relationship.id),
+        )).orderBy(desc(guardianVerificationEventsTable.createdAt),desc(guardianVerificationEventsTable.id)).limit(1),
+    ]);
+    return isNotificationEligible({
+      ...base,activeEnrollment:!!enrollment.length,gradePublished:grade.status==="published",
+      verifiedGuardianRelationship:true,latestGuardianDecision:latest[0]?.decision??null,
     });
   }
   // Security notifications require IdP-signed source evidence, not ticket fallback.

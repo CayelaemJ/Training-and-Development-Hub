@@ -1,10 +1,11 @@
 /**
- * Explicit, ONE-record operational dispatch. Never scheduled automatically.
- * Intentionally cannot send until a trustworthy recipient/guardian consent
- * authorizer is wired. Inspects/quarantines expired leases only, when opted in.
+ * Explicit, ONE-record operational dispatch. Each send is re-authorized by
+ * currentNoticeAuthorization (live recipient, school, consent and source).
+ * Automatic delivery is the separate, opt-in lib/outboxDispatcher.ts.
  */
 import { pool } from "@workspace/db";
 import { processOneApprovedNotice, quarantineExpiredLeases } from "../lib/notificationOutbox";
+import { currentNoticeAuthorization } from "../lib/currentNotificationAuthorization";
 
 async function main() {
   if(process.env.CABO_NOTIFICATION_OUTBOX_ENABLED!=="true" ||
@@ -12,8 +13,8 @@ async function main() {
     throw new Error("Notification outbox worker is not approved");
   }
   const quarantined=await quarantineExpiredLeases();
-  // No trusted recipient/guardian authorizer has been wired yet: dispatch stays disabled.
-  const status=await processOneApprovedNotice(undefined);
+  // Every send re-checks recipient, school, guardian consent and source now.
+  const status=await processOneApprovedNotice(currentNoticeAuthorization);
   // Only counts and bounded statuses: never print addresses or event IDs.
   process.stdout.write(JSON.stringify({status,quarantined,mode:"manual-single-delivery"})+"\n");
 }

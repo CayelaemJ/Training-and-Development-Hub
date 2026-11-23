@@ -1,0 +1,89 @@
+name: CABO native Android release candidate (manual)
+# Manual only: produces a release-type APK and AAB. Signs them only when the
+# owner has configured all four signing secrets; otherwise the outputs are
+# UNSIGNED, labelled as such, and must not be distributed.
+# Publishing to Google Play is NOT part of this workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Play version code (positive integer, must increase every upload)"
+        required: true
+      version_name:
+        description: "Version name, e.g. 0.2.0 or 0.2.0-rc.1"
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: native-android-release
+  cancel-in-progress: false
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+        with:
+          gradle-version: "8.11.1"
+          cache-read-only: true
+      - name: Verify official Gradle wrapper JAR
+        run: echo "2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046  native-apps/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum --check --status
+      - name: Prepare signing key from secrets (if configured)
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.CABO_ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.CABO_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.CABO_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.CABO_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          present=0
+          for v in "$KEYSTORE_B64" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"; do [ -n "$v" ] && present=$((present+1)); done
+          if [ "$present" -eq 0 ]; then echo "signed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$present" -ne 4 ]; then echo "::error::Configure all four Android signing secrets or none."; exit 1; fi
+          keystore="$RUNNER_TEMP/cabo-release.jks"
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$keystore"
+          {
+            echo "CABO_ANDROID_KEYSTORE_PATH=$keystore"
+            echo "CABO_ANDROID_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "CABO_ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "CABO_ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+      - name: Build release APK and AAB
+        working-directory: native-apps/android
+        env:
+          VERSION_CODE: ${{ inputs.version_code }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          # Inputs are validated again by app/build.gradle.kts.
+          [[ "$VERSION_CODE" =~ ^[0-9]{1,10}$ ]] || { echo "::error::Invalid version code"; exit 1; }
+          [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "::error::Invalid version name"; exit 1; }
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace \
+            -PcaboVersionCode="$VERSION_CODE" -PcaboVersionName="$VERSION_NAME"
+          mkdir -p app/build/ci-artifacts
+          label=$([ "$SIGNED" = "true" ] && echo signed || echo UNSIGNED-do-not-distribute)
+          cp app/build/outputs/apk/release/*.apk "app/build/ci-artifacts/cabo-android-$VERSION_NAME-$label.apk"
+          cp app/build/outputs/bundle/release/*.aab "app/build/ci-artifacts/cabo-android-$VERSION_NAME-$label.aab"
+          (cd app/build/ci-artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Remove signing key from runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cabo-release.jks"
+      - name: Upload release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: CABO-native-Android-RELEASE-${{ steps.signing.outputs.signed == 'true' && 'signed' || 'UNSIGNED' }}
+          path: native-apps/android/app/build/ci-artifacts/
+          retention-days: 7
+          if-no-files-found: error
+# A signed artifact from this workflow is a release CANDIDATE only. It still
+# needs physical-device acceptance, store listing, data-safety declarations and
+# owner approval before any distribution.

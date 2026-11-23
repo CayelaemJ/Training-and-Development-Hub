@@ -41,6 +41,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val api by lazy { NativeApi(this) }
     private var demoActive by mutableStateOf(false)
+    /** Section asked for by a shortcut or voice assistant; consumed by NativeHome. */
+    private var requestedSection by mutableStateOf<String?>(null)
     private var demoRole by mutableStateOf("learner")
     private var status by mutableStateOf("CABO native Android preview")
     private var testUsername by mutableStateOf("cabo_test")
@@ -365,6 +367,8 @@ class MainActivity : ComponentActivity() {
                         next = { readNextPage() }, close = { closeStudy() }
                     )
                     else -> NativeHome(
+                        requestedSection = requestedSection,
+                        consumeRequestedSection = { requestedSection = null },
                         status = status, busy = busy, data = screen?.copy(supportDrafts = supportDrafts),
                         signIn = { startSignIn() },
                         refresh = { if (demoActive) switchDemoRole(demoRole) else loadDashboard() },
@@ -442,7 +446,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (intent.data?.scheme == "cabo-learninghub-android") handleCallback(intent)
+        requestedSection = shortcutSection(intent)
+        if (intent.data?.scheme == "cabo-learninghub-android" && intent.data?.host == "auth") handleCallback(intent)
         else if (api.hasSession()) loadDashboard()
         else status = "Sign in to load your private CABO dashboard"
     }
@@ -451,7 +456,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.data?.scheme == "cabo-learninghub-android") handleCallback(intent)
+        shortcutSection(intent)?.let { requestedSection = it }
+        if (intent.data?.scheme == "cabo-learninghub-android" && intent.data?.host == "auth") handleCallback(intent)
     }
 
     private fun startSignIn() {
@@ -1473,6 +1479,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun NativeHome(
+    requestedSection: String? = null,
+    consumeRequestedSection: () -> Unit = {},
     status: String,
     busy: Boolean,
     data: NativeLearning?,
@@ -1524,6 +1532,9 @@ internal fun NativeHome(
     openSchoolProgression: (Int, String) -> Unit = { _, _ -> }
 ) {
     var section by remember(demoRole) { mutableStateOf("home") }
+    androidx.compose.runtime.LaunchedEffect(requestedSection) {
+        if (requestedSection != null) { section = requestedSection; consumeRequestedSection() }
+    }
     val sections = listOf(
         Triple("home", "Home", Icons.Default.Home),
         Triple("learn", "Learn", Icons.Default.School),
@@ -2751,3 +2762,15 @@ private fun NativeCard(title: String, subtitle: String) {
     }
 }
 
+/** Map a shortcut or assistant deep link to an app section; anything else is ignored. */
+internal fun shortcutSection(intent: Intent?): String? {
+    val data = intent?.data ?: return null
+    if (data.scheme != "cabo-learninghub-android" || data.host != "open") return null
+    return when (data.lastPathSegment?.lowercase()?.trim()) {
+        "learn", "study", "materials", "practice tests", "quizzes" -> "learn"
+        "progress", "results", "marks", "report" -> "progress"
+        "support", "help", "family", "teacher" -> "support"
+        "home" -> "home"
+        else -> null
+    }
+}
