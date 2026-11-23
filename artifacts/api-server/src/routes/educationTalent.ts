@@ -28,7 +28,10 @@ router.get("/organizations/:orgId/attendance/me",async(req,res)=>{
  res.json({organizationId:org.data,attendance:rows});
 });
 
-router.get("/school/attendance/me",async(req,res)=>{const u=who(req,res);if(!u)return;res.setHeader("Cache-Control","no-store");res.json(await db.select().from(schoolAttendanceTable).where(eq(schoolAttendanceTable.learnerId,u)).orderBy(desc(schoolAttendanceTable.day)).limit(180))});
+// Legacy all-schools view used by the web school-operations page. Projects only
+// what a learner needs: staff notes and the recorder's identity stay private
+// (same rule as the scoped endpoint above; docs/legal/ZA_BW_SCOPED_ATTENDANCE.md).
+router.get("/school/attendance/me",async(req,res)=>{const u=who(req,res);if(!u)return;res.setHeader("Cache-Control","private, no-store");res.json(await db.select({id:schoolAttendanceTable.id,organizationId:schoolAttendanceTable.organizationId,day:schoolAttendanceTable.day,status:schoolAttendanceTable.status}).from(schoolAttendanceTable).where(eq(schoolAttendanceTable.learnerId,u)).orderBy(desc(schoolAttendanceTable.day)).limit(180))});
 router.post("/organizations/:orgId/attendance",async(req,res)=>{
  const u=who(req,res);if(!u)return;const org=pos.safeParse(req.params.orgId),body=z.object({learnerId:z.string().min(1),day:z.iso.date(),status:z.enum(["present","absent","late","excused"]),note:z.string().max(1000).default("")}).safeParse(req.body);
  if(!org.success||!body.success){res.sendStatus(400);return}if(!["owner","admin"].includes((await role(org.data,u))??"")){res.sendStatus(403);return}

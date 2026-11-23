@@ -10,7 +10,7 @@ import {getSession,getSessionId} from "../lib/auth";
 import {canConfirmEmailPreference,isPreferenceKindAllowed,type PreferenceKind,type PreferenceActor} from "../lib/preferenceConsentPolicy";
 
 const router:IRouter=Router();
-const kindSchema=z.enum(["guardian_review_requested","learner_support_updated"]);
+const kindSchema=z.enum(["guardian_review_requested","learner_support_updated","results_published"]);
 const positive=z.coerce.number().int().positive();
 
 /** Never derive school permission from a browser-supplied role or organization ID. */
@@ -67,6 +67,7 @@ async function availableSchools(userId:string) {
      for(const r of relationships)for(const e of enrollments){
        if(e.learnerId===r.learnerId&&latest.get(r.id+":"+e.organizationId)==="verified"){
          add(e.organizationId,"guardian_review_requested");
+         add(e.organizationId,"results_published");
        }
      }
    }
@@ -102,10 +103,10 @@ router.get("/notifications/preferences",async(req,res)=>{
        enabled:!!current?.optedIn && !!current.confirmedAt && current.revokedAt===null};
    }),
  }));
- const former=new Map<number,Array<{kind:"guardian_review_requested"|"learner_support_updated";enabled:boolean;canEnable:boolean}>>();
+ const former=new Map<number,Array<{kind:PreferenceKind;enabled:boolean;canEnable:boolean}>>();
  for(const p of prefs){
    if(!p.optedIn||!p.confirmedAt||p.revokedAt!==null)continue;
-   if(p.kind!=="guardian_review_requested"&&p.kind!=="learner_support_updated")continue;
+   if(p.kind!=="guardian_review_requested"&&p.kind!=="learner_support_updated"&&p.kind!=="results_published")continue;
    if(available.get(p.organizationId)?.has(p.kind))continue;
    const choices=former.get(p.organizationId)??[];
    choices.push({kind:p.kind,enabled:true,canEnable:false});
@@ -156,7 +157,7 @@ router.patch("/notifications/preferences/:orgId/:kind",async(req,res)=>{
  const sessionId=getSessionId(req),session=sessionId?await getSession(sessionId):null;
  const [account]=await db.select({email:usersTable.email}).from(usersTable)
    .where(eq(usersTable.id,userId)).limit(1);
- const actor:PreferenceActor=kind.data==="guardian_review_requested"?"verified_guardian":"assigned_educator";
+ const actor:PreferenceActor=kind.data==="learner_support_updated"?"assigned_educator":"verified_guardian";
  if(!session||session.user.id!==userId||
     !canConfirmEmailPreference({
       accountEmail:account?.email??null,verifiedSessionEmail:session.verified_email,

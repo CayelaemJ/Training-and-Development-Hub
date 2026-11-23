@@ -1,5 +1,7 @@
 # CABO Learning Hub execution checkpoint
 
+> **2026-11-22:** newer session state is in `docs/engineering/CLAUDE_EXECUTION_STATE.md` (P0 organization-consent fix on branch `fix/org-member-consent-invitations-20261122`). This file remains the record of the 2026-10-28 Render/Neon staging state, which was not re-verified.
+
 ## Current checkpoint — 28 October 2026
 
 This section supersedes the historical audit snapshots below.

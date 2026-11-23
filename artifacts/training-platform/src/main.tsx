@@ -5,6 +5,10 @@ import { InstallApp, InstallAppProvider } from './components/install-app';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
+import { applyAppearance, cachedAppearance } from './lib/appearance';
+
+// Apply the saved look before the first paint so the app does not flash.
+applyAppearance(cachedAppearance());
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
