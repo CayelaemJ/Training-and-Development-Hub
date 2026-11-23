@@ -38,7 +38,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/CABODerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             build
-      - name: Run native progression review regression tests
+      - name: Run native iOS unit tests (progression, tutor contract, account isolation)
         working-directory: native-apps/ios
         shell: bash
         run: |
