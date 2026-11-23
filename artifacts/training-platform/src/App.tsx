@@ -41,6 +41,11 @@ import PrivacyRightsPage from '@/pages/privacy-rights';
 import MyProfilePage from '@/pages/my-profile';
 import AiCreditsPage from '@/pages/ai-credits';
 import AccessibilityPage from '@/pages/accessibility';
+import TourPage from '@/pages/tour';
+import { QuickJump } from '@/components/quick-jump';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Celebrate } from '@/components/celebrate';
+import { Compass } from 'lucide-react';
 import { Avatar } from '@/components/avatar';
 import { ReadAloud, VoiceInput } from '@/components/speech';
 import { applyAppearance, DEFAULT_APPEARANCE, type Appearance } from '@/lib/appearance';
@@ -64,7 +69,7 @@ const queryClient = new QueryClient();
 
 type PortalKind='superadmin'|'national_director'|'provincial_director'|'district_director'|'group_executive'|'governing_body_chair'|'headmaster'|'deputy_headmaster'|'department_head'|'grade_head'|'teacher'|'assessor'|'administrator'|'parent'|'learner';
 // Every signed-in person can raise a concern and see which privacy rules apply.
-const alwaysNav=['/me','/notification-preferences','/accountability','/privacy','/ai-credits','/accessibility'];
+const alwaysNav=['/tour','/me','/notification-preferences','/accountability','/privacy','/ai-credits','/accessibility'];
 const allowedNav:Record<PortalKind,string[]>={
  superadmin:['/admissions','/class-chat','/','/learner-success','/education-command','/question-bank','/school-intelligence','/report-issuance','/guardian-connect','/education-reports','/cabo-apply','/school-progression','/institution-setup','/school-stages','/hub-modules','/school-operations','/career-passport','/sports-development','/development-plan','/platform-admin','/platform-health','/study-overview','/organizations','/academics','/governance','/institution-records','/materials','/quizzes','/written-exams','/potential','/learner-journey'],
  national_director:['/','/education-command','/organizations','/governance'],
@@ -84,6 +89,7 @@ const allowedNav:Record<PortalKind,string[]>={
 };
 const navItems = [
   { href: '/my-ai', label: 'My CABO AI profile', icon: BrainCircuit },
+  { href: '/tour', label: 'Tour CABO', icon: Compass },
   { href: '/learner-success', label: 'Learner Success Loop', icon: Target },
   { href: '/', label: 'My role dashboard', icon: LayoutDashboard },
   { href: '/hub-modules', label: 'Institution hub', icon: GraduationCap },
@@ -169,6 +175,7 @@ function Router() {
     <Route path="/me" component={MyProfilePage} />
     <Route path="/ai-credits" component={AiCreditsPage} />
     <Route path="/accessibility" component={AccessibilityPage} />
+    <Route path="/tour" component={TourPage} />
     <Route path="/school-stages" component={SchoolStagesPage} />
     <Route path="/institution-setup" component={InstitutionSetupPage} />
     <Route path="/school-progression" component={SchoolProgressionPage} />
@@ -220,10 +227,11 @@ function AppShell({ user }: { user: any }) {
   useEffect(()=>setMobileMenuOpen(false),[location]);
   const [portalRole,setPortalRole] = useState<PortalKind|null>(null);
   useEffect(()=>{let live=true;fetch('/api/portal/me',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(live)setPortalRole(d.role as PortalKind)}).catch(()=>{if(live)setPortalRole('learner')});return()=>{live=false}},[]);
-  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/admissions' ? 'Admissions & transfers' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
+  const title = location.startsWith('/materials/') ? 'Build a practice test' : location === '/materials' ? 'Study materials' : location === '/quizzes' ? 'Practice tests' : location === '/written-exams' ? 'Written examinations' : location === '/my-ai' ? 'My CABO AI profile' : location === '/development-plan' ? 'My development plan' : location === '/sports-development' ? 'Sports & activities' : location === '/organizations' ? 'Organizations' : location === '/academics' ? 'Academics' : location === '/potential' ? 'My potential' : location === '/learner-journey' ? 'My journey' : location === '/notification-preferences' ? 'Notification preferences' : location === '/platform-admin' ? 'Platform administration' : location === '/platform-health' ? 'Platform health' : location === '/admissions' ? 'Admissions & transfers' : location === '/institution-records' ? 'Institutions' : location === '/governance' ? 'Governance' : location === '/tour' ? 'Tour CABO' : location.startsWith('/quiz/') ? 'Your practice session' : 'Your study space';
   const initials = `${user?.firstName?.[0] ?? user?.email?.[0] ?? 'S'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   const [me,setMe] = useState<{profile:{initials:string;name:string;avatarStyle:'initials'|'pattern'|'photo';avatarColor:Appearance['accent']};appearance:Appearance;photo:{status:string;url:string}|null}|null>(null);
   useEffect(()=>{let live=true;fetch('/api/me/profile',{credentials:'include',cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(!live||!d?.profile||!d?.appearance)return;setMe(d);applyAppearance({...DEFAULT_APPEARANCE,...d.appearance});}).catch(()=>undefined);return()=>{live=false};},[location==='/me']);
+  const firstName = (me?.profile.name || user?.firstName || '').split(' ')[0];
   const pinned = me?.appearance?.pinned ?? [];
   const orderedNav = [...navItems].sort((a,b)=>{const ia=pinned.indexOf(a.href),ib=pinned.indexOf(b.href);return (ia<0?99:ia)-(ib<0?99:ib);});
   return <div className="app-frame">
@@ -251,7 +259,9 @@ function AppShell({ user }: { user: any }) {
         <Link href="/" className="topbar-cabo-identity" aria-label="CABO Solutions Training and Development Hub home"><Mark /><span>Training &amp; Development Hub</span></Link>
         <div className="crumb"><span>Workspace</span><ChevronRight size={14} /><strong>{title}</strong></div>
         <div className="topbar-right">
-          <span className="quiet-status"><span className="status-dot" /> Your workspace</span>
+          {portalRole && <QuickJump items={navItems.filter(item=>alwaysNav.includes(item.href)||allowedNav[portalRole]?.includes(item.href)).map(({href,label})=>({href,label}))} />}
+          <span className="quiet-status greeting"><span className="status-dot" /> {greeting()}{firstName ? `, ${firstName}` : ''}</span>
+          <ThemeToggle appearance={me?.appearance ?? null} />
           <div className="avatar avatar-small">{initials}</div>
           <button type="button" className="topbar-signout" disabled={signingOut} onClick={signOut} aria-label="Sign out" data-testid="button-mobile-logout">
             <LogOut size={17} aria-hidden="true" /><span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
@@ -282,6 +292,8 @@ function AppShell({ user }: { user: any }) {
     </div>
   </div>;
 }
+
+function greeting(now = new Date()) { const h = now.getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
 
 function Mark() { return <img className="cabo-logo" src="/cabo-wordmark.svg" alt="CABO Solutions" width={140} height={47} />; }
 
@@ -574,6 +586,7 @@ function QuizReview({ quiz, result, onRetry }: { quiz: QuizDetail; result: QuizA
   const correct = result.correctCount;
   const scoreLabel = result.percentage >= 85 ? 'Strong recall' : result.percentage >= 60 ? 'Good progress' : 'A useful first pass';
   return <div className="review-page page-enter">
+    <Celebrate when={result.percentage >= 80} />
     <Link href="/quizzes" className="back-link"><ArrowLeft size={16} /> All practice tests</Link>
     <section className="result-hero"><div className="result-orbit"><div className="result-score"><strong>{Math.round(result.percentage)}<small>%</small></strong><span>YOUR SCORE</span></div></div><div className="result-copy"><p className="eyebrow">SESSION COMPLETE</p><h1 className="font-display">{scoreLabel}.</h1><p>You got <strong>{correct} of {result.totalQuestions}</strong> questions right on <strong>{quiz.title}</strong>.</p><span className="result-date"><Clock3 size={14} /> Completed {format(new Date(result.completedAt), 'MMM d, yyyy · h:mm a')}</span><div className="result-actions"><button onClick={onRetry} className="button button-primary" data-testid="button-retry-quiz"><RotateCcw size={16} /> Try again</button><Link href="/quizzes" className="button button-outline">Back to tests <ArrowRight size={15} /></Link></div></div></section>
     <section className="review-list"><div className="section-head review-list-heading"><div><p className="eyebrow">LEARN FROM THE ANSWERS</p><h2 className="font-display">Question review</h2></div><span className="review-count">{result.totalQuestions} questions</span></div>
