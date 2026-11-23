@@ -11,7 +11,7 @@
     "test:support": "node ../../scripts/test-learner-support.mjs"
   },
   "dependencies": {
-    "@google-cloud/storage": "^8.2.0",
+    "@google-cloud/storage": "^9.0.0",
     "@napi-rs/canvas": "0.1.80",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
