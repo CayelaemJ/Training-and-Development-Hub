@@ -1,29 +1,85 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, BrainCircuit, CheckCircle2, Coins, LoaderCircle, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import {
+  ArrowRight, BrainCircuit, CheckCircle2, Coins, ExternalLink,
+  LoaderCircle, PartyPopper, Sparkles, TrendingUp, Zap,
+} from "lucide-react";
 import { api } from "@/lib/schoolApi";
 
 // /ai-credits — shows the learner/educator their current AI credit balance,
 // monthly allowance, available top-up packs, and recent ledger entries.
-// All numbers come from GET /api/ai-credits/me.
+// Checkout wires to POST /api/ai-credits/checkout (Paystack hosted page).
+// Demo top-up wires to POST /api/ai-credits/demo-topup when demoTopUpAvailable.
 
-type Plan = { name: string; monthlyAllowance: number; price: string };
-type Pack = { name: string; credits: number; price: string };
-type OperationCost = { [operation: string]: number };
-type LedgerEntry = { kind: "allowance" | "topup" | "charge"; delta: number; operation: string | null; createdAt: string };
+// ---- Types matching the API response from GET /api/ai-credits/me ----
 
-type BalanceData = {
-  balance: { allowanceRemaining: number; topupRemaining: number; total: number };
-  subscription: { plan: string; status: string; currentPeriodEnd: string | null } | null;
-  plans: Plan[];
-  packs: Pack[];
-  costs: OperationCost;
-  enforced: boolean;
-  recentLedger: LedgerEntry[];
+type ApiBalance = {
+  plan: string;
+  allowance: number;
+  usedThisMonth: number;
+  allowanceLeft: number;
+  topUpLeft: number;
+  total: number;
 };
+
+type ApiPlan = {
+  code: string;
+  label: string;
+  monthlyCredits: number;
+  description: string;
+  price: { ZAR: number | null; BWP: number | null };
+};
+
+type ApiPack = {
+  code: string;
+  label: string;
+  credits: number;
+  price: { ZAR: number | null; BWP: number | null };
+};
+
+type ApiSubscription = {
+  plan: string;
+  status: string;
+  currentPeriodEnd: string | null;
+} | null;
+
+type LedgerEntry = {
+  kind: string;
+  delta: number;
+  operation: string | null;
+  createdAt: string;
+};
+
+type MeData = {
+  balance: ApiBalance;
+  subscription: ApiSubscription;
+  enforced: boolean;
+  plans: ApiPlan[];
+  packs: ApiPack[];
+  costs: Record<string, number>;
+  paymentsAvailable: boolean;
+  demoTopUpAvailable: boolean;
+  recent: LedgerEntry[];
+};
+
+// ---- Helpers ----
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
+
+function formatPrice(price: { ZAR: number | null; BWP: number | null }): string {
+  if (price.ZAR !== null) return `R ${(price.ZAR / 100).toFixed(2)} / mo`;
+  if (price.BWP !== null) return `P ${(price.BWP / 100).toFixed(2)} / mo`;
+  return "Contact CABO";
+}
+
+function formatPackPrice(price: { ZAR: number | null; BWP: number | null }): string {
+  if (price.ZAR !== null) return `R ${(price.ZAR / 100).toFixed(2)}`;
+  if (price.BWP !== null) return `P ${(price.BWP / 100).toFixed(2)}`;
+  return "Contact CABO";
+}
+
+// ---- Sub-components ----
 
 function BalanceRing({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.min(1, used / total) : 0;
@@ -67,18 +123,30 @@ function PlanBadge({ plan, status }: { plan: string; status: string }) {
   );
 }
 
+const opLabels: Record<string, string> = {
+  material_qa: "Study material Q&A",
+  learner_support: "AI learner support",
+  passport_reflection: "Career passport reflection",
+  quiz: "Practice quiz",
+  written_exam: "Written exam",
+  development_plan: "Development plan",
+  grading: "Essay grading",
+};
+
+const kindLabel: Record<string, string> = {
+  allowance: "Monthly allowance",
+  grant: "Credits granted",
+  purchase: "Top-up purchased",
+  charge: "AI usage",
+};
+
 function LedgerRow({ entry }: { entry: LedgerEntry }) {
   const isCredit = entry.delta > 0;
-  const kindLabel: Record<string, string> = { allowance: "Monthly allowance", topup: "Top-up credited", charge: "AI usage" };
-  const opLabel: Record<string, string> = {
-    quiz: "Practice quiz", written_exam: "Written exam", development_plan: "Development plan",
-    grading: "Grading", learner_support: "Learner support", material_qa: "Study material QA",
-  };
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
       <div>
         <p className="text-sm font-medium">{kindLabel[entry.kind] ?? entry.kind}</p>
-        {entry.operation && <p className="text-xs text-muted-foreground">{opLabel[entry.operation] ?? entry.operation}</p>}
+        {entry.operation && <p className="text-xs text-muted-foreground">{opLabels[entry.operation] ?? entry.operation}</p>}
         <p className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</p>
       </div>
       <span className={`text-sm font-semibold tabular-nums ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
@@ -88,16 +156,73 @@ function LedgerRow({ entry }: { entry: LedgerEntry }) {
   );
 }
 
+// ---- Checkout / demo-topup helpers ----
+
+type BuyState = "idle" | "loading" | "success" | "error";
+
+function useBuy(onSuccess: () => void) {
+  const [state, setState] = useState<BuyState>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const checkout = useCallback(async (productCode: string, currency: "ZAR" | "BWP") => {
+    setState("loading");
+    setErrorMsg("");
+    try {
+      const { checkoutUrl } = await api<{ checkoutUrl: string; reference: string }>(
+        "/ai-credits/checkout",
+        { method: "POST", body: { product: productCode, currency } },
+      );
+      // Redirect to Paystack hosted checkout in same tab
+      window.location.href = checkoutUrl;
+    } catch (e) {
+      setState("error");
+      setErrorMsg((e as Error).message ?? "Checkout failed. Please try again.");
+    }
+  }, []);
+
+  const demoTopUp = useCallback(async (productCode: string) => {
+    setState("loading");
+    setErrorMsg("");
+    try {
+      await api("/ai-credits/demo-topup", { method: "POST", body: { product: productCode } });
+      setState("success");
+      onSuccess();
+    } catch (e) {
+      setState("error");
+      setErrorMsg((e as Error).message ?? "Demo top-up failed.");
+    }
+  }, [onSuccess]);
+
+  return { state, errorMsg, checkout, demoTopUp };
+}
+
+// ---- Main page ----
+
 export default function AiCreditsPage() {
-  const [data, setData] = useState<BalanceData | null>(null);
-  const [error, setError] = useState("");
+  const [data, setData] = useState<MeData | null>(null);
+  const [fetchError, setFetchError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [paidBanner, setPaidBanner] = useState(false);
+  const [currency] = useState<"ZAR" | "BWP">("ZAR"); // future: detect from school country
+
+  const refresh = useCallback(() => {
+    api<MeData>("/ai-credits/me")
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setFetchError((e as Error).message); setLoading(false); });
+  }, []);
 
   useEffect(() => {
-    api<BalanceData>("/ai-credits/me")
-      .then(d => { setData(d); setLoading(false); })
-      .catch(e => { setError((e as Error).message); setLoading(false); });
-  }, []);
+    // Check if returning from a Paystack payment
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("paid") === "1") {
+      setPaidBanner(true);
+      // Remove the query param without pushing a new history entry
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    refresh();
+  }, [refresh]);
+
+  const { state: buyState, errorMsg: buyError, checkout, demoTopUp } = useBuy(refresh);
 
   if (loading) return (
     <main className="page-container" aria-busy="true">
@@ -108,31 +233,26 @@ export default function AiCreditsPage() {
     </main>
   );
 
-  if (error) return (
+  if (fetchError) return (
     <main className="page-container">
       <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-center">
         <p className="font-semibold text-destructive">Could not load AI credits</p>
-        <p className="text-sm text-muted-foreground mt-1">{error}</p>
+        <p className="text-sm text-muted-foreground mt-1">{fetchError}</p>
       </div>
     </main>
   );
 
   if (!data) return null;
 
-  const { balance, subscription, plans, packs, costs, enforced, recentLedger } = data;
-  const currentPlan = subscription?.plan ?? "free";
-  const monthlyAllowance = plans.find(p => p.name === currentPlan)?.monthlyAllowance ?? 30;
-  const used = monthlyAllowance - balance.allowanceRemaining;
+  const { balance, subscription, plans, packs, costs, enforced, paymentsAvailable, demoTopUpAvailable, recent } = data;
+  const currentPlan = balance.plan;
   const operationList = Object.entries(costs).filter(([, v]) => v > 0).map(([k, v]) => ({ key: k, cost: v }));
   const freeOps = Object.entries(costs).filter(([, v]) => v === 0).map(([k]) => k);
-
-  const opLabels: Record<string, string> = {
-    quiz: "Practice quiz", written_exam: "Written exam", development_plan: "Development plan",
-    grading: "Essay grading", learner_support: "AI learner support", material_qa: "Study material QA",
-  };
+  const isBuying = buyState === "loading";
 
   return (
     <main className="page-container space-y-8 py-6 max-w-3xl mx-auto px-4">
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="rounded-xl bg-primary/10 p-2.5">
@@ -144,25 +264,51 @@ export default function AiCreditsPage() {
         </div>
       </div>
 
+      {/* Paid confirmation banner */}
+      {paidBanner && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 px-4 py-3 flex items-center gap-3">
+          <PartyPopper size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <div className="text-sm text-emerald-800 dark:text-emerald-300">
+            <strong>Payment received!</strong> Your credits will appear below within a few seconds.{" "}
+            <button className="underline" onClick={refresh}>Refresh</button>
+          </div>
+        </div>
+      )}
+
+      {/* Dev mode banner */}
       {!enforced && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           <strong>Dev mode:</strong> AI credit enforcement is currently disabled. All AI features run without consuming credits.
         </div>
       )}
 
+      {/* Demo mode banner */}
+      {demoTopUpAvailable && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
+          <strong>Demo environment:</strong> No real payments — use the demo top-up buttons to simulate purchasing credits.
+        </div>
+      )}
+
+      {/* Buy error */}
+      {buyState === "error" && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {buyError}
+        </div>
+      )}
+
       {/* Balance card */}
       <section className="rounded-2xl border border-border bg-card p-6 flex flex-col sm:flex-row items-center gap-6" aria-labelledby="balance-heading">
-        <BalanceRing used={used} total={balance.total} />
+        <BalanceRing used={balance.usedThisMonth} total={balance.total} />
         <div className="flex-1 space-y-3 text-center sm:text-left">
-          <div className="flex items-center justify-center sm:justify-start gap-2">
+          <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
             <h2 id="balance-heading" className="text-lg font-semibold">Your balance</h2>
             <PlanBadge plan={currentPlan} status={subscription?.status ?? "active"} />
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
             <dt className="text-muted-foreground">Monthly allowance</dt>
-            <dd className="font-semibold">{balance.allowanceRemaining} left of {monthlyAllowance}</dd>
+            <dd className="font-semibold">{balance.allowanceLeft} left of {balance.allowance}</dd>
             <dt className="text-muted-foreground">Top-up credits</dt>
-            <dd className="font-semibold">{balance.topupRemaining}</dd>
+            <dd className="font-semibold">{balance.topUpLeft}</dd>
             <dt className="text-muted-foreground">Total available</dt>
             <dd className="font-semibold">{balance.total}</dd>
             {subscription?.currentPeriodEnd && (
@@ -189,7 +335,7 @@ export default function AiCreditsPage() {
         {freeOps.length > 0 && (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <CheckCircle2 size={12} className="text-emerald-500" />
-            Free: {freeOps.map(k => opLabels[k] ?? k).join(", ")}
+            Always free: {freeOps.map(k => opLabels[k] ?? k).join(", ")}
           </p>
         )}
       </section>
@@ -199,23 +345,48 @@ export default function AiCreditsPage() {
         <h2 id="plans-heading" className="font-semibold flex items-center gap-2"><TrendingUp size={16} className="text-primary" /> Subscription plans</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {plans.map(plan => {
-            const isCurrent = plan.name === currentPlan;
+            const isCurrent = plan.code === currentPlan;
+            const hasPrice = plan.price.ZAR !== null || plan.price.BWP !== null;
+            const productCode = `plan:${plan.code}` as string;
             return (
-              <div key={plan.name} className={`rounded-2xl border p-5 space-y-3 transition-all ${isCurrent ? "border-primary/60 bg-primary/5 ring-1 ring-primary/20" : "border-border bg-card"}`}>
-                <div className="flex items-center justify-between">
-                  <PlanBadge plan={plan.name} status="active" />
+              <div key={plan.code} className={`rounded-2xl border p-5 space-y-3 transition-all ${isCurrent ? "border-primary/60 bg-primary/5 ring-1 ring-primary/20" : "border-border bg-card"}`}>
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <PlanBadge plan={plan.code} status="active" />
                   {isCurrent && <span className="text-xs text-primary font-medium">Current plan</span>}
                 </div>
-                <p className="text-2xl font-bold">{plan.monthlyAllowance} <span className="text-sm font-normal text-muted-foreground">credits/month</span></p>
-                <p className="text-sm text-muted-foreground">{plan.price}</p>
-                {!isCurrent && (
-                  <button
-                    className="w-full text-sm rounded-lg bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5"
-                    onClick={() => alert("Contact your institution administrator to change your plan.")}
-                    aria-label={`Upgrade to ${plan.name} plan`}
-                  >
-                    Upgrade <ArrowRight size={14} />
-                  </button>
+                <p className="text-2xl font-bold">
+                  {plan.monthlyCredits} <span className="text-sm font-normal text-muted-foreground">credits/month</span>
+                </p>
+                <p className="text-sm text-muted-foreground">{plan.description}</p>
+                {hasPrice && !isCurrent && (
+                  <p className="text-sm font-medium">{formatPrice(plan.price)}</p>
+                )}
+                {!isCurrent && (plan.code === "free" || plan.code === "educator") ? (
+                  <p className="text-xs text-muted-foreground">Assigned automatically by your institution.</p>
+                ) : !isCurrent && (
+                  demoTopUpAvailable ? (
+                    <button
+                      disabled={isBuying}
+                      className="w-full text-sm rounded-lg bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      onClick={() => demoTopUp(productCode)}
+                      aria-label={`Demo-activate ${plan.label} plan`}
+                    >
+                      {isBuying ? <LoaderCircle size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      Activate (demo)
+                    </button>
+                  ) : paymentsAvailable ? (
+                    <button
+                      disabled={isBuying}
+                      className="w-full text-sm rounded-lg bg-primary text-primary-foreground px-3 py-2 font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      onClick={() => checkout(productCode, currency)}
+                      aria-label={`Upgrade to ${plan.label} plan`}
+                    >
+                      {isBuying ? <LoaderCircle size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                      Upgrade via Paystack
+                    </button>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Contact your institution to upgrade.</p>
+                  )
                 )}
               </div>
             );
@@ -226,39 +397,66 @@ export default function AiCreditsPage() {
       {/* Top-up packs */}
       <section className="space-y-4" aria-labelledby="packs-heading">
         <h2 id="packs-heading" className="font-semibold flex items-center gap-2"><Coins size={16} className="text-primary" /> Top-up packs</h2>
-        <p className="text-sm text-muted-foreground">Need more credits before your monthly allowance resets? Add a one-time pack.</p>
+        <p className="text-sm text-muted-foreground">Need more credits before your monthly allowance resets? Add a one-time pack. Top-up credits never expire.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {packs.map(pack => (
-            <div key={pack.name} className="rounded-2xl border border-border bg-card p-5 space-y-3 hover:border-primary/40 transition-colors">
-              <p className="font-semibold capitalize">{pack.name}</p>
-              <p className="text-2xl font-bold">{pack.credits} <span className="text-sm font-normal text-muted-foreground">credits</span></p>
-              <p className="text-sm text-muted-foreground">{pack.price}</p>
-              <button
-                className="w-full text-sm rounded-lg border border-primary text-primary px-3 py-2 font-medium hover:bg-primary/5 transition-colors"
-                onClick={() => alert("Paystack checkout coming soon. Your administrator can add credits via the billing portal.")}
-                aria-label={`Buy ${pack.name} top-up pack`}
-              >
-                Buy pack
-              </button>
-            </div>
-          ))}
+          {packs.map(pack => {
+            const productCode = `pack:${pack.code}` as string;
+            const hasPrice = pack.price.ZAR !== null || pack.price.BWP !== null;
+            return (
+              <div key={pack.code} className="rounded-2xl border border-border bg-card p-5 space-y-3 hover:border-primary/40 transition-colors">
+                <p className="font-semibold capitalize">{pack.label}</p>
+                <p className="text-2xl font-bold">{pack.credits} <span className="text-sm font-normal text-muted-foreground">credits</span></p>
+                {hasPrice && <p className="text-sm font-medium">{formatPackPrice(pack.price)}</p>}
+                {demoTopUpAvailable ? (
+                  <button
+                    disabled={isBuying}
+                    className="w-full text-sm rounded-lg border border-primary text-primary px-3 py-2 font-medium hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    onClick={() => demoTopUp(productCode)}
+                    aria-label={`Demo top-up: ${pack.label}`}
+                  >
+                    {isBuying ? <LoaderCircle size={14} className="animate-spin" /> : <Coins size={14} />}
+                    Add (demo)
+                  </button>
+                ) : paymentsAvailable ? (
+                  <button
+                    disabled={isBuying}
+                    className="w-full text-sm rounded-lg border border-primary text-primary px-3 py-2 font-medium hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    onClick={() => checkout(productCode, currency)}
+                    aria-label={`Buy ${pack.label} top-up pack`}
+                  >
+                    {isBuying ? <LoaderCircle size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                    Buy pack
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="w-full text-sm rounded-lg border border-border text-muted-foreground px-3 py-2 font-medium cursor-not-allowed"
+                    aria-label="Payments not yet configured"
+                    title="Your administrator needs to configure payments before top-ups are available."
+                  >
+                    Not available yet
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
       {/* Recent ledger */}
-      {recentLedger.length > 0 && (
+      {recent.length > 0 && (
         <section className="rounded-2xl border border-border bg-card p-6 space-y-2" aria-labelledby="ledger-heading">
           <h2 id="ledger-heading" className="font-semibold">Recent activity</h2>
           <div>
-            {recentLedger.map((entry, i) => <LedgerRow key={i} entry={entry} />)}
+            {recent.map((entry, i) => <LedgerRow key={i} entry={entry} />)}
           </div>
         </section>
       )}
 
-      {/* Footer note */}
+      {/* Footer */}
       <p className="text-xs text-muted-foreground text-center pb-4">
-        AI credits are reset at the start of each billing period. Top-up credits never expire.
-        Contact your institution administrator for plan changes.
+        Monthly allowance resets at the start of each billing period. Top-up credits never expire.
+        Contact your institution administrator for plan changes or billing support.
       </p>
     </main>
   );
