@@ -1,20 +1,19 @@
 # Android internal demo and test build
 
-The GitHub Actions workflow `.github/workflows/native-android-debug.yml` builds a debug APK when an Android app or workflow file changes.
+The [Android build workflow](../../.github/workflows/native-android-debug.yml) checks the demo APK on an Android emulator before uploading it.
 
-## Download
+## Download and install
 
-1. Open the pull request's **Checks** tab and select **CABO native Android emulator tests and debug APK**.
-2. Confirm the run is green and its commit matches the source you are testing.
-3. Download artifact `CABO-native-Android-DEMO-DEBUG-test-only` and extract `cabo-native-android-demo-debug.apk`.
+1. Open the [Android workflow](https://github.com/CayelaemJ/Training-and-Development-Hub/actions/workflows/native-android-debug.yml) and select a successful run for your branch.
+2. Open **Artifacts**, download **CABO-Android-Demo-APK**, and extract `cabo-learning-hub-demo.apk` from the ZIP.
+3. Open the extracted APK on an Android 6.0 or newer device and allow installation from that source if prompted.
+4. Launch **CABO Learning Hub Demo** from the app drawer. It opens the sample learner workspace with Child, Teacher and Parent role switching.
 
-The workflow retains this artifact for three days. Rerun the workflow from GitHub Actions when a fresh build is needed.
+The demo has its own application ID and can be installed alongside the connected CABO app. If Android reports a conflicting signature from an older **CABO Learning Hub Demo** build, uninstall that demo app and install the new APK. The artifact is retained for 14 days.
 
 ## Test limits
 
-This APK is signed with Android's generated debug key. It is not signed for Google Play and is not a production release. Its demo role switcher uses fictional records and local-only interactions; no account or backend is needed to explore it. The APK also contains a separately gated isolated test-login control, but the Render preview may require setup. Compose tests cover learning, practice, sample support handoff, parent invitation/report views, material upload and support drafts; they do not exercise live object-storage transfer, draft delivery against a real school account, push notifications, guardian authorization or physical devices. The demo represents the native child, teacher and parent flows and does not include every feature available in the web application.
-
-Use only authorised test accounts and synthetic learner records. Record the tested device model, Android version, install result, sign-in result and any reproduction steps without capturing real learner data. OS support floors in `DEVICE_INCLUSION_MATRIX.md` are proposed until device testing confirms them.
+The demo uses a generated debug key and fictional records. It opens offline and has no Internet permission. CI checks that the APK declares its icon, installs, launches, and shows the role switcher on API 23. Physical-device acceptance remains a separate check. Record device model, Android version, and any reproduction steps with synthetic data only.
 
 ## Release candidates (APK + AAB)
 

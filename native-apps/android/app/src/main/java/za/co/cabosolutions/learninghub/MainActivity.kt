@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 // Learner resources come from CABO's permission-filtered existing endpoints.
 class MainActivity : ComponentActivity() {
     private val api by lazy { NativeApi(this) }
+    private val offlineDemoBuild = BuildConfig.BUILD_TYPE == "demo"
     private var demoActive by mutableStateOf(false)
     /** Section asked for by a shortcut or voice assistant; consumed by NativeHome. */
     private var requestedSection by mutableStateOf<String?>(null)
@@ -116,6 +117,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (offlineDemoBuild) startDemo()
         setContent {
             val materialPicker = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument()
@@ -395,7 +397,7 @@ class MainActivity : ComponentActivity() {
                         startDemo = { startDemo() },
                         setDemoRole = { switchDemoRole(it) },
                         createSupportRequest = { creatingSupportRequest = true; selectedSupportDraft = null; supportFormMessage = null },
-                        testLoginAvailable = api.testLoginAvailable(),
+                        testLoginAvailable = !offlineDemoBuild && api.testLoginAvailable(),
                         testUsername = testUsername, testPassword = testPassword,
                         onTestUsername = { testUsername = it },
                         onTestPassword = { testPassword = it },
@@ -463,6 +465,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (offlineDemoBuild) return
         requestedSection = shortcutSection(intent)
         if (intent.data?.scheme == "cabo-learninghub-android" && intent.data?.host == "auth") handleCallback(intent)
         else if (api.hasSession()) loadDashboard()
@@ -472,6 +475,7 @@ class MainActivity : ComponentActivity() {
     // Called when the existing activity receives the browser handoff.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (offlineDemoBuild) return
         setIntent(intent)
         shortcutSection(intent)?.let { requestedSection = it }
         if (intent.data?.scheme == "cabo-learninghub-android" && intent.data?.host == "auth") handleCallback(intent)
@@ -1253,6 +1257,10 @@ class MainActivity : ComponentActivity() {
 
     private fun signOut() {
         if (busy) return
+        if (offlineDemoBuild) {
+            finish()
+            return
+        }
         busy = true
         lifecycleScope.launch {
             if (!demoActive) {
