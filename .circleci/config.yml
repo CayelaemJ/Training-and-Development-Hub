@@ -104,7 +104,8 @@ jobs:
       - run:
           name: Policy, isolation, migration and success-loop tests
           command: |
-            node --test artifacts/api-server/src/tests/*.test.mjs
+            mkdir -p test-results/unit
+            node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=test-results/unit/api.xml artifacts/api-server/src/tests/*.test.mjs
             node scripts/test-learner-support.mjs
             node scripts/test-uploads.mjs
             node scripts/test-passport.mjs
@@ -123,6 +124,8 @@ jobs:
             CABO_UI_SCREENSHOT=test-results/browser/learner-dna-mobile.png node scripts/run-learner-success-browser.mjs
             node scripts/run-learner-success-browser.mjs --pwa
             node scripts/run-learner-success-browser.mjs --admissions
+      - store_test_results:
+          path: test-results/unit
       - store_artifacts:
           path: test-results
   security_suite:
